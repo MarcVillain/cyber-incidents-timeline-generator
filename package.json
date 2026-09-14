@@ -1,0 +1,88 @@
+{
+  "name": "cyber-incidents-timeline-generator",
+  "version": "0.1.0",
+  "description": "Incident timeline and attack diagram generator for security teams. Zero runtime dependencies, pluggable storage, runs in any browser.",
+  "license": "Apache-2.0",
+  "author": "Marc Villain",
+  "homepage": "https://github.com/MarcVillain/cyber-incidents-timeline-generator#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MarcVillain/cyber-incidents-timeline-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MarcVillain/cyber-incidents-timeline-generator/issues"
+  },
+  "type": "module",
+  "keywords": [
+    "incident-response",
+    "timeline",
+    "mitre-attack",
+    "kill-chain",
+    "diamond-model",
+    "dfir",
+    "svg"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./styles.css": "./styles/timeline.css",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "cyber-incidents-timeline-generator": "./dist/server/cli.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "docs",
+    "!docs/images",
+    "app",
+    "styles",
+    "schema",
+    "licenses",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "QUICKSTART.md",
+    "INSTALL.md",
+    "CONNECTORS.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --disable-warning=ExperimentalWarning --test \".test-build/tests/**/*.test.js\"",
+    "icons": "node scripts/build-icons.mjs",
+    "start": "npm run build && node --disable-warning=ExperimentalWarning dist/server/cli.js --seed",
+    "clean": "node scripts/clean.mjs",
+    "prepublishOnly": "npm run typecheck && npm test",
+    "prepack": "npm run clean && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "linkedom": "0.18.13",
+    "lucide-static": "1.45.0",
+    "typescript": "7.0.2"
+  }
+}

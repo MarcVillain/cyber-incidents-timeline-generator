@@ -1,0 +1,1101 @@
+/*
+ * Timeline generator workspace.
+ *
+ * Every colour comes from a --tlg-* custom property declared on .tlg (the workspace) and .tlg-app (the incident
+ * app around it), so a host restyles both, and the diagrams they draw, by overriding those, and exports follow.
+ * data-tlg-theme is set to light or dark by script, following the page when the theme is automatic. Nothing
+ * here depends on a CSS framework, and nothing reaches outside those two roots.
+ */
+
+.tlg,
+.tlg-app {
+    --tlg-side-unknown: #6b7280;
+    --tlg-side-attacker: #c62828;
+    --tlg-side-victim: #e65100;
+    --tlg-side-defender: #1565c0;
+    --tlg-side-third-party: #7b1fa2;
+    --tlg-surface-unknown: #f3f4f6;
+    --tlg-surface-attacker: #fdecea;
+    --tlg-surface-victim: #fff3e0;
+    --tlg-surface-defender: #e8f1fb;
+    --tlg-impact-unknown: #6b7280;
+    --tlg-impact-none: #a3a9b3;
+    --tlg-impact-low: #1565c0;
+    --tlg-impact-medium: #b7791f;
+    --tlg-impact-high: #e65100;
+    --tlg-impact-critical: #c62828;
+    --tlg-ink: #1f2328;
+    --tlg-ink-muted: #6b7280;
+    --tlg-surface: #ffffff;
+    --tlg-surface-alt: #f6f7f9;
+    --tlg-border: #dcdfe4;
+    --tlg-border-strong: #a3a9b3;
+    --tlg-accent: #1565c0;
+    --tlg-accent-soft: #e8f1fb;
+    --tlg-good: #2e7d32;
+    --tlg-on-color: #ffffff;
+    --tlg-shadow: #000000;
+    --tlg-hover: #f1f3f5;
+
+    --tlg-font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --tlg-rail-width: 288px;
+    --tlg-inspector-width: 352px;
+    --tlg-radius: 10px;
+    --tlg-height: 760px;
+}
+
+.tlg {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    height: var(--tlg-height);
+    min-height: 34rem;
+    position: relative;
+    box-sizing: border-box;
+    color: var(--tlg-ink);
+    background: var(--tlg-surface-alt);
+    font-family: var(--tlg-font);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.tlg *,
+.tlg *::before,
+.tlg *::after,
+.tlg-app *,
+.tlg-app *::before,
+.tlg-app *::after {
+    box-sizing: inherit;
+}
+
+.tlg[data-tlg-theme="dark"],
+.tlg-app[data-tlg-theme="dark"] {
+    --tlg-side-unknown: #9aa3af;
+    --tlg-side-attacker: #ef5350;
+    --tlg-side-victim: #ffa040;
+    --tlg-side-defender: #5b9df0;
+    --tlg-side-third-party: #ba68c8;
+    --tlg-surface-unknown: #2a2f36;
+    --tlg-surface-attacker: #3a2023;
+    --tlg-surface-victim: #3a2c1c;
+    --tlg-surface-defender: #1c2a3d;
+    --tlg-impact-unknown: #9aa3af;
+    --tlg-impact-none: #6b7280;
+    --tlg-impact-low: #5b9df0;
+    --tlg-impact-medium: #e0b040;
+    --tlg-impact-high: #ffa040;
+    --tlg-impact-critical: #ef5350;
+    --tlg-ink: #e6e8eb;
+    --tlg-ink-muted: #9aa3af;
+    --tlg-surface: #1b1f24;
+    --tlg-surface-alt: #22272e;
+    --tlg-border: #353c45;
+    --tlg-border-strong: #5c6570;
+    --tlg-accent: #5b9df0;
+    --tlg-accent-soft: #1c2a3d;
+    --tlg-good: #66bb6a;
+    --tlg-on-color: #ffffff;
+    --tlg-shadow: #000000;
+    --tlg-hover: #2a3038;
+    color-scheme: dark;
+}
+
+.tlg [hidden] {
+    display: none !important;
+}
+
+.tlg-icon {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+    vertical-align: -0.125em;
+}
+
+/* Controls */
+
+.tlg-button,
+.tlg-menu > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    border: 1px solid var(--tlg-border);
+    background: var(--tlg-surface);
+    color: var(--tlg-ink);
+    border-radius: 6px;
+    padding: .3rem .65rem;
+    font: inherit;
+    font-size: .82rem;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.tlg-button:hover:not(:disabled),
+.tlg-menu > summary:hover {
+    background: var(--tlg-hover);
+}
+
+.tlg-button:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.tlg-button:focus-visible,
+.tlg-menu > summary:focus-visible,
+.tlg-view-pill:focus-visible,
+.tlg-chip-toggle:focus-visible,
+.tlg-record:focus-visible,
+.tlg-input:focus-visible,
+.tlg-select:focus-visible {
+    outline: 2px solid var(--tlg-accent);
+    outline-offset: 1px;
+}
+
+.tlg-button-icon {
+    padding: .3rem .45rem;
+}
+
+.tlg-button-primary {
+    background: var(--tlg-accent);
+    border-color: var(--tlg-accent);
+    color: var(--tlg-on-color);
+}
+
+.tlg-button-primary:hover:not(:disabled) {
+    background: var(--tlg-accent);
+    filter: brightness(1.08);
+}
+
+.tlg-button-danger {
+    color: var(--tlg-side-attacker);
+}
+
+.tlg-button-quiet {
+    border-color: transparent;
+    background: transparent;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-button-group {
+    display: inline-flex;
+}
+
+.tlg-button-group > .tlg-button {
+    border-radius: 0;
+    margin-left: -1px;
+}
+
+.tlg-button-group > .tlg-button:first-child {
+    border-radius: 6px 0 0 6px;
+    margin-left: 0;
+}
+
+.tlg-button-group > .tlg-button:last-child {
+    border-radius: 0 6px 6px 0;
+}
+
+.tlg-input,
+.tlg-select {
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid var(--tlg-border);
+    border-radius: 6px;
+    background: var(--tlg-surface);
+    color: var(--tlg-ink);
+    padding: .3rem .5rem;
+    font: inherit;
+    font-size: .82rem;
+}
+
+textarea.tlg-input {
+    resize: vertical;
+    overflow: hidden;
+}
+
+.tlg-check {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    margin-bottom: .625rem;
+    font-size: .82rem;
+}
+
+/* Toolbar */
+
+.tlg-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex: 0 0 auto;
+}
+
+.tlg-views {
+    display: flex;
+    gap: .25rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+    flex: 1 1 auto;
+}
+
+.tlg-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex: 0 0 auto;
+}
+
+.tlg-view-pill,
+.tlg-chip-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    white-space: nowrap;
+    border: 1px solid var(--tlg-border);
+    background: var(--tlg-surface);
+    color: var(--tlg-ink-muted);
+    border-radius: 999px;
+    padding: .3rem .75rem;
+    font: inherit;
+    font-size: .8rem;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.tlg-view-pill:hover {
+    color: var(--tlg-accent);
+}
+
+.tlg-view-pill[aria-selected="true"] {
+    background: var(--tlg-accent);
+    border-color: var(--tlg-accent);
+    color: var(--tlg-on-color);
+}
+
+.tlg-filters {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+}
+
+.tlg-chip-toggle {
+    padding: .25rem .65rem;
+    font-size: .76rem;
+}
+
+.tlg-chip-toggle[aria-pressed="true"] {
+    background: var(--tlg-accent-soft);
+    color: var(--tlg-accent);
+}
+
+.tlg-menu {
+    position: relative;
+}
+
+.tlg-menu > summary {
+    list-style: none;
+}
+
+.tlg-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.tlg-menu-list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 20;
+    min-width: 15rem;
+    padding: .3rem;
+    background: var(--tlg-surface);
+    border: 1px solid var(--tlg-border);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .16);
+}
+
+.tlg-menu-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--tlg-ink);
+    padding: .4rem .55rem;
+    border-radius: 6px;
+    font: inherit;
+    font-size: .82rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tlg-menu-item:hover {
+    background: var(--tlg-hover);
+}
+
+/* Body */
+
+.tlg-body {
+    display: flex;
+    gap: .75rem;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.tlg-rail,
+.tlg-inspector {
+    background: var(--tlg-surface);
+    border: 1px solid var(--tlg-border);
+    border-radius: var(--tlg-radius);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.tlg-rail {
+    width: var(--tlg-rail-width);
+    flex: 0 0 var(--tlg-rail-width);
+}
+
+.tlg-rail-head {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    padding: .625rem;
+    border-bottom: 1px solid var(--tlg-border);
+}
+
+.tlg-add {
+    justify-content: center;
+}
+
+.tlg-rail-list {
+    overflow-y: auto;
+    flex: 1 1 auto;
+    padding: .375rem;
+    scrollbar-width: thin;
+}
+
+.tlg-rail-foot {
+    border-top: 1px solid var(--tlg-border);
+    padding: .4rem .625rem;
+    font-size: .74rem;
+    color: var(--tlg-ink-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.tlg-group-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 700;
+    color: var(--tlg-ink-muted);
+    padding: .5rem .5rem .25rem;
+}
+
+.tlg-count {
+    font-weight: 600;
+    background: var(--tlg-surface-alt);
+    border-radius: 999px;
+    padding: 0 .45rem;
+}
+
+.tlg-record {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    width: 100%;
+    border-radius: 8px;
+    padding: .35rem .5rem;
+    font-size: .82rem;
+    line-height: 1.25;
+    cursor: pointer;
+}
+
+.tlg-record:hover {
+    background: var(--tlg-hover);
+}
+
+.tlg-record.is-selected {
+    background: var(--tlg-accent-soft);
+}
+
+.tlg-record-child {
+    margin-left: 1rem;
+    width: calc(100% - 1rem);
+}
+
+.tlg-record-icon {
+    flex: 0 0 1.6rem;
+    height: 1.6rem;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    color: var(--tlg-on-color);
+    background: var(--tlg-side-unknown);
+    font-size: .85rem;
+}
+
+.tlg-record-body {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.tlg-record-name,
+.tlg-record-meta {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tlg-record-name {
+    font-weight: 600;
+}
+
+.tlg-record-meta {
+    font-size: .72rem;
+    color: var(--tlg-ink-muted);
+}
+
+/*
+ * Deleting from the list. The bin only shows on hover, and the confirmation happens where the cursor
+ * already is: the cancel takes the bin's exact place so a second click at the same point keeps the
+ * record, and the confirm sits beside it where a click has to be meant.
+ */
+.tlg-record-delete {
+    position: relative;
+    flex: 0 0 1.35rem;
+    height: 1.35rem;
+}
+
+.tlg-record-delete button {
+    width: 1.35rem;
+    height: 1.35rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--tlg-ink-muted);
+    font-size: .75rem;
+    padding: 0;
+    cursor: pointer;
+}
+
+.tlg-record-delete-trigger {
+    opacity: 0;
+}
+
+.tlg-record:hover .tlg-record-delete-trigger,
+.tlg-record-delete-trigger:focus-visible {
+    opacity: 1;
+}
+
+.tlg-record-delete-trigger:hover {
+    color: var(--tlg-side-attacker);
+}
+
+/* One box around both answers, so the space between them still counts as being over the control */
+.tlg-record-delete-ask {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: none;
+    gap: .2rem;
+}
+
+.tlg-record-delete.is-asking .tlg-record-delete-trigger {
+    display: none;
+}
+
+.tlg-record-delete.is-asking .tlg-record-delete-ask {
+    display: flex;
+}
+
+.tlg-record-delete.is-asking .tlg-record-delete-cancel {
+    background: var(--tlg-surface);
+    border-color: var(--tlg-border-strong);
+    color: var(--tlg-ink);
+}
+
+.tlg-record-delete.is-asking .tlg-record-delete-confirm {
+    background: var(--tlg-side-attacker);
+    color: var(--tlg-on-color);
+}
+
+.tlg-quickadd {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .25rem .5rem;
+}
+
+/* Stage */
+
+.tlg-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--tlg-surface);
+    border: 1px solid var(--tlg-border);
+    border-radius: var(--tlg-radius);
+    overflow: hidden;
+}
+
+.tlg-canvas {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+    /* Dragging the canvas must move it, not sweep a text selection across every label */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.tlg-canvas.is-panning {
+    cursor: grabbing;
+}
+
+.tlg-canvas > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+
+.tlg-canvas .tlg-node,
+.tlg-canvas .tlg-step,
+.tlg-canvas .tlg-step-marker,
+.tlg-canvas .tlg-link {
+    cursor: pointer;
+}
+
+.tlg-canvas .tlg-hit {
+    cursor: pointer;
+}
+
+.tlg-canvas .tlg-node:not(.is-selected):hover,
+.tlg-canvas .tlg-step:not(.is-selected):hover,
+.tlg-canvas .tlg-step-marker:not(.is-selected):hover,
+.tlg-canvas .tlg-link:not(.is-selected):hover {
+    filter: drop-shadow(0 0 3px var(--tlg-border-strong));
+}
+
+/* Links are drawn faint so a dense graph stays readable, so the one being pointed at comes to full strength */
+.tlg-canvas .tlg-link:hover .tlg-link-line,
+.tlg-canvas .tlg-link.is-selected .tlg-link-line {
+    opacity: 1;
+    stroke-width: 2.2px;
+}
+
+/* A halo rather than a changed colour, so the selected record keeps the colours that carry its meaning */
+.tlg-canvas .is-selected {
+    filter: drop-shadow(0 0 1.5px var(--tlg-accent)) drop-shadow(0 0 6px var(--tlg-accent));
+}
+
+.tlg-stage-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .4rem .6rem;
+    border-top: 1px solid var(--tlg-border);
+    font-size: .76rem;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-pager {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+}
+
+.tlg-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: .35rem;
+    text-align: center;
+    padding: 2rem;
+    background: var(--tlg-surface);
+}
+
+.tlg-empty > .tlg-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--tlg-border-strong);
+    margin-bottom: .5rem;
+}
+
+.tlg-empty-title {
+    margin: 0;
+    font-weight: 600;
+}
+
+.tlg-empty-hint {
+    margin: 0 0 .75rem;
+    color: var(--tlg-ink-muted);
+    max-width: 28rem;
+}
+
+.tlg-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 3rem;
+    transform: translateX(-50%);
+    background: var(--tlg-ink);
+    color: var(--tlg-surface);
+    border-radius: 999px;
+    padding: .35rem .9rem;
+    font-size: .78rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+    z-index: 5;
+}
+
+/* Inspector */
+
+.tlg-inspector {
+    width: var(--tlg-inspector-width);
+    flex: 0 0 var(--tlg-inspector-width);
+}
+
+.tlg-inspector-head {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .625rem;
+    border-bottom: 1px solid var(--tlg-border);
+}
+
+.tlg-inspector-head .tlg-record-icon {
+    flex: 0 0 2rem;
+    height: 2rem;
+}
+
+.tlg-inspector-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tlg-inspector-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1 1 auto;
+    padding: .625rem;
+    scrollbar-width: thin;
+}
+
+.tlg-inspector-foot {
+    border-top: 1px solid var(--tlg-border);
+    padding: .5rem .625rem;
+    display: flex;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+.tlg-inspector-foot.is-confirming {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* The answers are at least as wide as the Delete button they replace, so Keep it covers its whole spot */
+.tlg-inspector-foot > .tlg-button,
+.tlg-dialog-foot .tlg-button {
+    min-width: 5.5rem;
+    justify-content: center;
+}
+
+.tlg-inspector-question {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: .82rem;
+}
+
+.tlg-field {
+    margin-bottom: .625rem;
+    min-width: 0;
+}
+
+.tlg-field > label {
+    display: block;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--tlg-ink-muted);
+    margin-bottom: .2rem;
+}
+
+.tlg-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+    min-width: 0;
+}
+
+/* Date beside time, with the time free to be left empty when only the day is known */
+.tlg-when {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: .35rem;
+}
+
+.tlg-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin-bottom: .4rem;
+}
+
+.tlg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    border: 1px solid var(--tlg-border);
+    border-radius: 999px;
+    padding: .1rem .2rem .1rem .55rem;
+    font-size: .76rem;
+    background: var(--tlg-surface-alt);
+}
+
+.tlg-chip-remove {
+    border: 0;
+    background: transparent;
+    color: var(--tlg-ink-muted);
+    padding: 0 .15rem;
+    cursor: pointer;
+    display: inline-flex;
+}
+
+.tlg-readonly {
+    display: grid;
+    grid-template-columns: 7rem 1fr;
+    gap: .35rem .5rem;
+    margin: 0;
+    font-size: .82rem;
+}
+
+.tlg-readonly dt {
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-readonly dd {
+    margin: 0;
+}
+
+/* Add menu */
+
+.tlg-addmenu {
+    position: fixed;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    z-index: 1080;
+    width: 20rem;
+    background: var(--tlg-surface);
+    border: 1px solid var(--tlg-border);
+    border-radius: var(--tlg-radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+    padding: .625rem;
+}
+
+.tlg-addmenu-section {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 700;
+    color: var(--tlg-ink-muted);
+    margin: .5rem .15rem .3rem;
+}
+
+.tlg-addmenu-section:first-child {
+    margin-top: 0;
+}
+
+/* The two headline actions sit in the same four column rhythm as everything else, so no tile is wider
+   or taller than its neighbours */
+.tlg-addmenu-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: .25rem;
+}
+
+.tlg-addmenu-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .3rem;
+    border: 0;
+    background: transparent;
+    border-radius: 8px;
+    padding: .45rem .2rem;
+    font: inherit;
+    font-size: .66rem;
+    line-height: 1.15;
+    text-align: center;
+    color: var(--tlg-ink-muted);
+    cursor: pointer;
+}
+
+.tlg-addmenu-item .tlg-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    color: var(--tlg-ink);
+}
+
+.tlg-addmenu-item:hover {
+    background: var(--tlg-accent-soft);
+    color: var(--tlg-accent);
+}
+
+/* Narrow screens stack the side panels to keep the canvas usable */
+
+@media (max-width: 1200px) {
+    .tlg {
+        height: auto;
+    }
+
+    .tlg-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tlg-actions {
+        flex-wrap: wrap;
+    }
+
+    .tlg-body {
+        flex-direction: column;
+    }
+
+    .tlg-rail,
+    .tlg-inspector {
+        width: 100%;
+        flex: 0 0 auto;
+        max-height: 20rem;
+    }
+
+    .tlg-stage {
+        min-height: 30rem;
+    }
+}
+
+@media print {
+    .tlg-rail,
+    .tlg-inspector,
+    .tlg-actions,
+    .tlg-stage-foot {
+        display: none !important;
+    }
+
+    .tlg {
+        height: auto;
+        background: #fff;
+    }
+
+    .tlg-stage {
+        border: none;
+    }
+}
+
+/* Incident app */
+
+.tlg-app {
+    --tlg-app-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+    height: var(--tlg-app-height);
+    position: relative;
+    box-sizing: border-box;
+    color: var(--tlg-ink);
+    background: var(--tlg-surface-alt);
+    font-family: var(--tlg-font);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.tlg-app [hidden] {
+    display: none !important;
+}
+
+.tlg-appbar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    padding: .55rem 1rem;
+    background: var(--tlg-surface);
+    border-bottom: 1px solid var(--tlg-border);
+}
+
+.tlg-appbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    font-weight: 600;
+    font-size: .95rem;
+    white-space: nowrap;
+}
+
+.tlg-appbar-brand > .tlg-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--tlg-accent);
+}
+
+.tlg-appbar-incident {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex: 1 1 18rem;
+    min-width: 0;
+}
+
+.tlg-appbar-picker {
+    max-width: 32rem;
+}
+
+.tlg-appbar-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-left: auto;
+}
+
+.tlg-app-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: .75rem 1rem 1rem;
+    position: relative;
+}
+
+.tlg-app-timeline {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.tlg-app-timeline.tlg {
+    --tlg-height: 100%;
+}
+
+.tlg-app-empty {
+    flex: 1 1 auto;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: .35rem;
+    text-align: center;
+    padding: 2rem;
+    background: var(--tlg-surface);
+    border: 1px solid var(--tlg-border);
+    border-radius: var(--tlg-radius);
+}
+
+.tlg-app-empty > .tlg-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--tlg-border-strong);
+    margin-bottom: .5rem;
+}
+
+.tlg-app-quick {
+    display: flex;
+    gap: .5rem;
+    width: min(28rem, 100%);
+}
+
+.tlg-app-quick > .tlg-button {
+    white-space: nowrap;
+}
+
+.tlg-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, .45);
+    z-index: 20;
+}
+
+.tlg-dialog {
+    width: min(40rem, 100%);
+    max-height: calc(100vh - 2rem);
+    display: flex;
+    flex-direction: column;
+    background: var(--tlg-surface);
+    color: var(--tlg-ink);
+    border: 1px solid var(--tlg-border);
+    border-radius: var(--tlg-radius);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, .3);
+}
+
+.tlg-dialog-head {
+    padding: .85rem 1.1rem .4rem;
+}
+
+.tlg-dialog-head h2 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.tlg-dialog-body {
+    padding: .5rem 1.1rem;
+    overflow-y: auto;
+}
+
+.tlg-dialog-note {
+    margin: 0 0 .5rem;
+    font-size: .8rem;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-dialog-error {
+    margin: 0 0 .5rem;
+    font-size: .82rem;
+    color: var(--tlg-side-attacker);
+}
+
+.tlg-dialog-foot {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    padding: .75rem 1.1rem;
+    border-top: 1px solid var(--tlg-border);
+}
+
+.tlg-dialog-confirm {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .82rem;
+}
+
+.tlg-dialog-spacer {
+    flex: 1 1 auto;
+}
+
+@media (max-width: 640px) {
+    .tlg-app-quick {
+        flex-direction: column;
+    }
+}

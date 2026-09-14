@@ -1,0 +1,22 @@
+/* The page around the incident app. The app sets data-theme on the root, and everything here follows it. */
+
+:root {
+    color-scheme: light;
+    background: #f6f7f9;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    background: #22272e;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        color-scheme: dark;
+        background: #22272e;
+    }
+}
+
+body {
+    margin: 0;
+}

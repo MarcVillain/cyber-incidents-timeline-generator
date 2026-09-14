@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.test-build/
+coverage/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+.DS_Store
+Thumbs.db

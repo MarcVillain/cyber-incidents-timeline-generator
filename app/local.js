@@ -1,7 +1,7 @@
 // The incident app with nothing behind it: incidents are kept in the local storage of this browser.
 // Add ?sample to the address to start with the sample incident.
 
-import { BrowserStorageTimelineStore, TimelineService, mountTimelineApp, seedSampleData } from "../dist/index.js";
+import { BrowserStorageTimelineStore, TimelineService, mountTimelineApp, seedSampleData } from "./dist/index.js";
 import { applyAddressPresets } from "./presets.js";
 
 const STORAGE_KEY = "cyber-incidents-timeline-local";

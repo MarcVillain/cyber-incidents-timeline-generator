@@ -27,6 +27,7 @@ All notable changes to this project are documented here. The format follows
   deletion, address sync and a theme toggle for the whole page. Incident management can be turned off.
 - The command line serves the app at `/` on SQLite, `/local.html` for a browser only desk, and `--api-only`
   for the REST API alone.
+- `npm run site` assembles the browser only desk for static hosting, published to GitHub Pages by a workflow.
 - The workspace follows the theme of the page it sits in (`data-theme`, `data-bs-theme`, `dark` and `light`
   classes, `color-scheme`) and the system, or a `themeDetector` of the host.
 - `IncidentSource` and `SourcedTimelineStore` to keep timelines here for incidents owned by a ticketing tool,

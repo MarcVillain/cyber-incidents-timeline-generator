@@ -71,6 +71,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "site": "npm run build && node scripts/build-site.mjs",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "tsc -p tsconfig.test.json && node --disable-warning=ExperimentalWarning --test \".test-build/tests/**/*.test.js\"",
     "icons": "node scripts/build-icons.mjs",

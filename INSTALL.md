@@ -174,6 +174,22 @@ npx serve .
 
 Pages using ES modules must be served over HTTP. Opening `index.html` straight from the disk does not work.
 
+### Hosting the ready desk on a static host
+
+The browser only desk needs no code of your own. From a clone of the repository:
+
+```bash
+npm ci
+npm run site
+```
+
+`site/` then holds `index.html`, its scripts, `dist/` and `styles/`, all with relative paths, so it can be served from
+any folder of any static host: GitHub Pages, GitLab Pages, an S3 bucket, an intranet web server. Every visitor keeps
+their own incidents in their own browser, and add `?sample` to the address to start with the sample incident.
+
+This repository publishes it to GitHub Pages with `.github/workflows/pages.yml` on every push to `master`. In a fork,
+enable it once under **Settings > Pages** by choosing **GitHub Actions** as the source.
+
 ### With a bundler
 
 With Vite, webpack, Rollup, esbuild or anything else that understands package exports, import by package name:

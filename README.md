@@ -15,6 +15,10 @@
   <img src="https://img.shields.io/badge/runtime%20dependencies-0-brightgreen" alt="Zero runtime dependencies">
 </p>
 
+<p align="center">
+  <a href="https://marcvillain.github.io/cyber-incidents-timeline-generator/?sample"><strong>Try it in your browser</strong></a>. Nothing to install, incidents stay on your machine.
+</p>
+
 ![The incident desk with the sequential timeline of a phishing incident and the details of one step](docs/images/02-step-details.png)
 
 Record who did what, to what and when, and twelve representations build themselves from the same records. Run
@@ -198,6 +202,7 @@ npm run build       # compile to dist/
 npm test            # compile and run the test suite with node:test
 npm run typecheck   # type check sources and tests without emitting
 npm run icons       # regenerate the icon shapes from lucide-static
+npm run site        # assemble the browser only desk in site/ for static hosting
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions, [SECURITY.md](SECURITY.md) for the security model

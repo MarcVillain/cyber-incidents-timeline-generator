@@ -1,8 +1,10 @@
 name: Publish
 
-# Publishes to npm when a version tag is pushed, then creates the GitHub release from the matching
-# CHANGELOG.md section. Authentication uses npm trusted publishing, so no token is stored in the
-# repository, and the package is signed with provenance pointing at this workflow.
+# Stages the package on npm when a version tag is pushed, then creates the GitHub release from the
+# matching CHANGELOG.md section. A staged version only goes live once a maintainer approves it on npmjs.com
+# with two factor authentication, so push access alone cannot ship a release. Authentication uses npm
+# trusted publishing, so no token is stored in the repository, and the package carries provenance
+# pointing at this workflow.
 
 on:
   push:
@@ -32,7 +34,11 @@ jobs:
         run: |
           awk -v heading="## [${GITHUB_REF_NAME#v}]" 'index($0, "## [") == 1 { inside = index($0, heading) == 1; next } inside' CHANGELOG.md > release-notes.md
           test -s release-notes.md
-      - run: npm publish --provenance --access public
+      # Checked and built here rather than left to the publish lifecycle scripts, which staging may not run
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm stage publish --provenance --access public
       - name: Create the GitHub release
         run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag
         env:

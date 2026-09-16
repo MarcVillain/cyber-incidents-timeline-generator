@@ -2,7 +2,8 @@
 
 The package is published to npm as `cyber-incidents-timeline-generator`. Releases go out from GitHub Actions through npm
 trusted publishing, so no npm token lives anywhere and every version carries a provenance statement
-linking it to the commit and workflow that built it.
+linking it to the commit and workflow that built it. The workflow only stages a version: it goes live once a
+maintainer approves it on npmjs.com with two factor authentication.
 
 ## What gets published
 
@@ -28,9 +29,10 @@ stale build cannot be published.
    npm publish --access public
    ```
 4. On npmjs.com, open the package settings, add a trusted publisher of type GitHub Actions, and enter the
-   repository owner, the repository name and the workflow file `publish.yml`.
+   repository owner, the repository name and the workflow file `publish.yml`. Leave the environment empty
+   and **Allow `npm publish`** unchecked, so the workflow can stage versions but not publish them directly.
 5. In the package settings, set publishing access to require two factor authentication and disallow
-   tokens, so the workflow is the only way to publish.
+   tokens, so a version staged by the workflow and approved by a maintainer is the only way to publish.
 
 ## Releasing a version
 
@@ -40,7 +42,10 @@ stale build cannot be published.
    npm version minor
    git push --follow-tags
    ```
-3. Pushing the tag starts the publish workflow. It checks the tag matches `package.json`, runs the tests,
-   publishes to npm, then creates the GitHub release with the changelog section of that version as notes.
+3. Pushing the tag starts the publish workflow. It checks the tag matches `package.json`, runs the type
+   check and tests, builds, stages the version on npm, then creates the GitHub release with the changelog
+   section of that version as notes.
+4. On npmjs.com, review the staged version and approve it with two factor authentication. Until then the
+   GitHub release exists but `npm install` still resolves the previous version.
 
 Before 1.0, a minor version may change the public API; a patch version never does.

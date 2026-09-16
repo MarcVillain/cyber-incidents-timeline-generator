@@ -1,14 +1,15 @@
 name: Publish
 
-# Publishes to npm when a GitHub release is published. Authentication uses npm trusted publishing, so no
-# token is stored in the repository, and the package is signed with provenance pointing at this workflow.
+# Publishes to npm when a version tag is pushed, then creates the GitHub release from the matching
+# CHANGELOG.md section. Authentication uses npm trusted publishing, so no token is stored in the
+# repository, and the package is signed with provenance pointing at this workflow.
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -24,6 +25,15 @@ jobs:
       # Trusted publishing needs npm 11.5.1 or later, newer than the one bundled with Node 22
       - run: npm install --global npm@latest
       - run: npm ci
-      - name: Check the release tag matches the package version
-        run: test "v$(node -p "require('./package.json').version")" = "${{ github.event.release.tag_name }}"
+      - name: Check the tag matches the package version
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      # Read before publishing, so a version missing from the changelog stops the release early
+      - name: Extract the release notes from the changelog
+        run: |
+          awk -v heading="## [${GITHUB_REF_NAME#v}]" 'index($0, "## [") == 1 { inside = index($0, heading) == 1; next } inside' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
       - run: npm publish --provenance --access public
+      - name: Create the GitHub release
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -40,7 +40,7 @@ stale build cannot be published.
    npm version minor
    git push --follow-tags
    ```
-3. Create a GitHub release from the tag. The publish workflow checks the tag matches `package.json`, runs
-   the tests and publishes.
+3. Pushing the tag starts the publish workflow. It checks the tag matches `package.json`, runs the tests,
+   publishes to npm, then creates the GitHub release with the changelog section of that version as notes.
 
 Before 1.0, a minor version may change the public API; a patch version never does.

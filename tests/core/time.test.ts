@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatDuration, hoursBetween, joinWallClock, normalizeWallClock, parseWallClock, splitWallClock } from "../../src/core/time.js";
+import { formatDuration, hoursBetween, joinWallClock, momentBetween, normalizeWallClock, parseWallClock, splitWallClock } from "../../src/core/time.js";
 
 const MOMENT = "2026-03-05T09:30:00";
 
@@ -38,6 +38,15 @@ describe("wall clock times", () => {
         const to = parseWallClock("2026-03-05T11:30");
         assert.equal(hoursBetween(from, to), 3.5);
         assert.equal(hoursBetween(to, from), null);
+    });
+
+    it("finds the whole minute halfway between two moments, never before the first", () => {
+        const from = new Date(2026, 2, 5, 9, 30);
+        assert.deepEqual(momentBetween(from, new Date(2026, 2, 5, 9, 45)), new Date(2026, 2, 5, 9, 37));
+        assert.deepEqual(momentBetween(from, from), from);
+
+        const late = new Date(2026, 2, 5, 9, 30, 40);
+        assert.deepEqual(momentBetween(late, new Date(2026, 2, 5, 9, 31)), late);
     });
 
     it("formats durations at a readable unit", () => {

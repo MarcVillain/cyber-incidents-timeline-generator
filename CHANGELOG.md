@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-09-16
+
+### Changed
+
+- A step added while another step is selected is dated halfway between it and the next step, or one hour
+  after it when it is the last, so it lands right after the selection instead of at the current time.
+
 ## [0.1.0] - 2026-09-14
 
 ### Added

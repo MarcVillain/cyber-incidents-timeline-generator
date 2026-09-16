@@ -13,6 +13,10 @@ const START_X = 100;
 const START_Y = 100;
 const PAN_DISTANCE = 40;
 const SETTLE_ROUNDS = 10;
+const FIRST_STEP = "2026-01-12T08:00:00";
+const SECOND_STEP = "2026-01-12T10:00:00";
+const BETWEEN_STEPS = "2026-01-12T09:00:00";
+const AFTER_LAST_STEP = "2026-01-12T11:00:00";
 
 async function settle(): Promise<void> {
     for (let round = 0; round < SETTLE_ROUNDS; round += 1) {
@@ -23,6 +27,12 @@ async function settle(): Promise<void> {
 function footButton(element: HTMLElement, text: string): HTMLButtonElement {
     const found = [...element.querySelectorAll<HTMLButtonElement>(".tlg-inspector-foot button")].find(button => button.textContent?.trim() === text);
     assert.ok(found, `The details panel has no "${text}" button`);
+    return found;
+}
+
+function addMenuItem(element: HTMLElement, text: string): HTMLButtonElement {
+    const found = [...element.querySelectorAll<HTMLButtonElement>(".tlg-addmenu-item")].find(button => button.textContent?.trim() === text);
+    assert.ok(found, `The add menu has no "${text}" item`);
     return found;
 }
 
@@ -212,6 +222,29 @@ describe("mountTimeline", () => {
         await handle.reload();
         assert.equal(element.querySelector<HTMLElement>(".tlg-empty")?.hidden, true);
         assert.ok(element.querySelector(".tlg-canvas svg [data-step-id]"));
+        handle.destroy();
+    });
+
+    it("adds a step right after the selected one, halfway to the next", async () => {
+        const { service } = createService();
+        const incident = await createIncident(service);
+        const first = await service.createStep(incident.id, { title: "First", timestamp: FIRST_STEP });
+        const second = await service.createStep(incident.id, { title: "Second", timestamp: SECOND_STEP });
+        const element = mountPoint();
+        const handle = await mountTimeline(element, { api: service, incidentId: incident.id, preferences: null, renderers: BUILT_IN_RENDERERS.slice(0, 1) });
+        const addStep = async (): Promise<string[]> => {
+            element.querySelector<HTMLButtonElement>(".tlg-add")?.click();
+            addMenuItem(element, "Step").click();
+            await settle();
+            const { steps } = await service.getDiagram(incident.id);
+            return steps.map(step => step.timestamp);
+        };
+
+        handle.select({ type: RecordType.Step, id: first.id });
+        assert.deepEqual(await addStep(), [FIRST_STEP, BETWEEN_STEPS, SECOND_STEP]);
+
+        handle.select({ type: RecordType.Step, id: second.id });
+        assert.deepEqual(await addStep(), [FIRST_STEP, BETWEEN_STEPS, SECOND_STEP, AFTER_LAST_STEP]);
         handle.destroy();
     });
 });

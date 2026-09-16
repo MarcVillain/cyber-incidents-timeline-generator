@@ -5,7 +5,7 @@ import type { NodeKindInfo } from "../core/catalog.js";
 import { LinkKind, NodeCategory, NodeKind, RecordType, Side } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { DiagramLink, DiagramNode, RecordId } from "../core/models.js";
-import { formatDateTime, formatWallClock } from "../core/time.js";
+import { formatDateTime, formatWallClock, millisecondsFromHours, momentBetween } from "../core/time.js";
 import type { TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
 import type { PanelContext, PendingRecord } from "./panels.js";
@@ -26,6 +26,7 @@ const DEFAULT_SIDES: ReadonlyMap<NodeKind, Side> = new Map([
 const MENU_MARGIN = 8;
 const MENU_OFFSET = 6;
 const BLUR_GRACE_MS = 120;
+const HOURS_AFTER_LAST_STEP = 1;
 
 export interface RailElements {
     list: HTMLElement;
@@ -291,9 +292,24 @@ export class Rail {
         this.closeMenu();
         const id = await this.context.actions.create({
             type: RecordType.Step,
-            input: { title: "New step", timestamp: formatWallClock(new Date()), side: Side.Attacker }
+            input: { title: "New step", timestamp: formatWallClock(this.newStepMoment()), side: Side.Attacker }
         });
         if (id !== null) this.context.store.setSelection({ type: RecordType.Step, id });
+    }
+
+    /**
+     * A step added while another is selected lands right after it, halfway to the one that follows.
+     */
+    private newStepMoment(): Date {
+        const { store } = this.context;
+        const selection = store.selection;
+        const selected = selection?.type === RecordType.Step ? store.step(selection.id) : null;
+        if (!selected?.at) return new Date();
+
+        const next = store.steps.at(store.steps.indexOf(selected) + 1);
+        return next?.at
+            ? momentBetween(selected.at, next.at)
+            : new Date(selected.at.getTime() + millisecondsFromHours(HOURS_AFTER_LAST_STEP));
     }
 
     private async beginLink(): Promise<void> {

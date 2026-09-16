@@ -3,6 +3,7 @@ import type { WallClock } from "./models.js";
 const ZONE_SUFFIX = /(Z|[+-]\d{2}:?\d{2})$/i;
 const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?)?$/;
 const MILLISECONDS_PER_HOUR = 3600000;
+const MILLISECONDS_PER_MINUTE = 60000;
 
 function pad(value: number): string {
     return String(value).padStart(2, "0");
@@ -38,6 +39,16 @@ export function parseWallClock(value: WallClock | null | undefined): Date | null
 
 export function formatWallClock(date: Date): WallClock {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/**
+ * The moment halfway between two others. It falls on a whole minute because forms edit minutes, and
+ * never before the first moment so it keeps its place after it.
+ */
+export function momentBetween(from: Date, to: Date): Date {
+    const halfway = (from.getTime() + to.getTime()) / 2;
+    const minute = Math.floor(halfway / MILLISECONDS_PER_MINUTE) * MILLISECONDS_PER_MINUTE;
+    return new Date(Math.max(from.getTime(), minute));
 }
 
 export interface WallClockParts {

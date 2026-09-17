@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format follows
 - `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
   module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
   speak different languages.
+- A page of any size, and a canvas as tall as its content. `PAGE_WIDTH` and `PAGE_HEIGHT` become the
+  default rather than the law: `TimelineOptions.pageSize` and the render entry point take a size, every
+  representation lays itself out against it, and the frame, the export and the print sheet follow.
+  `canvasMode: "continuous"` grows the page until the representation stops splitting and pans the whole
+  scene in the stage instead of paginating. Slides stay the default, at 1600 by 900, unchanged.
 - Rendering with no page. A new `cyber-incidents-timeline-generator/render` entry point exports
   `renderPages`, `renderPage` and `countPages`, which draw any representation into SVG given a document,
   so a scheduled report or a mail can carry the picture. The document is passed in and put back after, so

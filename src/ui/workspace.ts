@@ -28,8 +28,9 @@ import { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from
 import { ThemeMode } from "./theme-mode.js";
 import { TimeFormats, type DurationUnits } from "../core/time.js";
 import { buildStrings, type Strings, type StringsOverride } from "./strings.js";
-import { Viewport, type Point } from "./viewport.js";
+import { DEFAULT_PAGE_SIZE, Viewport, type PageSize, type Point } from "./viewport.js";
 import type { DiagramSummary } from "../core/summary.js";
+import { withPageSize } from "./chrome.js";
 
 export { ThemeMode };
 
@@ -60,6 +61,10 @@ export interface TimelineOptions {
     onNotify?: (message: string) => void;
     /** Receives the view state after every change, which is what lets a host own the address bar. */
     onStateChange?: (state: TimelineState) => void;
+    /** The page a representation lays itself out in. Defaults to the 1600 by 900 slide. */
+    pageSize?: PageSize;
+    /** Whether the scene is cut into slides, or laid out in one run as tall as it needs. */
+    canvasMode?: CanvasMode;
     /** The words of the interface. Anything left out keeps the English default. */
     strings?: StringsOverride;
     /** The locale dates are written in. Defaults to en-GB, whatever the browser is set to. */
@@ -104,6 +109,19 @@ export interface TimelineHandle {
 
 const DEFAULT_PREFERENCE_KEY = "cyber-incidents-timeline";
 const TOAST_MS = 4000;
+
+/** How the scene meets the page it is drawn on. */
+export enum CanvasMode {
+    /** Cut into pages of a fixed size, which is what a deck and a printer want. */
+    Slides = "slides",
+    /** One page as tall as the content needs, panned and zoomed in the stage. */
+    Continuous = "continuous"
+}
+
+// Growing the canvas is a search, not a measurement: a renderer only ever says how many pages it took
+const CANVAS_GROWTH_TRIES = 6;
+const CANVAS_GROWTH_STEP = 4;
+const CANVAS_MAX_HEIGHT = 20000;
 
 function audienceChoices(strings: Strings): readonly RendererChoice<Audience>[] {
     return [
@@ -225,6 +243,9 @@ class Workspace implements TimelineHandle {
     private readonly onNotify: ((message: string) => void) | null;
     private readonly onStateChange: ((state: TimelineState) => void) | null;
     private readonly slideHeader: SlideHeaderCustomizer | null;
+    private readonly canvasMode: CanvasMode;
+    private readonly slideSize: PageSize;
+    private canvas: PageSize;
     private readonly strings: Strings;
     private readonly time: TimeFormats;
     private readonly detectTheme: ThemeDetector;
@@ -252,6 +273,9 @@ class Workspace implements TimelineHandle {
         this.onNotify = options.onNotify ?? null;
         this.onStateChange = options.onStateChange ?? null;
         this.slideHeader = options.slideHeader ?? null;
+        this.canvasMode = options.canvasMode ?? CanvasMode.Slides;
+        this.slideSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+        this.canvas = this.slideSize;
         this.strings = buildStrings(options.strings);
         this.time = new TimeFormats(options.locale, options.durationUnits);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);
@@ -641,18 +665,38 @@ class Workspace implements TimelineHandle {
         if (!this.store.isLoaded) return;
 
         this.elements.empty.hidden = !this.store.isEmpty;
-        const pages = this.renderer.paginate(this.renderContext());
-        this.followSelection(pages);
-        this.pageIndex = Math.min(Math.max(this.pageIndex, 0), pages.count - 1);
-        this.viewport.allowDrag = this.renderer.draggable && this.permissions.canMove;
+        this.canvas = this.canvasMode === CanvasMode.Slides ? this.slideSize : this.wholeScene();
 
-        const info = this.store.representationInfo(this.representation);
-        this.viewport.setContent(pages.draw(this.pageIndex), `${info.label} of ${this.store.incident.title}`);
-        this.markSelection();
-        this.renderCaption();
-        this.renderPager(pages.count);
-        this.pageCount = pages.count;
+        withPageSize(this.canvas, () => {
+            const pages = this.renderer.paginate(this.renderContext());
+            this.followSelection(pages);
+            this.pageIndex = Math.min(Math.max(this.pageIndex, 0), pages.count - 1);
+            this.viewport.allowDrag = this.renderer.draggable && this.permissions.canMove;
+
+            const info = this.store.representationInfo(this.representation);
+            this.viewport.setPageSize(this.canvas);
+            this.viewport.setContent(pages.draw(this.pageIndex), `${info.label} of ${this.store.incident.title}`);
+            this.markSelection();
+            this.renderCaption();
+            this.renderPager(pages.count);
+            this.pageCount = pages.count;
+        });
         this.onStateChange?.(this.state);
+    }
+
+    /**
+     * A page tall enough to hold the whole representation in one run. Found by growing the page until the
+     * renderer stops splitting, using nothing but the contract every renderer already keeps.
+     */
+    private wholeScene(): PageSize {
+        let size = this.slideSize;
+        for (let attempt = 0; attempt < CANVAS_GROWTH_TRIES; attempt += 1) {
+            const count = withPageSize(size, () => this.renderer.paginate(this.renderContext()).count);
+            if (count === 1) return size;
+            size = { width: size.width, height: Math.min(size.height * Math.min(count, CANVAS_GROWTH_STEP), CANVAS_MAX_HEIGHT) };
+            if (size.height >= CANVAS_MAX_HEIGHT) break;
+        }
+        return size;
     }
 
     /**

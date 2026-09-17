@@ -6,7 +6,7 @@ export * from "./storage/memory-store.js";
 export * from "./storage/browser-storage-store.js";
 export * from "./storage/http-api.js";
 export * from "./storage/sourced-store.js";
-export { mountTimeline, ThemeMode, type TimelineHandle, type TimelineOptions } from "./ui/workspace.js";
+export { mountTimeline, CanvasMode, ThemeMode, type TimelineHandle, type TimelineOptions, type TimelineState } from "./ui/workspace.js";
 export { mountTimelineApp, type TimelineAppHandle, type TimelineAppOptions } from "./ui/app.js";
 export { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./ui/theme-detection.js";
 export {
@@ -20,7 +20,7 @@ export { ExportFormat, standaloneHtml, serialize } from "./ui/export.js";
 export { IconSet } from "./ui/icons/icon-set.js";
 export { DiagramStore, StoreChange, type TimelineStep, type Selection, type StepFilters } from "./ui/diagram-store.js";
 export { Palette, defaultTokenResolver, elementTokenResolver, type TokenResolver } from "./ui/theme.js";
-export { PAGE_WIDTH, PAGE_HEIGHT } from "./ui/viewport.js";
-export { CONTENT, frame, placeholder, sideLegend, LegendStroke, type LegendEntry } from "./ui/chrome.js";
+export { PAGE_WIDTH, PAGE_HEIGHT, DEFAULT_PAGE_SIZE, type PageSize } from "./ui/viewport.js";
+export { CONTENT, contentArea, pageSize, withPageSize, frame, placeholder, sideLegend, LegendStroke, type LegendEntry } from "./ui/chrome.js";
 export { defaultSlideHeader, type SlideDetail, type SlideHeader, type SlideHeaderContext, type SlideHeaderCustomizer, type SlideImpact } from "./ui/slide-header.js";
 export * from "./ui/renderers/index.js";

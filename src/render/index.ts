@@ -11,8 +11,10 @@ import { BUILT_IN_RENDERERS } from "../ui/renderers/index.js";
 import type { Renderer } from "../ui/renderers/registry.js";
 import type { SlideHeaderCustomizer } from "../ui/slide-header.js";
 import { buildStrings, type StringsOverride } from "../ui/strings.js";
+import { withPageSize } from "../ui/chrome.js";
 import { withDocument } from "../ui/svg.js";
 import { Palette, defaultTokenResolver, type TokenResolver } from "../ui/theme.js";
+import { DEFAULT_PAGE_SIZE, type PageSize } from "../ui/viewport.js";
 
 export interface RenderOptions {
     representation: RepresentationKey;
@@ -38,6 +40,8 @@ export interface RenderOptions {
     slideHeader?: SlideHeaderCustomizer;
     /** How each page is wrapped into a file. */
     file?: SerializeOptions;
+    /** The page the representation lays itself out in. Defaults to the 1600 by 900 slide. */
+    pageSize?: PageSize;
 }
 
 function drawn(diagram: Diagram, options: RenderOptions): { pages: SVGGElement[] } {
@@ -76,18 +80,22 @@ function drawn(diagram: Diagram, options: RenderOptions): { pages: SVGGElement[]
  * Every slide of one representation, as SVG documents.
  */
 export function renderPages(diagram: Diagram, options: RenderOptions): string[] {
-    return withDocument(options.document, () => {
+    return inPage(options, () => {
         const { pages } = drawn(diagram, options);
         const file = { serializer: options.serializer, ...options.file };
         return pages.map(page => serialize(page, file));
     });
 }
 
+function inPage<TResult>(options: RenderOptions, work: () => TResult): TResult {
+    return withDocument(options.document, () => withPageSize(options.pageSize ?? DEFAULT_PAGE_SIZE, work));
+}
+
 /**
  * One slide, which is what a mail or a report usually wants. Out of range asks for the last one.
  */
 export function renderPage(diagram: Diagram, options: RenderOptions, pageIndex = 0): string {
-    return withDocument(options.document, () => {
+    return inPage(options, () => {
         const { pages } = drawn(diagram, options);
         const wanted = Math.min(Math.max(Math.trunc(pageIndex), 0), pages.length - 1);
         const page = pages[wanted];
@@ -100,7 +108,7 @@ export function renderPage(diagram: Diagram, options: RenderOptions, pageIndex =
 
 /** How many slides one representation of this diagram takes. */
 export function countPages(diagram: Diagram, options: RenderOptions): number {
-    return withDocument(options.document, () => drawn(diagram, options).pages.length);
+    return inPage(options, () => drawn(diagram, options).pages.length);
 }
 
-export type { SerializeOptions, XmlSerializer };
+export type { PageSize, SerializeOptions, XmlSerializer };

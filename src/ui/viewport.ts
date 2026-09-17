@@ -6,6 +6,14 @@ import { SVG_NS } from "./svg.js";
 export const PAGE_WIDTH = 1600;
 export const PAGE_HEIGHT = 900;
 
+/** The box a representation lays itself out in. The 16:9 slide unless a host asks for another. */
+export interface PageSize {
+    width: number;
+    height: number;
+}
+
+export const DEFAULT_PAGE_SIZE: PageSize = { width: PAGE_WIDTH, height: PAGE_HEIGHT };
+
 const MIN_SCALE = 1;
 const MAX_SCALE = 8;
 const ZOOM_STEP = 1.25;
@@ -73,6 +81,7 @@ export class Viewport {
     private readonly onTap: (target: Element | null) => void;
     private scale = 1;
     private offset: Point = { x: 0, y: 0 };
+    private page: PageSize = DEFAULT_PAGE_SIZE;
 
     constructor(container: HTMLElement, options: ViewportOptions) {
         this.container = container;
@@ -80,13 +89,20 @@ export class Viewport {
         this.onTap = options.onTap;
 
         this.svg = document.createElementNS(SVG_NS, "svg");
-        this.svg.setAttribute("viewBox", `0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}`);
+        this.svg.setAttribute("viewBox", `0 0 ${this.page.width} ${this.page.height}`);
         this.svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
         this.svg.setAttribute("role", "img");
         this.container.appendChild(this.svg);
 
         this.bindPointer(options.signal);
         this.bindWheel(options.signal);
+    }
+
+    /** The size the scene is drawn at. Changing it re-frames the stage around the new page. */
+    setPageSize(size: PageSize): void {
+        this.page = size;
+        this.svg.setAttribute("viewBox", `0 0 ${size.width} ${size.height}`);
+        this.fit();
     }
 
     setContent(node: SVGElement, label: string): void {
@@ -109,10 +125,10 @@ export class Viewport {
     }
 
     private applyViewBox(): void {
-        const width = PAGE_WIDTH / this.scale;
-        const height = PAGE_HEIGHT / this.scale;
-        this.offset.x = Math.min(Math.max(this.offset.x, 0), Math.max(PAGE_WIDTH - width, 0));
-        this.offset.y = Math.min(Math.max(this.offset.y, 0), Math.max(PAGE_HEIGHT - height, 0));
+        const width = this.page.width / this.scale;
+        const height = this.page.height / this.scale;
+        this.offset.x = Math.min(Math.max(this.offset.x, 0), Math.max(this.page.width - width, 0));
+        this.offset.y = Math.min(Math.max(this.offset.y, 0), Math.max(this.page.height - height, 0));
         this.svg.setAttribute("viewBox", `${this.offset.x} ${this.offset.y} ${width} ${height}`);
     }
 
@@ -121,7 +137,7 @@ export class Viewport {
         this.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.scale * factor));
         if (this.scale === previous) return;
 
-        const point = focus ?? { x: PAGE_WIDTH / 2, y: PAGE_HEIGHT / 2 };
+        const point = focus ?? { x: this.page.width / 2, y: this.page.height / 2 };
         this.offset.x = point.x - (point.x - this.offset.x) * (previous / this.scale);
         this.offset.y = point.y - (point.y - this.offset.y) * (previous / this.scale);
         this.applyViewBox();
@@ -131,10 +147,10 @@ export class Viewport {
      * Screen coordinates to page coordinates, which is what layouts and stored placements use.
      */
     private toPagePoint(clientX: number, clientY: number): Point {
-        const rendered = fitBox(this.svg.getBoundingClientRect(), PAGE_WIDTH / PAGE_HEIGHT);
+        const rendered = fitBox(this.svg.getBoundingClientRect(), this.page.width / this.page.height);
         return {
-            x: this.offset.x + ((clientX - rendered.left) / rendered.width) * (PAGE_WIDTH / this.scale),
-            y: this.offset.y + ((clientY - rendered.top) / rendered.height) * (PAGE_HEIGHT / this.scale)
+            x: this.offset.x + ((clientX - rendered.left) / rendered.width) * (this.page.width / this.scale),
+            y: this.offset.y + ((clientY - rendered.top) / rendered.height) * (this.page.height / this.scale)
         };
     }
 
@@ -179,9 +195,9 @@ export class Viewport {
 
         this.container.addEventListener("pointermove", event => {
             if (pan) {
-                const rendered = fitBox(this.svg.getBoundingClientRect(), PAGE_WIDTH / PAGE_HEIGHT);
-                this.offset.x = pan.offset.x - (event.clientX - pan.clientX) * ((PAGE_WIDTH / this.scale) / rendered.width);
-                this.offset.y = pan.offset.y - (event.clientY - pan.clientY) * ((PAGE_HEIGHT / this.scale) / rendered.height);
+                const rendered = fitBox(this.svg.getBoundingClientRect(), this.page.width / this.page.height);
+                this.offset.x = pan.offset.x - (event.clientX - pan.clientX) * ((this.page.width / this.scale) / rendered.width);
+                this.offset.y = pan.offset.y - (event.clientY - pan.clientY) * ((this.page.height / this.scale) / rendered.height);
                 this.applyViewBox();
                 return;
             }

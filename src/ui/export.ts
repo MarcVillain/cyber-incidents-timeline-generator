@@ -4,7 +4,7 @@
 
 import { SVG_NS, svgDocument } from "./svg.js";
 import { FONT_STACK } from "./theme.js";
-import { PAGE_HEIGHT, PAGE_WIDTH } from "./viewport.js";
+import { pageSize } from "./chrome.js";
 import { DEFAULT_STRINGS, type DeckStrings } from "./strings.js";
 
 export enum ExportFormat {
@@ -47,8 +47,8 @@ export interface XmlSerializer {
 }
 
 export function serialize(page: SVGGElement, options: SerializeOptions = {}): string {
-    const width = options.width ?? PAGE_WIDTH;
-    const height = options.height ?? PAGE_HEIGHT;
+    const width = options.width ?? pageSize().width;
+    const height = options.height ?? pageSize().height;
     const owner = svgDocument();
 
     const svg = owner.createElementNS(SVG_NS, "svg");
@@ -109,8 +109,8 @@ async function toPngBlob(markup: string, background: string): Promise<Blob> {
     });
 
     const canvas = document.createElement("canvas");
-    canvas.width = PAGE_WIDTH * PNG_SCALE;
-    canvas.height = PAGE_HEIGHT * PNG_SCALE;
+    canvas.width = pageSize().width * PNG_SCALE;
+    canvas.height = pageSize().height * PNG_SCALE;
     const context = canvas.getContext("2d");
     if (!context) {
         throw new Error("This browser cannot draw on a canvas.");
@@ -156,7 +156,7 @@ export function standaloneHtml(pages: readonly SVGGElement[], title: string, str
   button { border: 1px solid #dcdfe4; background: #fff; border-radius: 6px; padding: .3rem .7rem; cursor: pointer; font: inherit; }
   button:disabled { opacity: .4; cursor: default; }
   main { padding: 1.25rem; }
-  .slide { margin: 0 auto; max-width: ${PAGE_WIDTH}px; background: #fff; border: 1px solid #dcdfe4; border-radius: 10px; overflow: hidden; }
+  .slide { margin: 0 auto; max-width: ${pageSize().width}px; background: #fff; border: 1px solid #dcdfe4; border-radius: 10px; overflow: hidden; }
   .slide svg { display: block; width: 100%; height: auto; }
   [hidden] { display: none !important; }
   @media print {
@@ -234,7 +234,7 @@ export async function printPages(pages: readonly SVGGElement[], title: string): 
 
     target.title = title;
     const style = target.createElement("style");
-    style.textContent = `@page { size: ${PAGE_WIDTH}px ${PAGE_HEIGHT}px; margin: 0; } body { margin: 0; } figure { margin: 0; page-break-after: always; } svg { display: block; width: 100%; height: auto; }`;
+    style.textContent = `@page { size: ${pageSize().width}px ${pageSize().height}px; margin: 0; } body { margin: 0; } figure { margin: 0; page-break-after: always; } svg { display: block; width: 100%; height: auto; }`;
     target.head.appendChild(style);
     pages.forEach(page => {
         const figure = target.createElement("figure");
@@ -249,7 +249,7 @@ export async function printPages(pages: readonly SVGGElement[], title: string): 
 
 function wrapPage(page: SVGGElement): SVGSVGElement {
     const svg = document.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("viewBox", `0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}`);
+    svg.setAttribute("viewBox", `0 0 ${pageSize().width} ${pageSize().height}`);
     svg.appendChild(page.cloneNode(true));
     return svg;
 }

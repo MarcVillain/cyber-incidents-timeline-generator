@@ -10,7 +10,7 @@ import type { RenderContext } from "./renderers/registry.js";
 import { defaultSlideHeader, type SlideDetail, type SlideHeader, type SlideImpact } from "./slide-header.js";
 import { group, line, rect, text, truncate } from "./svg.js";
 import { FONT_STACK, textWidth, type Palette } from "./theme.js";
-import { PAGE_HEIGHT, PAGE_WIDTH } from "./viewport.js";
+import { DEFAULT_PAGE_SIZE, type PageSize } from "./viewport.js";
 
 export const MARGIN = 26;
 export const HEADER_HEIGHT = 78;
@@ -25,17 +25,50 @@ export interface ContentArea {
     bottom: number;
 }
 
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-const CONTENT_HEIGHT = PAGE_HEIGHT - MARGIN * 2 - HEADER_HEIGHT - FOOTER_HEIGHT;
+/**
+ * Where the drawing goes inside a page of the given size.
+ */
+export function contentArea(page: PageSize): ContentArea {
+    const width = page.width - MARGIN * 2;
+    const height = page.height - MARGIN * 2 - HEADER_HEIGHT - FOOTER_HEIGHT;
+    return {
+        x: MARGIN,
+        y: MARGIN + HEADER_HEIGHT,
+        width,
+        height,
+        right: MARGIN + width,
+        bottom: MARGIN + HEADER_HEIGHT + height
+    };
+}
 
-export const CONTENT: ContentArea = {
-    x: MARGIN,
-    y: MARGIN + HEADER_HEIGHT,
-    width: CONTENT_WIDTH,
-    height: CONTENT_HEIGHT,
-    right: MARGIN + CONTENT_WIDTH,
-    bottom: MARGIN + HEADER_HEIGHT + CONTENT_HEIGHT
-};
+let current: PageSize = DEFAULT_PAGE_SIZE;
+
+/**
+ * The page being drawn. Every representation lays itself out against this rather than a constant, which
+ * is what lets a host ask for a sheet of paper or a canvas as tall as its content.
+ */
+export const CONTENT: ContentArea = { ...contentArea(DEFAULT_PAGE_SIZE) };
+
+export function pageSize(): PageSize {
+    return current;
+}
+
+/**
+ * Draws at the given page size for the length of the work and puts back what was there before. A render
+ * runs start to finish without yielding, so the box cannot change under a renderer mid draw.
+ */
+export function withPageSize<TResult>(size: PageSize, work: () => TResult): TResult {
+    const previous = current;
+    const restore = { ...CONTENT };
+    current = size;
+    Object.assign(CONTENT, contentArea(size));
+    try {
+        return work();
+    } finally {
+        current = previous;
+        Object.assign(CONTENT, restore);
+    }
+}
 
 const ACCENT_HEIGHT = 5;
 const BOLD = 700;
@@ -100,15 +133,15 @@ export function frame(context: RenderContext, { page, pageCount, subtitle, legen
     const header = context.slideHeader ? context.slideHeader(defaults, headerContext) : defaults;
 
     const root = group({ "font-family": FONT_STACK });
-    root.appendChild(rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, { fill: palette.surface }));
+    root.appendChild(rect(0, 0, pageSize().width, pageSize().height, { fill: palette.surface }));
 
     // A rule across the top in the colour of the rating, rather than a bar down one side
     if (header.accentColor) {
-        root.appendChild(rect(0, 0, PAGE_WIDTH, ACCENT_HEIGHT, { fill: header.accentColor }));
+        root.appendChild(rect(0, 0, pageSize().width, ACCENT_HEIGHT, { fill: header.accentColor }));
     }
 
     const details = measureDetails(header.details);
-    const titleRoom = Math.max(MIN_TITLE_WIDTH, PAGE_WIDTH - MARGIN * 2 - metaWidth(context, header, details) - META_GAP);
+    const titleRoom = Math.max(MIN_TITLE_WIDTH, pageSize().width - MARGIN * 2 - metaWidth(context, header, details) - META_GAP);
 
     root.appendChild(text(truncate(header.kicker, KICKER_SIZE, titleRoom), MARGIN, MARGIN + 8, {
         "font-size": KICKER_SIZE, "font-weight": BOLD, "letter-spacing": 1.4, fill: palette.inkMuted
@@ -123,7 +156,7 @@ export function frame(context: RenderContext, { page, pageCount, subtitle, legen
     }
 
     root.appendChild(headerMeta(context, header, details));
-    root.appendChild(line(MARGIN, MARGIN + HEADER_HEIGHT - 14, PAGE_WIDTH - MARGIN, MARGIN + HEADER_HEIGHT - 14, {
+    root.appendChild(line(MARGIN, MARGIN + HEADER_HEIGHT - 14, pageSize().width - MARGIN, MARGIN + HEADER_HEIGHT - 14, {
         stroke: palette.border, "stroke-width": 1
     }));
 
@@ -165,7 +198,7 @@ function metaWidth(context: RenderContext, header: SlideHeader, details: readonl
 function headerMeta(context: RenderContext, header: SlideHeader, details: readonly DetailCell[]): SVGGElement {
     const { palette } = context;
     const node = group();
-    const right = PAGE_WIDTH - MARGIN;
+    const right = pageSize().width - MARGIN;
 
     if (header.reference) {
         node.appendChild(text(header.reference, right, MARGIN + 10, {
@@ -234,9 +267,9 @@ function detailRow(palette: Palette, details: readonly DetailCell[], right: numb
 function footer(context: RenderContext, legend: readonly LegendEntry[], page: number, pageCount: number): SVGGElement {
     const { palette } = context;
     const node = group();
-    const y = PAGE_HEIGHT - MARGIN + 2;
+    const y = pageSize().height - MARGIN + 2;
 
-    node.appendChild(line(MARGIN, y - 18, PAGE_WIDTH - MARGIN, y - 18, { stroke: palette.border, "stroke-width": 1 }));
+    node.appendChild(line(MARGIN, y - 18, pageSize().width - MARGIN, y - 18, { stroke: palette.border, "stroke-width": 1 }));
 
     let cursor = MARGIN;
     legend.forEach(entry => {
@@ -244,7 +277,7 @@ function footer(context: RenderContext, legend: readonly LegendEntry[], page: nu
     });
 
     if (pageCount > 1) {
-        node.appendChild(text(`${page + 1} / ${pageCount}`, PAGE_WIDTH - MARGIN, y - 2, {
+        node.appendChild(text(`${page + 1} / ${pageCount}`, pageSize().width - MARGIN, y - 2, {
             "font-size": 11, "text-anchor": "end", fill: palette.inkMuted
         }));
     }

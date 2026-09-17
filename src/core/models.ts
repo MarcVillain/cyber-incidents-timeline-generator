@@ -30,6 +30,13 @@ export type ImpactLevel = string;
  */
 export type WallClock = string;
 
+/**
+ * A bag the host application owns. The package stores it, returns it and never reads it, which is how a
+ * host carries its own identifiers, provenance or classification alongside a record without the package
+ * having to know what any of it means.
+ */
+export type Metadata = Readonly<Record<string, unknown>>;
+
 export interface Incident {
     id: RecordId;
     title: string;
@@ -46,6 +53,8 @@ export interface Incident {
      * managed outside this tool.
      */
     externalId: string | null;
+    /** Host owned data, stored and returned untouched. */
+    metadata: Metadata | null;
 }
 
 export type IncidentFields = Omit<Incident, "id">;
@@ -81,6 +90,8 @@ export interface NodeRecord {
      * Maintained by the service, never supplied by a caller.
      */
     canonicalKey: string | null;
+    /** Host owned data, stored and returned untouched. */
+    metadata: Metadata | null;
 }
 
 export type NodeFields = Omit<NodeRecord, "id" | "incidentId" | "canonicalKey">;
@@ -127,6 +138,10 @@ export interface StepRecord {
     targetNodeId: RecordId | null;
     involvements: StepInvolvement[];
     tags: string[];
+    /** A reference into the host application, such as the id of the record this step was imported from. */
+    externalId: string | null;
+    /** Host owned data, stored and returned untouched. */
+    metadata: Metadata | null;
 }
 
 export type StepFields = Omit<StepRecord, "id" | "incidentId">;
@@ -147,6 +162,8 @@ export interface LinkRecord {
     confidence: Confidence;
     /** The step that established the relationship, if any. */
     stepId: RecordId | null;
+    /** Host owned data, stored and returned untouched. */
+    metadata: Metadata | null;
 }
 
 export type LinkFields = Omit<LinkRecord, "id" | "incidentId">;

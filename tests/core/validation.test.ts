@@ -72,3 +72,40 @@ describe("validation", () => {
         assert.deepEqual(issuesOf(() => readLayouts({})), ["layouts"]);
     });
 });
+
+describe("host metadata", () => {
+    it("stores a bag of host values untouched", () => {
+        const node = readNodeCreate({ name: "Clerk", kind: "Person", metadata: { crudyId: "a-b-c", depth: 2, tags: ["x"] } });
+        assert.deepEqual(node.metadata, { crudyId: "a-b-c", depth: 2, tags: ["x"] });
+    });
+
+    it("defaults to nothing, and an empty bag is nothing", () => {
+        assert.equal(readNodeCreate({ name: "Clerk", kind: "Person" }).metadata, null);
+        assert.equal(readNodeCreate({ name: "Clerk", kind: "Person", metadata: {} }).metadata, null);
+    });
+
+    it("clears with a null and is left alone when not sent", () => {
+        assert.deepEqual(readNodeUpdate({ metadata: null }), { metadata: null });
+        assert.deepEqual(readNodeUpdate({}), {});
+    });
+
+    it("refuses anything that is not a plain object", () => {
+        assert.deepEqual(issuesOf(() => readNodeCreate({ name: "A", kind: "Person", metadata: "x" })), ["metadata"]);
+        assert.deepEqual(issuesOf(() => readNodeCreate({ name: "A", kind: "Person", metadata: [1, 2] })), ["metadata"]);
+    });
+
+    it("refuses a bag beyond the key and size limits", () => {
+        const wide: Record<string, number> = {};
+        for (let index = 0; index <= FieldLimits.MetadataKeys; index += 1) wide[`k${index}`] = index;
+        assert.deepEqual(issuesOf(() => readNodeCreate({ name: "A", kind: "Person", metadata: wide })), ["metadata"]);
+
+        const long = { note: "x".repeat(FieldLimits.MetadataLength) };
+        assert.deepEqual(issuesOf(() => readNodeCreate({ name: "A", kind: "Person", metadata: long })), ["metadata"]);
+    });
+
+    it("carries on every record, and a step also takes an external id", () => {
+        const step = readStepCreate({ title: "Opened", timestamp: TIMESTAMP, externalId: "ticket-8", metadata: { source: "SIEM" } });
+        assert.equal(step.externalId, "ticket-8");
+        assert.deepEqual(step.metadata, { source: "SIEM" });
+    });
+});

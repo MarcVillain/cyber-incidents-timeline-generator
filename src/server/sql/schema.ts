@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS ${tables.incidents} (
     reference_id TEXT NULL,
     impact TEXT NOT NULL,
     scope TEXT NULL,
-    external_id TEXT NULL
+    external_id TEXT NULL,
+    metadata TEXT NULL
 );
 
 CREATE INDEX IF NOT EXISTS ${tables.incidents}_external ON ${tables.incidents}(external_id);
@@ -69,7 +70,8 @@ CREATE TABLE IF NOT EXISTS ${tables.nodes} (
     icon TEXT NULL,
     color_override TEXT NULL,
     external_id TEXT NULL,
-    canonical_key TEXT NULL
+    canonical_key TEXT NULL,
+    metadata TEXT NULL
 );
 CREATE INDEX IF NOT EXISTS ${tables.nodes}_incident ON ${tables.nodes}(incident_id);
 CREATE INDEX IF NOT EXISTS ${tables.nodes}_canonical ON ${tables.nodes}(canonical_key);
@@ -103,10 +105,13 @@ CREATE TABLE IF NOT EXISTS ${tables.steps} (
     is_milestone INTEGER NOT NULL,
     icon TEXT NULL,
     source_node_id INTEGER NULL REFERENCES ${tables.nodes}(id) ON DELETE SET NULL,
-    target_node_id INTEGER NULL REFERENCES ${tables.nodes}(id) ON DELETE SET NULL
+    target_node_id INTEGER NULL REFERENCES ${tables.nodes}(id) ON DELETE SET NULL,
+    external_id TEXT NULL,
+    metadata TEXT NULL
 );
 CREATE INDEX IF NOT EXISTS ${tables.steps}_incident ON ${tables.steps}(incident_id);
 CREATE INDEX IF NOT EXISTS ${tables.steps}_timestamp ON ${tables.steps}(timestamp);
+CREATE INDEX IF NOT EXISTS ${tables.steps}_external ON ${tables.steps}(external_id);
 
 CREATE TABLE IF NOT EXISTS ${tables.involvements} (
     step_id INTEGER NOT NULL REFERENCES ${tables.steps}(id) ON DELETE CASCADE,
@@ -130,7 +135,8 @@ CREATE TABLE IF NOT EXISTS ${tables.links} (
     kind TEXT NOT NULL,
     label TEXT NULL,
     confidence TEXT NOT NULL,
-    step_id INTEGER NULL REFERENCES ${tables.steps}(id) ON DELETE CASCADE
+    step_id INTEGER NULL REFERENCES ${tables.steps}(id) ON DELETE CASCADE,
+    metadata TEXT NULL
 );
 CREATE INDEX IF NOT EXISTS ${tables.links}_incident ON ${tables.links}(incident_id);
 `;

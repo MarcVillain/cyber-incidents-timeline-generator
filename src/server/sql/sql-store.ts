@@ -12,28 +12,28 @@ import {
 } from "../../core/enums.js";
 import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, RecordId, StepInvolvement, StepRecord } from "../../core/models.js";
 import type { LinkData, NodeData, StepData, TimelineStore } from "../../core/store.js";
-import { RowReader, flag, type SqlDriver, type SqlRow, type SqlValue } from "./driver.js";
+import { RowReader, flag, json, type SqlDriver, type SqlRow, type SqlValue } from "./driver.js";
 import { DEFAULT_TABLE_PREFIX, TableNames } from "./schema.js";
 
 export interface SqlTimelineStoreOptions {
     tablePrefix?: string;
 }
 
-const INCIDENT_COLUMNS = "id, title, reference_id, impact, scope, external_id";
-const NODE_COLUMNS = "id, incident_id, name, description, kind, side, parent_id, identifier, role, criticality, compromised, icon, color_override, external_id, canonical_key";
-const STEP_COLUMNS = "id, incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, icon, source_node_id, target_node_id";
-const LINK_COLUMNS = "id, incident_id, source_node_id, target_node_id, kind, label, confidence, step_id";
+const INCIDENT_COLUMNS = "id, title, reference_id, impact, scope, external_id, metadata";
+const NODE_COLUMNS = "id, incident_id, name, description, kind, side, parent_id, identifier, role, criticality, compromised, icon, color_override, external_id, canonical_key, metadata";
+const STEP_COLUMNS = "id, incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, icon, source_node_id, target_node_id, external_id, metadata";
+const LINK_COLUMNS = "id, incident_id, source_node_id, target_node_id, kind, label, confidence, step_id, metadata";
 
 function incidentValues(fields: IncidentFields): SqlValue[] {
     return [
-        fields.title, fields.referenceId, fields.impact, fields.scope, fields.externalId
+        fields.title, fields.referenceId, fields.impact, fields.scope, fields.externalId, json(fields.metadata)
     ];
 }
 
 function nodeValues(data: NodeData): SqlValue[] {
     return [
         data.incidentId, data.name, data.description, data.kind, data.side, data.parentId, data.identifier,
-        data.role, data.criticality, flag(data.compromised), data.icon, data.colorOverride, data.externalId, data.canonicalKey
+        data.role, data.criticality, flag(data.compromised), data.icon, data.colorOverride, data.externalId, data.canonicalKey, json(data.metadata)
     ];
 }
 
@@ -42,12 +42,12 @@ function stepValues(data: StepData): SqlValue[] {
         data.incidentId, data.timestamp, data.endTimestamp, flag(data.timeKnown), data.orderIndex, data.title,
         data.description, data.side, data.attackTactic, data.responsePhase, data.mitreTechniqueId, data.severity,
         data.confidence, data.outcome, data.audience, data.evidenceSource, flag(data.isMilestone), data.icon,
-        data.sourceNodeId, data.targetNodeId
+        data.sourceNodeId, data.targetNodeId, data.externalId, json(data.metadata)
     ];
 }
 
 function linkValues(data: LinkData): SqlValue[] {
-    return [data.incidentId, data.sourceNodeId, data.targetNodeId, data.kind, data.label, data.confidence, data.stepId];
+    return [data.incidentId, data.sourceNodeId, data.targetNodeId, data.kind, data.label, data.confidence, data.stepId, json(data.metadata)];
 }
 
 function readIncident(row: SqlRow, classifications: string[]): Incident {
@@ -59,6 +59,7 @@ function readIncident(row: SqlRow, classifications: string[]): Incident {
         impact: read.text("impact"),
         scope: read.nullableText("scope"),
         externalId: read.nullableText("external_id"),
+        metadata: read.json("metadata"),
         classifications
     };
 }
@@ -80,7 +81,8 @@ function readNode(row: SqlRow): NodeRecord {
         icon: read.nullableText("icon"),
         colorOverride: read.nullableText("color_override"),
         externalId: read.nullableText("external_id"),
-        canonicalKey: read.nullableText("canonical_key")
+        canonicalKey: read.nullableText("canonical_key"),
+        metadata: read.json("metadata")
     };
 }
 
@@ -108,6 +110,8 @@ function readStep(row: SqlRow, involvements: StepInvolvement[], tags: string[]):
         icon: read.nullableText("icon"),
         sourceNodeId: read.nullableNumber("source_node_id"),
         targetNodeId: read.nullableNumber("target_node_id"),
+        externalId: read.nullableText("external_id"),
+        metadata: read.json("metadata"),
         involvements,
         tags
     };
@@ -123,7 +127,8 @@ function readLink(row: SqlRow): LinkRecord {
         kind: read.enumValue("kind", LinkKind),
         label: read.nullableText("label"),
         confidence: read.enumValue("confidence", Confidence),
-        stepId: read.nullableNumber("step_id")
+        stepId: read.nullableNumber("step_id"),
+        metadata: read.json("metadata")
     };
 }
 
@@ -202,7 +207,7 @@ export class SqlTimelineStore implements TimelineStore {
     async insertIncident(fields: IncidentFields): Promise<Incident> {
         return this.driver.transaction(async () => {
             const id = await this.insertReturningId(
-                `INSERT INTO ${this.tables.incidents} (title, reference_id, impact, scope, external_id) VALUES (?, ?, ?, ?, ?)`,
+                `INSERT INTO ${this.tables.incidents} (title, reference_id, impact, scope, external_id, metadata) VALUES (?, ?, ?, ?, ?, ?)`,
                 incidentValues(fields)
             );
             await this.writeClassifications(id, fields.classifications);
@@ -213,7 +218,7 @@ export class SqlTimelineStore implements TimelineStore {
     async updateIncident(incident: Incident): Promise<void> {
         await this.driver.transaction(async () => {
             await this.driver.execute(
-                `UPDATE ${this.tables.incidents} SET title = ?, reference_id = ?, impact = ?, scope = ?, external_id = ? WHERE id = ?`,
+                `UPDATE ${this.tables.incidents} SET title = ?, reference_id = ?, impact = ?, scope = ?, external_id = ?, metadata = ? WHERE id = ?`,
                 [...incidentValues(incident), incident.id]
             );
             await this.writeClassifications(incident.id, incident.classifications);
@@ -252,7 +257,7 @@ export class SqlTimelineStore implements TimelineStore {
 
     async insertNode(data: NodeData): Promise<NodeRecord> {
         const id = await this.insertReturningId(
-            `INSERT INTO ${this.tables.nodes} (incident_id, name, description, kind, side, parent_id, identifier, role, criticality, compromised, icon, color_override, external_id, canonical_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO ${this.tables.nodes} (incident_id, name, description, kind, side, parent_id, identifier, role, criticality, compromised, icon, color_override, external_id, canonical_key, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             nodeValues(data)
         );
         return { ...data, id };
@@ -260,7 +265,7 @@ export class SqlTimelineStore implements TimelineStore {
 
     async updateNode(node: NodeRecord): Promise<void> {
         await this.driver.execute(
-            `UPDATE ${this.tables.nodes} SET incident_id = ?, name = ?, description = ?, kind = ?, side = ?, parent_id = ?, identifier = ?, role = ?, criticality = ?, compromised = ?, icon = ?, color_override = ?, external_id = ?, canonical_key = ? WHERE id = ?`,
+            `UPDATE ${this.tables.nodes} SET incident_id = ?, name = ?, description = ?, kind = ?, side = ?, parent_id = ?, identifier = ?, role = ?, criticality = ?, compromised = ?, icon = ?, color_override = ?, external_id = ?, canonical_key = ?, metadata = ? WHERE id = ?`,
             [...nodeValues(node), node.id]
         );
     }
@@ -318,7 +323,7 @@ export class SqlTimelineStore implements TimelineStore {
     async insertStep(data: StepData): Promise<StepRecord> {
         return this.driver.transaction(async () => {
             const id = await this.insertReturningId(
-                `INSERT INTO ${this.tables.steps} (incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, icon, source_node_id, target_node_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO ${this.tables.steps} (incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, icon, source_node_id, target_node_id, external_id, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 stepValues(data)
             );
             await this.writeStepChildren(id, data.involvements, data.tags);
@@ -329,7 +334,7 @@ export class SqlTimelineStore implements TimelineStore {
     async updateStep(step: StepRecord): Promise<void> {
         await this.driver.transaction(async () => {
             await this.driver.execute(
-                `UPDATE ${this.tables.steps} SET incident_id = ?, timestamp = ?, end_timestamp = ?, time_known = ?, order_index = ?, title = ?, description = ?, side = ?, attack_tactic = ?, response_phase = ?, mitre_technique_id = ?, severity = ?, confidence = ?, outcome = ?, audience = ?, evidence_source = ?, is_milestone = ?, icon = ?, source_node_id = ?, target_node_id = ? WHERE id = ?`,
+                `UPDATE ${this.tables.steps} SET incident_id = ?, timestamp = ?, end_timestamp = ?, time_known = ?, order_index = ?, title = ?, description = ?, side = ?, attack_tactic = ?, response_phase = ?, mitre_technique_id = ?, severity = ?, confidence = ?, outcome = ?, audience = ?, evidence_source = ?, is_milestone = ?, icon = ?, source_node_id = ?, target_node_id = ?, external_id = ?, metadata = ? WHERE id = ?`,
                 [...stepValues(step), step.id]
             );
             await this.writeStepChildren(step.id, step.involvements, step.tags);
@@ -356,7 +361,7 @@ export class SqlTimelineStore implements TimelineStore {
 
     async insertLink(data: LinkData): Promise<LinkRecord> {
         const id = await this.insertReturningId(
-            `INSERT INTO ${this.tables.links} (incident_id, source_node_id, target_node_id, kind, label, confidence, step_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO ${this.tables.links} (incident_id, source_node_id, target_node_id, kind, label, confidence, step_id, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             linkValues(data)
         );
         return { ...data, id };
@@ -364,7 +369,7 @@ export class SqlTimelineStore implements TimelineStore {
 
     async updateLink(link: LinkRecord): Promise<void> {
         await this.driver.execute(
-            `UPDATE ${this.tables.links} SET incident_id = ?, source_node_id = ?, target_node_id = ?, kind = ?, label = ?, confidence = ?, step_id = ? WHERE id = ?`,
+            `UPDATE ${this.tables.links} SET incident_id = ?, source_node_id = ?, target_node_id = ?, kind = ?, label = ?, confidence = ?, step_id = ?, metadata = ? WHERE id = ?`,
             [...linkValues(link), link.id]
         );
     }

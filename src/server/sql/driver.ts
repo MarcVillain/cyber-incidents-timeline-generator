@@ -1,7 +1,13 @@
 import { isEnumValue } from "../../core/enums.js";
 
+/** A JSON document a driver may hand back for a column the engine parses itself, such as PostgreSQL JSONB. */
+export type SqlJson = Readonly<Record<string, unknown>>;
+
 export type SqlValue = string | number | null;
-export type SqlRow = Readonly<Record<string, SqlValue>>;
+
+/** What a row may hold. Wider than a parameter, because an engine may parse a JSON column for us. */
+export type SqlColumn = SqlValue | SqlJson;
+export type SqlRow = Readonly<Record<string, SqlColumn>>;
 
 /**
  * The only thing SqlTimelineStore needs from a database. Statements use ? placeholders and standard
@@ -26,7 +32,7 @@ export class RowReader {
         this.row = row;
     }
 
-    private raw(column: string): SqlValue {
+    private raw(column: string): SqlColumn {
         const value = this.row[column];
         if (value === undefined) {
             throw new Error(`Column ${column} is missing from the result.`);
@@ -36,6 +42,9 @@ export class RowReader {
 
     text(column: string): string {
         const value = this.raw(column);
+        if (typeof value === "object" && value !== null) {
+            throw new Error(`Column ${column} should hold text.`);
+        }
         if (typeof value !== "string") {
             throw new Error(`Column ${column} should hold text.`);
         }
@@ -62,6 +71,29 @@ export class RowReader {
         return this.number(column) !== 0;
     }
 
+    /**
+     * A JSON document. Engines differ on whether they hand back the text or the parsed value, so both are
+     * accepted, and anything that is neither is a broken column rather than a value to guess at.
+     */
+    json(column: string): SqlJson | null {
+        const value = this.raw(column);
+        if (value === null) return null;
+        if (typeof value === "object") return value;
+        if (typeof value !== "string") {
+            throw new Error(`Column ${column} should hold a JSON document.`);
+        }
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(value);
+        } catch {
+            throw new Error(`Column ${column} does not hold valid JSON.`);
+        }
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error(`Column ${column} should hold a JSON object.`);
+        }
+        return parsed as SqlJson;
+    }
+
     enumValue<TValue extends string>(column: string, enumObject: Readonly<Record<string, TValue>>): TValue {
         const value = this.text(column);
         if (!isEnumValue(enumObject, value)) {
@@ -73,4 +105,9 @@ export class RowReader {
 
 export function flag(value: boolean): number {
     return value ? 1 : 0;
+}
+
+/** Metadata is bound as JSON text, which every engine accepts for a text or a JSON column. */
+export function json(value: SqlJson | null): SqlValue {
+    return value === null ? null : JSON.stringify(value);
 }

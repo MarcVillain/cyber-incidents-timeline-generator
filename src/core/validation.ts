@@ -24,6 +24,7 @@ import type {
     RecordId,
     StepFields,
     StepInvolvement,
+    Metadata,
     StepUpdateInput,
     WallClock
 } from "./models.js";
@@ -53,6 +54,8 @@ export class FieldLimits {
     static readonly LinkLabel = 200;
     static readonly LayoutEntries = 1000;
     static readonly Coordinate = 100000;
+    static readonly MetadataKeys = 100;
+    static readonly MetadataLength = 16000;
 }
 
 /**
@@ -241,6 +244,32 @@ class FieldReader {
         return this.value(field) === null ? null : this.wallClock(field);
     }
 
+    /**
+     * A bag of host owned values. It is never interpreted, only checked for being a plain JSON object
+     * of a bounded size, because it is stored and handed back as it came.
+     */
+    metadata(field: string): Metadata | null | undefined {
+        const value = this.value(field);
+        if (value === undefined) return undefined;
+        if (value === null) return null;
+        if (!isRecord(value)) return this.fail(field, "must be an object or null");
+
+        const keys = Object.keys(value);
+        if (keys.length > FieldLimits.MetadataKeys) return this.fail(field, `must hold at most ${FieldLimits.MetadataKeys} keys`);
+        if (!keys.length) return null;
+
+        let serialized: string;
+        try {
+            serialized = JSON.stringify(value);
+        } catch {
+            return this.fail(field, "must hold plain JSON values");
+        }
+        if (serialized === undefined || serialized.length > FieldLimits.MetadataLength) {
+            return this.fail(field, `must serialize to at most ${FieldLimits.MetadataLength} characters of JSON`);
+        }
+        return value as Metadata;
+    }
+
     textList(field: string, maxLength: number, maxItems: number): string[] | undefined {
         const value = this.value(field);
         if (value === undefined) return undefined;
@@ -284,7 +313,8 @@ function incidentDefaults(rules: ValidationRules): Omit<IncidentFields, "title">
         impact: rules.unassessedImpact,
         scope: null,
         classifications: [],
-        externalId: null
+        externalId: null,
+        metadata: null
     };
 }
 
@@ -299,7 +329,8 @@ function nodeDefaults(rules: ValidationRules): Omit<NodeFields, "name" | "kind">
         compromised: false,
         icon: null,
         colorOverride: null,
-        externalId: null
+        externalId: null,
+        metadata: null
     };
 }
 
@@ -323,7 +354,9 @@ function stepDefaults(rules: ValidationRules): Omit<StepFields, "title" | "times
         sourceNodeId: null,
         targetNodeId: null,
         involvements: [],
-        tags: []
+        tags: [],
+        externalId: null,
+        metadata: null
     };
 }
 
@@ -332,7 +365,8 @@ function linkDefaults(): Omit<LinkFields, "sourceNodeId" | "targetNodeId"> {
         kind: LinkKind.ConnectsTo,
         label: null,
         confidence: Confidence.Confirmed,
-        stepId: null
+        stepId: null,
+        metadata: null
     };
 }
 
@@ -343,7 +377,8 @@ function readIncidentPatch(reader: FieldReader, rules: ValidationRules): Partial
         impact: reader.oneOf("impact", rules.impactLevels),
         scope: reader.nullableText("scope", FieldLimits.Scope),
         classifications: reader.textList("classifications", FieldLimits.Classification, FieldLimits.Classifications),
-        externalId: reader.nullableText("externalId", FieldLimits.ExternalId)
+        externalId: reader.nullableText("externalId", FieldLimits.ExternalId),
+        metadata: reader.metadata("metadata")
     });
 }
 
@@ -360,7 +395,8 @@ function readNodePatch(reader: FieldReader, rules: ValidationRules): Partial<Nod
         compromised: reader.boolean("compromised"),
         icon: reader.nullableText("icon", FieldLimits.Icon, ICON_PATTERN),
         colorOverride: reader.nullableText("colorOverride", FieldLimits.Color, COLOR_PATTERN),
-        externalId: reader.nullableText("externalId", FieldLimits.ExternalId)
+        externalId: reader.nullableText("externalId", FieldLimits.ExternalId),
+        metadata: reader.metadata("metadata")
     });
 }
 
@@ -407,7 +443,9 @@ function readStepPatch(reader: FieldReader, rules: ValidationRules): Partial<Ste
         sourceNodeId: reader.nullableId("sourceNodeId"),
         targetNodeId: reader.nullableId("targetNodeId"),
         involvements: distinctInvolvements(reader.list("involvements", FieldLimits.Involvements, readInvolvement)),
-        tags: reader.textList("tags", FieldLimits.Tag, FieldLimits.Tags)
+        tags: reader.textList("tags", FieldLimits.Tag, FieldLimits.Tags),
+        externalId: reader.nullableText("externalId", FieldLimits.ExternalId),
+        metadata: reader.metadata("metadata")
     });
 }
 
@@ -418,7 +456,8 @@ function readLinkPatch(reader: FieldReader): Partial<LinkFields> {
         kind: reader.enumValue("kind", LinkKind),
         label: reader.nullableText("label", FieldLimits.LinkLabel),
         confidence: reader.enumValue("confidence", Confidence),
-        stepId: reader.nullableId("stepId")
+        stepId: reader.nullableId("stepId"),
+        metadata: reader.metadata("metadata")
     });
 }
 

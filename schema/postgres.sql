@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS tlg_incidents (
     reference_id TEXT NULL,
     impact TEXT NOT NULL,
     scope TEXT NULL,
-    external_id TEXT NULL
+    external_id TEXT NULL,
+    metadata JSONB NULL
 );
 
 CREATE INDEX IF NOT EXISTS tlg_incidents_external ON tlg_incidents(external_id);
@@ -34,7 +35,8 @@ CREATE TABLE IF NOT EXISTS tlg_nodes (
     icon TEXT NULL,
     color_override TEXT NULL,
     external_id TEXT NULL,
-    canonical_key TEXT NULL
+    canonical_key TEXT NULL,
+    metadata JSONB NULL
 );
 CREATE INDEX IF NOT EXISTS tlg_nodes_incident ON tlg_nodes(incident_id);
 CREATE INDEX IF NOT EXISTS tlg_nodes_canonical ON tlg_nodes(canonical_key);
@@ -68,10 +70,13 @@ CREATE TABLE IF NOT EXISTS tlg_steps (
     is_milestone SMALLINT NOT NULL,
     icon TEXT NULL,
     source_node_id BIGINT NULL REFERENCES tlg_nodes(id) ON DELETE SET NULL,
-    target_node_id BIGINT NULL REFERENCES tlg_nodes(id) ON DELETE SET NULL
+    target_node_id BIGINT NULL REFERENCES tlg_nodes(id) ON DELETE SET NULL,
+    external_id TEXT NULL,
+    metadata JSONB NULL
 );
 CREATE INDEX IF NOT EXISTS tlg_steps_incident ON tlg_steps(incident_id);
 CREATE INDEX IF NOT EXISTS tlg_steps_timestamp ON tlg_steps(timestamp);
+CREATE INDEX IF NOT EXISTS tlg_steps_external ON tlg_steps(external_id);
 
 CREATE TABLE IF NOT EXISTS tlg_step_involvements (
     step_id BIGINT NOT NULL REFERENCES tlg_steps(id) ON DELETE CASCADE,
@@ -95,6 +100,7 @@ CREATE TABLE IF NOT EXISTS tlg_links (
     kind TEXT NOT NULL,
     label TEXT NULL,
     confidence TEXT NOT NULL,
-    step_id BIGINT NULL REFERENCES tlg_steps(id) ON DELETE CASCADE
+    step_id BIGINT NULL REFERENCES tlg_steps(id) ON DELETE CASCADE,
+    metadata JSONB NULL
 );
 CREATE INDEX IF NOT EXISTS tlg_links_incident ON tlg_links(incident_id);

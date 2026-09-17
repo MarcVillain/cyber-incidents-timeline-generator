@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Host metadata on every record. `Incident`, `NodeRecord`, `StepRecord` and `LinkRecord` carry an optional
+  `metadata` object that the package stores and hands back without ever reading it, so a host application
+  can keep its own identifiers and provenance beside a record. Bounded to 100 keys and 16000 characters of
+  JSON.
+- `externalId` on a step, which every other record already had.
+
 ## [0.1.1] - 2026-09-16
 
 ### Changed

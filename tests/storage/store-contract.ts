@@ -29,6 +29,24 @@ export function runStoreContract(name: string, createStore: () => Promise<Timeli
             assert.equal((await store.listIncidents()).length, 1);
         });
 
+        it("round trips the host metadata of every record", async () => {
+            const store = await createStore();
+            const bag = { crudyId: "7f0c", nested: { depth: 2 }, list: [1, 2] };
+            const incident = await store.insertIncident(readIncidentCreate({ title: "Incident", metadata: bag }));
+            const node = await store.insertNode({ ...readNodeCreate({ name: "Clerk", kind: NodeKind.Person, metadata: bag }), incidentId: incident.id, canonicalKey: null });
+            const step = await store.insertStep({ ...readStepCreate({ title: "Step", timestamp: TIMESTAMP, externalId: "ticket-8", metadata: bag }), incidentId: incident.id });
+            const link = await store.insertLink({ ...readLinkCreate({ sourceNodeId: node.id, targetNodeId: node.id, metadata: bag }), incidentId: incident.id });
+
+            assert.deepEqual((await store.findIncident(incident.id))?.metadata, bag);
+            assert.deepEqual((await store.findNode(node.id))?.metadata, bag);
+            assert.deepEqual((await store.findStep(step.id))?.metadata, bag);
+            assert.equal((await store.findStep(step.id))?.externalId, "ticket-8");
+            assert.deepEqual((await store.findLink(link.id))?.metadata, bag);
+
+            await store.updateStep({ ...step, metadata: null });
+            assert.equal((await store.findStep(step.id))?.metadata, null);
+        });
+
         it("round trips records, steps and links", async () => {
             const store = await createStore();
             const incident = await store.insertIncident(readIncidentCreate({ title: "Incident" }));

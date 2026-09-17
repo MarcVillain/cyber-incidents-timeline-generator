@@ -229,6 +229,8 @@ interface Elements {
     zoomOut: HTMLButtonElement;
     zoomFit: HTMLButtonElement;
     exportMenu: HTMLDetailsElement | null;
+    importButton: HTMLButtonElement | null;
+    importPicker: HTMLInputElement;
     themeButton: HTMLButtonElement | null;
     stage: HTMLElement;
 }
@@ -334,6 +336,13 @@ class Workspace implements TimelineHandle {
             h("div", "tlg-menu-list", { role: "menu" }, exportChoices(this.strings).map(entry => h("button", "tlg-menu-item", { type: "button", role: "menuitem", "data-export": entry.format }, [icons.element(entry.icon), entry.label])))
         ]) : null;
 
+        // Beside the export, because opening a timeline file and writing one out are the same errand, and
+        // both belong to the timeline on screen rather than to the application around it
+        const importButton = this.permissions.canCreate
+            ? iconButton(Icon.Upload, words.import)
+            : null;
+        const importPicker = h("input", "tlg-import-picker", { type: "file", accept: "application/json,.json", hidden: "" });
+
         const views = h("div", "tlg-views", { role: "tablist", "aria-label": words.representations });
         const filters = h("div", "tlg-filters");
         const search = h("input", "tlg-input", { type: "search", placeholder: words.filterRecords, "aria-label": words.filterRecords });
@@ -369,6 +378,8 @@ class Workspace implements TimelineHandle {
                     undo && redo ? h("div", "tlg-button-group", {}, [undo, redo]) : null,
                     h("div", "tlg-button-group", {}, [zoomOut, zoomFit, zoomIn]),
                     themeButton,
+                    importPicker,
+                    importButton,
                     exportMenu
                 ])
             ]),
@@ -380,7 +391,7 @@ class Workspace implements TimelineHandle {
             addMenu
         );
 
-        return { views, filters, canvas, caption, pager, empty, emptyAdd, list, search, stats, addButton, addMenu, inspector, undo, redo, zoomIn, zoomOut, zoomFit, exportMenu, themeButton, stage };
+        return { views, filters, canvas, caption, pager, empty, emptyAdd, list, search, stats, addButton, addMenu, inspector, undo, redo, zoomIn, zoomOut, zoomFit, exportMenu, importButton, importPicker, themeButton, stage };
     }
 
     async start(): Promise<void> {
@@ -421,6 +432,9 @@ class Workspace implements TimelineHandle {
             event.stopPropagation();
             this.rail.openMenu();
         }, { signal });
+
+        elements.importButton?.addEventListener("click", () => elements.importPicker.click(), { signal });
+        elements.importPicker.addEventListener("change", () => void this.importChosenFile(), { signal });
 
         elements.exportMenu?.querySelectorAll<HTMLButtonElement>("[data-export]").forEach(control => {
             control.addEventListener("click", () => {
@@ -979,6 +993,28 @@ class Workspace implements TimelineHandle {
         this.store.load(await this.api.getDiagram(this.incidentId));
         if (selection) {
             this.store.setSelection(selection);
+        }
+    }
+
+    /**
+     * Reads a timeline written elsewhere into the incident on screen. The records are added to what is
+     * already here rather than replacing it, and a record the file names again is recognised, so opening
+     * the same file twice does not draw everything twice.
+     */
+    private async importChosenFile(): Promise<void> {
+        const picker = this.elements.importPicker;
+        const file = picker.files?.[0];
+        // Cleared before the work, so choosing the same file again still counts as a change
+        picker.value = "";
+        if (!file || !this.permissions.canCreate) return;
+
+        try {
+            const report = await this.api.importDocument(JSON.parse(await file.text()), { into: this.incidentId });
+            await this.reload();
+            this.redraw();
+            this.notify(this.strings.workspace.imported(report.created.nodes, report.created.steps));
+        } catch {
+            this.notify(this.strings.workspace.importFailed);
         }
     }
 

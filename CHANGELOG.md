@@ -73,7 +73,9 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
   identifies them; `POST /documents` reads one back into a new incident and
   `POST /incidents/{id}/document` into one that already exists, merging or adding, optionally retitled and
   moved in time. The whole import is one transaction, and a milestone another step already holds is
-  reported rather than displaced. Offered in the export menu, and opened from the app bar.
+  reported rather than displaced. Both live in the timeline toolbar: written out from the export menu,
+  read back from the button beside it, into the timeline on screen. A record the file names again is
+  recognised, so opening the same file twice does not draw everything twice.
 
 ### Changed
 

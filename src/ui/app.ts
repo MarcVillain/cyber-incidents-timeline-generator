@@ -97,8 +97,6 @@ interface AppElements {
     picker: HTMLSelectElement;
     details: HTMLButtonElement | null;
     create: HTMLButtonElement | null;
-    importButton: HTMLButtonElement | null;
-    importPicker: HTMLInputElement;
     themeButton: HTMLButtonElement | null;
     main: HTMLElement;
     timeline: HTMLElement;
@@ -160,10 +158,6 @@ class TimelineApp implements TimelineAppHandle {
         const create = this.permissions.canCreate
             ? h("button", "tlg-button tlg-button-primary", { type: "button" }, [icons.element(Icon.Plus), words.newIncident])
             : null;
-        const importButton = this.permissions.canCreate
-            ? h("button", "tlg-button tlg-button-icon", { type: "button", title: words.importDocument, "aria-label": words.importDocument }, [icons.element(Icon.Upload)])
-            : null;
-        const importPicker = h("input", "tlg-app-import", { type: "file", accept: "application/json,.json", hidden: "" });
         const themeButton = themeToggle
             ? h("button", "tlg-button tlg-button-icon", { type: "button", title: themes[this.theme].label, "aria-label": themes[this.theme].label }, [icons.element(themes[this.theme].icon)])
             : null;
@@ -180,12 +174,12 @@ class TimelineApp implements TimelineAppHandle {
             h("header", "tlg-appbar", {}, [
                 h("span", "tlg-appbar-brand", {}, [icons.element(Icon.Timeline), this.options.title ?? words.title]),
                 h("div", "tlg-appbar-incident", {}, [picker, details]),
-                h("div", "tlg-appbar-actions", {}, [importPicker, importButton, create, themeButton])
+                h("div", "tlg-appbar-actions", {}, [create, themeButton])
             ]),
             main,
             dialog
         );
-        return { picker, details, create, importButton, importPicker, themeButton, main, timeline, empty, dialog };
+        return { picker, details, create, themeButton, main, timeline, empty, dialog };
     }
 
     private bind(): void {
@@ -193,8 +187,6 @@ class TimelineApp implements TimelineAppHandle {
         this.elements.picker.addEventListener("change", () => void this.open(Number(this.elements.picker.value)), { signal });
         this.elements.details?.addEventListener("click", () => this.showDetails(), { signal });
         this.elements.create?.addEventListener("click", () => this.showCreate(), { signal });
-        this.elements.importButton?.addEventListener("click", () => this.elements.importPicker.click(), { signal });
-        this.elements.importPicker.addEventListener("change", () => void this.importChosenFile(), { signal });
         this.elements.themeButton?.addEventListener("click", () => this.setTheme(themeLabels(this.strings)[this.theme].next), { signal });
         this.elements.dialog.addEventListener("click", event => {
             if (event.target === this.elements.dialog) this.closeDialog();
@@ -377,26 +369,6 @@ class TimelineApp implements TimelineAppHandle {
         const save = this.permissions.canEdit ? (error: HTMLElement): Promise<void> => this.saveIncident(incident.id, draft, error) : null;
         const remove = this.permissions.canDelete ? (error: HTMLElement): Promise<void> => this.deleteIncident(incident.id, error) : null;
         this.openDialog(words.incidentDetails, this.incidentFields(incident, draft, !this.permissions.canEdit), save ? words.save : null, save, remove);
-    }
-
-    /**
-     * Opens a timeline written by another instance. The file is read here and the document is sent whole,
-     * so the server reads it exactly as it reads any other request body.
-     */
-    private async importChosenFile(): Promise<void> {
-        const picker = this.elements.importPicker;
-        const file = picker.files?.[0];
-        picker.value = "";
-        if (!file) return;
-
-        try {
-            const report = await this.api.importDocument(JSON.parse(await file.text()));
-            await this.refresh();
-            await this.show(report.incidentId);
-            this.notify(this.strings.app.imported(report.created.nodes, report.created.steps));
-        } catch (failure) {
-            this.report(failure, null);
-        }
     }
 
     private async saveIncident(incidentId: RecordId, draft: IncidentUpdateInput, error: HTMLElement): Promise<void> {

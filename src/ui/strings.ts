@@ -21,6 +21,9 @@ export interface WorkspaceStrings {
     exportHtml: string;
     exportPrint: string;
     exportDocument: string;
+    import: string;
+    imported(records: number, steps: number): string;
+    importFailed: string;
     zoomIn: string;
     zoomOut: string;
     fitToScreen: string;
@@ -56,8 +59,6 @@ export interface AppStrings {
     title: string;
     incidents: string;
     newIncident: string;
-    importDocument: string;
-    imported(records: number, steps: number): string;
     openIncident: string;
     details: string;
     incidentDetails: string;
@@ -316,6 +317,9 @@ export const DEFAULT_STRINGS: Strings = {
         exportHtml: "Interactive HTML",
         exportPrint: "Print or save as PDF",
         exportDocument: "Timeline file, to open elsewhere",
+        import: "Open a timeline file",
+        imported: (records, steps) => `Added ${records} record(s) and ${steps} step(s).`,
+        importFailed: "The timeline file could not be read.",
         zoomIn: "Zoom in",
         zoomOut: "Zoom out",
         fitToScreen: "Fit to screen",
@@ -350,8 +354,6 @@ export const DEFAULT_STRINGS: Strings = {
         title: "Incident timelines",
         incidents: "Incidents",
         newIncident: "New incident",
-        importDocument: "Open a timeline file",
-        imported: (records, steps) => `Imported ${records} record(s) and ${steps} step(s).`,
         openIncident: "Open the incident",
         details: "Details",
         incidentDetails: "Incident details",

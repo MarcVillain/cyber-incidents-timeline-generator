@@ -25,6 +25,8 @@ import { Palette, elementTokenResolver } from "./theme.js";
 import type { SlideHeaderCustomizer } from "./slide-header.js";
 import { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./theme-detection.js";
 import { ThemeMode } from "./theme-mode.js";
+import { TimeFormats, type DurationUnits } from "../core/time.js";
+import { buildStrings, type Strings, type StringsOverride } from "./strings.js";
 import { Viewport, type Point } from "./viewport.js";
 
 export { ThemeMode };
@@ -54,6 +56,12 @@ export interface TimelineOptions {
     slideHeader?: SlideHeaderCustomizer;
     /** Receives every message the workspace would otherwise show as a toast. */
     onNotify?: (message: string) => void;
+    /** The words of the interface. Anything left out keeps the English default. */
+    strings?: StringsOverride;
+    /** The locale dates are written in. Defaults to en-GB, whatever the browser is set to. */
+    locale?: string;
+    /** The suffixes durations are written with, which no locale covers. */
+    durationUnits?: DurationUnits;
 }
 
 export interface TimelineHandle {
@@ -69,28 +77,37 @@ export interface TimelineHandle {
 
 const DEFAULT_PREFERENCE_KEY = "cyber-incidents-timeline";
 const TOAST_MS = 4000;
-const AUDIENCE_CHOICES: readonly RendererChoice<Audience>[] = [
-    { value: Audience.Both, label: "Everything" },
-    { value: Audience.Executive, label: "Executive" },
-    { value: Audience.Technical, label: "Technical" }
-];
-const EXPORTS: readonly { format: ExportFormat; label: string; icon: Icon }[] = [
-    { format: ExportFormat.Png, label: "PNG, one file per slide", icon: Icon.Image },
-    { format: ExportFormat.Svg, label: "SVG, one file per slide", icon: Icon.Vector },
-    { format: ExportFormat.Html, label: "Interactive HTML", icon: Icon.Code },
-    { format: ExportFormat.Print, label: "Print or save as PDF", icon: Icon.Print }
-];
+
+function audienceChoices(strings: Strings): readonly RendererChoice<Audience>[] {
+    return [
+        { value: Audience.Both, label: strings.workspace.audienceEverything },
+        { value: Audience.Executive, label: strings.workspace.audienceExecutive },
+        { value: Audience.Technical, label: strings.workspace.audienceTechnical }
+    ];
+}
+
+function exportChoices(strings: Strings): readonly { format: ExportFormat; label: string; icon: Icon }[] {
+    return [
+        { format: ExportFormat.Png, label: strings.workspace.exportPng, icon: Icon.Image },
+        { format: ExportFormat.Svg, label: strings.workspace.exportSvg, icon: Icon.Vector },
+        { format: ExportFormat.Html, label: strings.workspace.exportHtml, icon: Icon.Code },
+        { format: ExportFormat.Print, label: strings.workspace.exportPrint, icon: Icon.Print }
+    ];
+}
+
 interface ThemeChoice {
     label: string;
     icon: Icon;
     next: ThemeMode;
 }
 
-const THEME_CHOICES: Readonly<Record<ThemeMode, ThemeChoice>> = {
-    [ThemeMode.Auto]: { label: "Theme follows the page, switch to light", icon: Icon.Auto, next: ThemeMode.Light },
-    [ThemeMode.Light]: { label: "Light theme, switch to dark", icon: Icon.Sun, next: ThemeMode.Dark },
-    [ThemeMode.Dark]: { label: "Dark theme, switch to following the page", icon: Icon.Moon, next: ThemeMode.Auto }
-};
+function themeChoices(strings: Strings): Readonly<Record<ThemeMode, ThemeChoice>> {
+    return {
+        [ThemeMode.Auto]: { label: strings.workspace.themeAuto, icon: Icon.Auto, next: ThemeMode.Light },
+        [ThemeMode.Light]: { label: strings.workspace.themeLight, icon: Icon.Sun, next: ThemeMode.Dark },
+        [ThemeMode.Dark]: { label: strings.workspace.themeDark, icon: Icon.Moon, next: ThemeMode.Auto }
+    };
+}
 
 const RECORD_ATTRIBUTES: Readonly<Record<RecordType, string>> = {
     [RecordType.Node]: "data-node-id",
@@ -98,8 +115,9 @@ const RECORD_ATTRIBUTES: Readonly<Record<RecordType, string>> = {
     [RecordType.Link]: "data-link-id"
 };
 
-function labelFor(type: RecordType): string {
-    return type === RecordType.Node ? "record" : type;
+function labelFor(strings: Strings, type: RecordType): string {
+    if (type === RecordType.Node) return strings.workspace.recordLabel;
+    return type === RecordType.Step ? strings.workspace.stepLabel : strings.workspace.linkLabel;
 }
 
 function resolveOptional(history: History, type: RecordType, id: RecordId | null): RecordId | null {
@@ -179,6 +197,8 @@ class Workspace implements TimelineHandle {
     private readonly preferences: Preferences;
     private readonly onNotify: ((message: string) => void) | null;
     private readonly slideHeader: SlideHeaderCustomizer | null;
+    private readonly strings: Strings;
+    private readonly time: TimeFormats;
     private readonly detectTheme: ThemeDetector;
     private stopWatchingTheme: () => void = () => undefined;
     private readonly store = new DiagramStore();
@@ -202,6 +222,8 @@ class Workspace implements TimelineHandle {
         this.icons = options.icons ?? new IconSet();
         this.onNotify = options.onNotify ?? null;
         this.slideHeader = options.slideHeader ?? null;
+        this.strings = buildStrings(options.strings);
+        this.time = new TimeFormats(options.locale, options.durationUnits);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);
         this.history = new History(() => this.renderHistoryButtons());
 
@@ -229,7 +251,7 @@ class Workspace implements TimelineHandle {
             remove: (type, id) => this.remove(type, id),
             notify: message => this.notify(message)
         };
-        const panelContext = { store: this.store, actions, permissions: this.permissions, icons: this.icons, signal };
+        const panelContext = { store: this.store, actions, permissions: this.permissions, icons: this.icons, strings: this.strings, time: this.time, signal };
         this.rail = new Rail(this.elements, panelContext);
         this.inspector = new Inspector(this.elements.inspector, panelContext);
         this.bind();
@@ -243,39 +265,41 @@ class Workspace implements TimelineHandle {
             return node;
         };
 
-        const undo = this.permissions.canEdit ? iconButton(Icon.Undo, "Nothing to undo", true) : null;
-        const redo = this.permissions.canEdit ? iconButton(Icon.Redo, "Nothing to redo", true) : null;
-        const zoomOut = iconButton(Icon.ZoomOut, "Zoom out");
-        const zoomFit = iconButton(Icon.Fit, "Fit to screen");
-        const zoomIn = iconButton(Icon.ZoomIn, "Zoom in");
-        const themeButton = themeToggle ? iconButton(THEME_CHOICES[this.theme].icon, THEME_CHOICES[this.theme].label) : null;
+        const words = this.strings.workspace;
+        const themes = themeChoices(this.strings);
+        const undo = this.permissions.canEdit ? iconButton(Icon.Undo, words.nothingToUndo, true) : null;
+        const redo = this.permissions.canEdit ? iconButton(Icon.Redo, words.nothingToRedo, true) : null;
+        const zoomOut = iconButton(Icon.ZoomOut, words.zoomOut);
+        const zoomFit = iconButton(Icon.Fit, words.fitToScreen);
+        const zoomIn = iconButton(Icon.ZoomIn, words.zoomIn);
+        const themeButton = themeToggle ? iconButton(themes[this.theme].icon, themes[this.theme].label) : null;
 
         const exportMenu = h("details", "tlg-menu", {}, [
-            h("summary", "tlg-button", {}, [icons.element(Icon.Download), "Export"]),
-            h("div", "tlg-menu-list", { role: "menu" }, EXPORTS.map(entry => h("button", "tlg-menu-item", { type: "button", role: "menuitem", "data-export": entry.format }, [icons.element(entry.icon), entry.label])))
+            h("summary", "tlg-button", {}, [icons.element(Icon.Download), words.export]),
+            h("div", "tlg-menu-list", { role: "menu" }, exportChoices(this.strings).map(entry => h("button", "tlg-menu-item", { type: "button", role: "menuitem", "data-export": entry.format }, [icons.element(entry.icon), entry.label])))
         ]);
 
-        const views = h("div", "tlg-views", { role: "tablist", "aria-label": "Representations" });
+        const views = h("div", "tlg-views", { role: "tablist", "aria-label": words.representations });
         const filters = h("div", "tlg-filters");
-        const search = h("input", "tlg-input", { type: "search", placeholder: "Filter records", "aria-label": "Filter records" });
+        const search = h("input", "tlg-input", { type: "search", placeholder: words.filterRecords, "aria-label": words.filterRecords });
         const addButton = this.permissions.canCreate
-            ? h("button", "tlg-button tlg-button-primary tlg-add", { type: "button", "aria-haspopup": "true", "aria-expanded": "false" }, [icons.element(Icon.Plus), "Add"])
+            ? h("button", "tlg-button tlg-button-primary tlg-add", { type: "button", "aria-haspopup": "true", "aria-expanded": "false" }, [icons.element(Icon.Plus), words.add])
             : null;
         const list = h("div", "tlg-rail-list");
         const stats = h("div", "tlg-rail-foot");
         const canvas = h("div", "tlg-canvas");
         const caption = h("div", "tlg-caption");
         const pager = h("div", "tlg-pager");
-        const emptyAdd = this.permissions.canCreate ? h("button", "tlg-button tlg-button-primary", { type: "button" }, [icons.element(Icon.Plus), "Add the first record"]) : null;
+        const emptyAdd = this.permissions.canCreate ? h("button", "tlg-button tlg-button-primary", { type: "button" }, [icons.element(Icon.Plus), words.addFirstRecord]) : null;
         const empty = h("div", "tlg-empty", {}, [
             icons.element(Icon.Graph),
-            h("p", "tlg-empty-title", {}, ["No incident diagram yet"]),
-            h("p", "tlg-empty-hint", {}, ["Add the parties, the machines they touched and what happened, and every view builds itself."]),
+            h("p", "tlg-empty-title", {}, [words.emptyTitle]),
+            h("p", "tlg-empty-hint", {}, [words.emptyHint]),
             emptyAdd
         ]);
         empty.hidden = true;
         const stage = h("main", "tlg-stage", {}, [canvas, h("div", "tlg-stage-foot", {}, [caption, pager]), empty]);
-        const inspector = h("aside", "tlg-inspector", { "aria-label": "Record details" });
+        const inspector = h("aside", "tlg-inspector", { "aria-label": words.recordDetails });
         inspector.hidden = true;
         const addMenu = h("div", "tlg-addmenu", { role: "menu" });
         addMenu.hidden = true;
@@ -294,7 +318,7 @@ class Workspace implements TimelineHandle {
                 ])
             ]),
             h("div", "tlg-body", {}, [
-                h("aside", "tlg-rail", { "aria-label": "Records" }, [h("div", "tlg-rail-head", {}, [search, addButton]), list, stats]),
+                h("aside", "tlg-rail", { "aria-label": words.records }, [h("div", "tlg-rail-head", {}, [search, addButton]), list, stats]),
                 stage,
                 inspector
             ]),
@@ -308,7 +332,7 @@ class Workspace implements TimelineHandle {
         try {
             this.store.load(await this.api.getDiagram(this.incidentId));
         } catch (error) {
-            this.notify("The incident diagram could not be loaded.");
+            this.notify(this.strings.workspace.loadFailed);
             throw error;
         }
     }
@@ -335,7 +359,7 @@ class Workspace implements TimelineHandle {
         elements.zoomIn.addEventListener("click", () => this.viewport.zoomIn(), { signal });
         elements.zoomOut.addEventListener("click", () => this.viewport.zoomOut(), { signal });
         elements.zoomFit.addEventListener("click", () => this.viewport.fit(), { signal });
-        elements.themeButton?.addEventListener("click", () => this.setTheme(THEME_CHOICES[this.theme].next), { signal });
+        elements.themeButton?.addEventListener("click", () => this.setTheme(themeChoices(this.strings)[this.theme].next), { signal });
         elements.undo?.addEventListener("click", () => void this.undo(), { signal });
         elements.redo?.addEventListener("click", () => void this.redo(), { signal });
         elements.emptyAdd?.addEventListener("click", event => {
@@ -346,7 +370,7 @@ class Workspace implements TimelineHandle {
         elements.exportMenu.querySelectorAll<HTMLButtonElement>("[data-export]").forEach(control => {
             control.addEventListener("click", () => {
                 elements.exportMenu.open = false;
-                const format = EXPORTS.find(entry => entry.format === control.getAttribute("data-export"))?.format;
+                const format = exportChoices(this.strings).find(entry => entry.format === control.getAttribute("data-export"))?.format;
                 if (format) void this.exportAs(format);
             }, { signal });
         });
@@ -401,7 +425,7 @@ class Workspace implements TimelineHandle {
     private get renderer(): Renderer {
         const found = this.renderers.find(renderer => renderer.representation === this.representation) ?? this.renderers[0];
         if (!found) {
-            throw new Error("No renderer is available.");
+            throw new Error(this.strings.workspace.noRenderer);
         }
         return found;
     }
@@ -411,6 +435,8 @@ class Workspace implements TimelineHandle {
             store: this.store,
             palette: new Palette(this.store.catalog, elementTokenResolver(this.root)),
             icons: this.icons,
+            strings: this.strings,
+            time: this.time,
             representation: this.store.representationInfo(this.representation),
             options: this.preferences.choices(this.representation),
             slideHeader: this.slideHeader
@@ -446,13 +472,13 @@ class Workspace implements TimelineHandle {
     private renderFilters(): void {
         const filters = this.store.filters;
         const controls: HTMLButtonElement[] = [
-            this.cycleButton(AUDIENCE_CHOICES, filters.audience, filters.audience !== Audience.Both, value => {
+            this.cycleButton(audienceChoices(this.strings), filters.audience, filters.audience !== Audience.Both, value => {
                 this.store.setFilters({ audience: value });
                 this.renderFilters();
             })
         ];
 
-        const milestones = h("button", "tlg-chip-toggle", { type: "button", "aria-pressed": String(filters.milestonesOnly) }, ["Milestones only"]);
+        const milestones = h("button", "tlg-chip-toggle", { type: "button", "aria-pressed": String(filters.milestonesOnly) }, [this.strings.workspace.milestonesOnly]);
         milestones.addEventListener("click", () => {
             this.store.setFilters({ milestonesOnly: !this.store.filters.milestonesOnly });
             this.renderFilters();
@@ -460,7 +486,7 @@ class Workspace implements TimelineHandle {
         controls.push(milestones);
 
         const chosen = this.preferences.choices(this.representation);
-        this.renderer.options.forEach(option => {
+        this.renderer.options(this.strings).forEach(option => {
             const current = option.choices.find(choice => choice.value === chosen.get(option.id))?.value ?? option.fallback;
             controls.push(this.cycleButton(option.choices, current, current !== option.fallback, value => {
                 this.preferences.setChoice(this.representation, option.id, value);
@@ -477,11 +503,11 @@ class Workspace implements TimelineHandle {
         const { undo, redo } = this.elements;
         if (undo) {
             undo.disabled = !this.history.canUndo;
-            undo.title = this.history.undoLabel ? `Undo ${this.history.undoLabel}` : "Nothing to undo";
+            undo.title = this.history.undoLabel ? this.strings.workspace.undoChange(this.history.undoLabel) : this.strings.workspace.nothingToUndo;
         }
         if (redo) {
             redo.disabled = !this.history.canRedo;
-            redo.title = this.history.redoLabel ? `Redo ${this.history.redoLabel}` : "Nothing to redo";
+            redo.title = this.history.redoLabel ? this.strings.workspace.redoChange(this.history.redoLabel) : this.strings.workspace.nothingToRedo;
         }
     }
 
@@ -508,9 +534,10 @@ class Workspace implements TimelineHandle {
 
         const button = this.elements.themeButton;
         if (button) {
-            button.replaceChildren(this.icons.element(THEME_CHOICES[mode].icon));
-            button.title = THEME_CHOICES[mode].label;
-            button.setAttribute("aria-label", THEME_CHOICES[mode].label);
+            const choice = themeChoices(this.strings)[mode];
+            button.replaceChildren(this.icons.element(choice.icon));
+            button.title = choice.label;
+            button.setAttribute("aria-label", choice.label);
         }
         this.applyTheme();
     }
@@ -613,9 +640,9 @@ class Workspace implements TimelineHandle {
         };
 
         this.elements.pager.replaceChildren(
-            turn(Icon.ChevronLeft, "Previous slide", this.pageIndex === 0, -1),
-            h("span", null, {}, [`Slide ${this.pageIndex + 1} of ${pageCount}`]),
-            turn(Icon.ChevronRight, "Next slide", this.pageIndex === pageCount - 1, 1)
+            turn(Icon.ChevronLeft, this.strings.workspace.previousSlide, this.pageIndex === 0, -1),
+            h("span", null, {}, [this.strings.workspace.slideCounter(this.pageIndex + 1, pageCount)]),
+            turn(Icon.ChevronRight, this.strings.workspace.nextSlide, this.pageIndex === pageCount - 1, 1)
         );
     }
 
@@ -629,7 +656,7 @@ class Workspace implements TimelineHandle {
         if (!previous) return;
 
         this.history.push({
-            label: labelFor(edit.type),
+            label: labelFor(this.strings, edit.type),
             undo: history => { this.applyEdit(history.resolve(edit.type, id), previous); },
             redo: history => { this.applyEdit(history.resolve(edit.type, id), edit); }
         });
@@ -664,7 +691,7 @@ class Workspace implements TimelineHandle {
         }
 
         saving.catch(() => {
-            this.notify("The change could not be saved, reloading the diagram.");
+            this.notify(this.strings.workspace.saveFailed);
             void this.reload();
         });
         return previous;
@@ -700,7 +727,7 @@ class Workspace implements TimelineHandle {
             await this.reload();
 
             const entry: HistoryEntry = {
-                label: labelFor(draft.type),
+                label: labelFor(this.strings, draft.type),
                 undo: async history => {
                     await this.deleteRemote(draft.type, history.resolve(draft.type, createdId));
                     await this.reload();
@@ -714,7 +741,7 @@ class Workspace implements TimelineHandle {
             this.history.push(entry);
             return createdId;
         } catch {
-            this.notify("The record could not be created.");
+            this.notify(this.strings.workspace.createFailed);
             return null;
         }
     }
@@ -734,7 +761,7 @@ class Workspace implements TimelineHandle {
             await this.reload();
 
             this.history.push({
-                label: labelFor(type),
+                label: labelFor(this.strings, type),
                 undo: async history => {
                     await this.restore(captured, history);
                     await this.reload();
@@ -745,7 +772,7 @@ class Workspace implements TimelineHandle {
                 }
             });
         } catch {
-            this.notify("The record could not be deleted.");
+            this.notify(this.strings.workspace.deleteFailed);
         }
     }
 
@@ -800,9 +827,9 @@ class Workspace implements TimelineHandle {
     private async undo(): Promise<void> {
         try {
             const label = await this.history.undo();
-            if (label) this.notify(`Undid the ${label} change.`);
+            if (label) this.notify(this.strings.workspace.undone(label));
         } catch {
-            this.notify("That change can no longer be undone.");
+            this.notify(this.strings.workspace.undoExpired);
             await this.reload();
         }
     }
@@ -810,9 +837,9 @@ class Workspace implements TimelineHandle {
     private async redo(): Promise<void> {
         try {
             const label = await this.history.redo();
-            if (label) this.notify(`Redid the ${label} change.`);
+            if (label) this.notify(this.strings.workspace.redone(label));
         } catch {
-            this.notify("That change can no longer be redone.");
+            this.notify(this.strings.workspace.redoExpired);
             await this.reload();
         }
     }
@@ -822,7 +849,7 @@ class Workspace implements TimelineHandle {
         try {
             await this.api.saveLayout(this.incidentId, [{ nodeId, representation: this.representation, x: position.x, y: position.y }]);
         } catch {
-            this.notify("The new position could not be saved.");
+            this.notify(this.strings.workspace.placementFailed);
         }
     }
 
@@ -851,14 +878,14 @@ class Workspace implements TimelineHandle {
                     await exportSvg(drawn, title);
                     break;
                 case ExportFormat.Html:
-                    await exportHtml(drawn, title, title);
+                    await exportHtml(drawn, title, title, this.strings.deck, this.time.locale);
                     break;
                 case ExportFormat.Print:
                     await printPages(drawn, title);
                     break;
             }
         } catch {
-            this.notify("The export could not be produced.");
+            this.notify(this.strings.workspace.exportFailed);
         }
     }
 

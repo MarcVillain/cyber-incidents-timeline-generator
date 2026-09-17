@@ -10,6 +10,7 @@ import type { TimelineStep } from "../diagram-store.js";
 import { group, line, rect, text, truncate, wrap } from "../svg.js";
 import type { Palette } from "../theme.js";
 import { defineRenderer, optionValue, type RenderContext, type RendererOption } from "./registry.js";
+import type { Strings } from "../strings.js";
 
 const HEADER_HEIGHT = 62;
 const CELL_GAP = 5;
@@ -34,15 +35,17 @@ const DETAILS: Readonly<Record<Detail, DetailLayout>> = {
     [Detail.Detailed]: { minHeight: 76, showWhen: true, showWho: true }
 };
 
-const DETAIL_OPTION: RendererOption<Detail> = {
-    id: "detail",
-    label: "Detail",
-    fallback: Detail.Compact,
-    choices: [
-        { value: Detail.Compact, label: "Compact" },
-        { value: Detail.Detailed, label: "Detailed" }
-    ]
-};
+function detailOption(strings: Strings): RendererOption<Detail> {
+    return {
+        id: "detail",
+        label: strings.options.detail,
+        fallback: Detail.Compact,
+        choices: [
+            { value: Detail.Compact, label: strings.options.densityCompact },
+            { value: Detail.Detailed, label: strings.options.detailDetailed }
+        ]
+    };
+}
 
 
 interface Cell {
@@ -68,7 +71,7 @@ interface MatrixPage {
 }
 
 function detailOf(context: RenderContext): DetailLayout {
-    return DETAILS[optionValue(context, DETAIL_OPTION)];
+    return DETAILS[optionValue(context, detailOption(context.strings))];
 }
 
 /**
@@ -163,7 +166,7 @@ function matrixCell(palette: Palette, cell: Cell, x: number, y: number, width: n
 
 export const attackMatrix = defineRenderer<MatrixPage>({
     representation: Representation.AttackMatrix,
-    options: [DETAIL_OPTION],
+    options: strings => [detailOption(strings)],
 
     pages(context) {
         const { store } = context;
@@ -196,7 +199,7 @@ export const attackMatrix = defineRenderer<MatrixPage>({
         });
 
         if (!page.hasAnything) {
-            content.appendChild(placeholder(context, "No techniques recorded yet", "Give a step an ATT&CK tactic and a technique to fill the matrix."));
+            content.appendChild(placeholder(context, context.strings.scene.emptyMatrixTitle, context.strings.scene.emptyMatrixHint));
             return root;
         }
 

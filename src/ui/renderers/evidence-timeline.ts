@@ -11,6 +11,7 @@ import { paginateGroups, timeScale, type TimeScale, type Weighted } from "../geo
 import { circle, group, line, rect, text } from "../svg.js";
 import type { Palette } from "../theme.js";
 import { defineRenderer } from "./registry.js";
+import type { SceneStrings } from "../strings.js";
 
 const GUTTER = 208;
 const AXIS_HEADROOM = 44;
@@ -37,13 +38,13 @@ interface Gap {
     hours: number;
 }
 
-function buildSources(steps: readonly TimelineStep[]): Source[] {
+function buildSources(steps: readonly TimelineStep[], words: SceneStrings): Source[] {
     const sources = new Map<string | null, Source>();
     steps.forEach(step => {
         const name = step.evidenceSource?.trim() || null;
         let source = sources.get(name);
         if (!source) {
-            source = { name, label: name ?? "No source recorded", steps: [], weight: 1 };
+            source = { name, label: name ?? words.noSourceRecorded, steps: [], weight: 1 };
             sources.set(name, source);
         }
         source.steps.push(step);
@@ -123,7 +124,7 @@ export const evidenceTimeline = defineRenderer<Source[]>({
     representation: Representation.EvidenceTimeline,
 
     pages(context) {
-        const sources = buildSources(context.store.visibleSteps());
+        const sources = buildSources(context.store.visibleSteps(), context.strings.scene);
         if (sources.length === 0) return [[]];
         const capacity = Math.max(1, Math.floor((CONTENT.height - AXIS_HEADROOM - COVERAGE_HEIGHT) / MIN_ROW_HEIGHT));
         return paginateGroups(sources, capacity);
@@ -140,13 +141,13 @@ export const evidenceTimeline = defineRenderer<Source[]>({
             pageCount,
             subtitle: first && last ? `${formatDate(first.at)} to ${formatDate(last.at)}` : null,
             legend: [
-                { label: "Something recorded", color: palette.accent },
-                { label: "Nothing recorded", color: palette.sides[Side.Attacker].color }
+                { label: context.strings.scene.somethingRecorded, color: palette.accent },
+                { label: context.strings.scene.nothingRecorded, color: palette.sides[Side.Attacker].color }
             ]
         });
 
         if (sources.length === 0) {
-            content.appendChild(placeholder(context, "No evidence recorded yet", "Name the source a step came from, such as EDR or a user report."));
+            content.appendChild(placeholder(context, context.strings.scene.emptyEvidenceTitle, context.strings.scene.emptyEvidenceHint));
             return root;
         }
 
@@ -165,7 +166,7 @@ export const evidenceTimeline = defineRenderer<Source[]>({
             }
         });
 
-        content.appendChild(timeAxis(palette, scale, { x: trackX, width: trackWidth, top, bottom: bottom + COVERAGE_HEIGHT }));
+        content.appendChild(timeAxis(palette, scale, { x: trackX, width: trackWidth, top, bottom: bottom + COVERAGE_HEIGHT }, context.time));
 
         sources.forEach((source, index) => {
             const rowTop = top + index * rowHeight;

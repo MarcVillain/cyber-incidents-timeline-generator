@@ -3,9 +3,11 @@
 
 import type { RepresentationInfo } from "../../core/catalog.js";
 import type { Representation } from "../../core/enums.js";
+import type { TimeFormats } from "../../core/time.js";
 import type { DiagramStore } from "../diagram-store.js";
 import type { IconSet } from "../icons/icon-set.js";
 import type { SlideHeaderCustomizer } from "../slide-header.js";
+import type { Strings } from "../strings.js";
 import type { Palette } from "../theme.js";
 
 export interface RenderContext {
@@ -13,6 +15,8 @@ export interface RenderContext {
     readonly palette: Palette;
     readonly icons: IconSet;
     readonly representation: RepresentationInfo;
+    readonly strings: Strings;
+    readonly time: TimeFormats;
     /** Choices made for this representation, keyed by option id. */
     readonly options: ReadonlyMap<string, string>;
     /** Rewrites the title block of each slide; null keeps the default. */
@@ -41,7 +45,8 @@ export function optionValue<TValue extends string>(context: RenderContext, optio
 
 export interface RendererDefinition<TPage> {
     representation: Representation;
-    options?: readonly RendererOption[];
+    /** A function when the labels are translated, which is how the built in representations declare theirs. */
+    options?: readonly RendererOption[] | ((strings: Strings) => readonly RendererOption[]);
     /** Whether records can be pinned by hand in this representation. */
     draggable?: boolean;
     /** Never empty: a representation with nothing to show still returns one page saying so. */
@@ -56,7 +61,7 @@ export interface Pagination {
 
 export interface Renderer {
     readonly representation: Representation;
-    readonly options: readonly RendererOption[];
+    options(strings: Strings): readonly RendererOption[];
     readonly draggable: boolean;
     paginate(context: RenderContext): Pagination;
 }
@@ -66,9 +71,10 @@ export interface Renderer {
  * pages have nothing in common.
  */
 export function defineRenderer<TPage>(definition: RendererDefinition<TPage>): Renderer {
+    const options = definition.options ?? [];
     return {
         representation: definition.representation,
-        options: definition.options ?? [],
+        options: strings => (typeof options === "function" ? options(strings) : options),
         draggable: definition.draggable ?? false,
         paginate(context: RenderContext): Pagination {
             const pages = definition.pages(context);

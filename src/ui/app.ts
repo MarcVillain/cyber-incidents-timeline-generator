@@ -15,6 +15,7 @@ import type { TimelinePermissions } from "./panels.js";
 import { Preferences, defaultPreferenceStorage } from "./preferences.js";
 import { ColorScheme, detectPageTheme, watchPageTheme } from "./theme-detection.js";
 import { ThemeMode } from "./theme-mode.js";
+import { buildStrings, type Strings, type StringsOverride } from "./strings.js";
 import { mountTimeline, type TimelineHandle, type TimelineOptions } from "./workspace.js";
 
 export interface TimelineAppOptions {
@@ -38,6 +39,10 @@ export interface TimelineAppOptions {
     /** Passed to the workspace of the open incident. */
     timeline?: Omit<TimelineOptions, "api" | "incidentId" | "theme" | "themeToggle" | "preferences" | "onNotify">;
     onNotify?: (message: string) => void;
+    /** The words of the interface, shared with the workspace it opens. */
+    strings?: StringsOverride;
+    /** The locale dates are written in, shared with the workspace it opens. */
+    locale?: string;
 }
 
 export interface TimelineAppHandle {
@@ -50,23 +55,25 @@ export interface TimelineAppHandle {
     destroy(): void;
 }
 
-const DEFAULT_TITLE = "Incident timelines";
+
 const DEFAULT_PREFERENCE_KEY = "cyber-incidents-timeline-app";
 const ADDRESS_KEY = "incident";
 const PAGE_THEME_ATTRIBUTE = "data-theme";
 const TOAST_MS = 4000;
 
-const THEME_LABELS: Readonly<Record<ThemeMode, { label: string; icon: Icon; next: ThemeMode }>> = {
-    [ThemeMode.Auto]: { label: "Theme follows the system, switch to light", icon: Icon.Auto, next: ThemeMode.Light },
-    [ThemeMode.Light]: { label: "Light theme, switch to dark", icon: Icon.Sun, next: ThemeMode.Dark },
-    [ThemeMode.Dark]: { label: "Dark theme, switch to following the system", icon: Icon.Moon, next: ThemeMode.Auto }
-};
+function themeLabels(strings: Strings): Readonly<Record<ThemeMode, { label: string; icon: Icon; next: ThemeMode }>> {
+    return {
+        [ThemeMode.Auto]: { label: strings.app.themeAuto, icon: Icon.Auto, next: ThemeMode.Light },
+        [ThemeMode.Light]: { label: strings.app.themeLight, icon: Icon.Sun, next: ThemeMode.Dark },
+        [ThemeMode.Dark]: { label: strings.app.themeDark, icon: Icon.Moon, next: ThemeMode.Auto }
+    };
+}
 
-function messageOf(error: unknown): string {
+function messageOf(error: unknown, strings: Strings): string {
     if (error instanceof ValidationError) {
         return error.issues.map(issue => `${issue.field} ${issue.message}`).join(". ");
     }
-    return error instanceof Error ? error.message : "The request could not be completed.";
+    return error instanceof Error ? error.message : strings.app.requestFailed;
 }
 
 function incidentLabel(incident: Incident): string {
@@ -97,6 +104,7 @@ class TimelineApp implements TimelineAppHandle {
     private readonly permissions: TimelinePermissions;
     private readonly icons: IconSet;
     private readonly preferences: Preferences;
+    private readonly strings: Strings;
     private readonly elements: AppElements;
     private readonly lifetime = new AbortController();
     private readonly stopWatchingTheme: () => void;
@@ -113,6 +121,7 @@ class TimelineApp implements TimelineAppHandle {
         const managed = options.manageIncidents ?? true;
         this.permissions = { canCreate: managed, canEdit: managed, canDelete: managed, ...(managed ? options.incidentPermissions : {}) };
         this.icons = options.timeline?.icons ?? new IconSet();
+        this.strings = buildStrings(options.strings);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);
         const themeToggle = options.themeToggle ?? true;
         this.theme = (themeToggle ? this.preferences.theme : null) ?? options.theme ?? ThemeMode.Auto;
@@ -130,15 +139,17 @@ class TimelineApp implements TimelineAppHandle {
 
     private build(themeToggle: boolean): AppElements {
         const icons = this.icons;
-        const picker = h("select", "tlg-select tlg-appbar-picker", { "aria-label": "Incident" });
+        const words = this.strings.app;
+        const themes = themeLabels(this.strings);
+        const picker = h("select", "tlg-select tlg-appbar-picker", { "aria-label": words.incidents });
         const details = this.permissions.canEdit || this.permissions.canDelete
-            ? h("button", "tlg-button", { type: "button" }, [icons.element(Icon.Text), "Details"])
+            ? h("button", "tlg-button", { type: "button" }, [icons.element(Icon.Text), words.details])
             : null;
         const create = this.permissions.canCreate
-            ? h("button", "tlg-button tlg-button-primary", { type: "button" }, [icons.element(Icon.Plus), "New incident"])
+            ? h("button", "tlg-button tlg-button-primary", { type: "button" }, [icons.element(Icon.Plus), words.newIncident])
             : null;
         const themeButton = themeToggle
-            ? h("button", "tlg-button tlg-button-icon", { type: "button", title: THEME_LABELS[this.theme].label, "aria-label": THEME_LABELS[this.theme].label }, [icons.element(THEME_LABELS[this.theme].icon)])
+            ? h("button", "tlg-button tlg-button-icon", { type: "button", title: themes[this.theme].label, "aria-label": themes[this.theme].label }, [icons.element(themes[this.theme].icon)])
             : null;
         const timeline = h("div", "tlg-app-timeline");
         const empty = h("section", "tlg-app-empty");
@@ -151,7 +162,7 @@ class TimelineApp implements TimelineAppHandle {
         this.root.setAttribute("data-tlg-theme", this.scheme());
         this.root.replaceChildren(
             h("header", "tlg-appbar", {}, [
-                h("span", "tlg-appbar-brand", {}, [icons.element(Icon.Timeline), this.options.title ?? DEFAULT_TITLE]),
+                h("span", "tlg-appbar-brand", {}, [icons.element(Icon.Timeline), this.options.title ?? words.title]),
                 h("div", "tlg-appbar-incident", {}, [picker, details]),
                 h("div", "tlg-appbar-actions", {}, [create, themeButton])
             ]),
@@ -166,7 +177,7 @@ class TimelineApp implements TimelineAppHandle {
         this.elements.picker.addEventListener("change", () => void this.open(Number(this.elements.picker.value)), { signal });
         this.elements.details?.addEventListener("click", () => this.showDetails(), { signal });
         this.elements.create?.addEventListener("click", () => this.showCreate(), { signal });
-        this.elements.themeButton?.addEventListener("click", () => this.setTheme(THEME_LABELS[this.theme].next), { signal });
+        this.elements.themeButton?.addEventListener("click", () => this.setTheme(themeLabels(this.strings)[this.theme].next), { signal });
         this.elements.dialog.addEventListener("click", event => {
             if (event.target === this.elements.dialog) this.closeDialog();
         }, { signal });
@@ -190,7 +201,7 @@ class TimelineApp implements TimelineAppHandle {
             this.catalog = await this.api.getCatalog();
             this.incidents = await this.api.listIncidents();
         } catch (error) {
-            this.notify(`The incidents could not be loaded. ${messageOf(error)}`);
+            this.notify(`The incidents could not be loaded. ${messageOf(error, this.strings)}`);
             return;
         }
         const wanted = this.options.incidentId ?? (this.syncAddress() ? addressedIncident() : null);
@@ -221,7 +232,7 @@ class TimelineApp implements TimelineAppHandle {
         this.applyPageTheme();
         const button = this.elements.themeButton;
         if (button) {
-            const choice = THEME_LABELS[mode];
+            const choice = themeLabels(this.strings)[mode];
             button.replaceChildren(this.icons.element(choice.icon));
             button.title = choice.label;
             button.setAttribute("aria-label", choice.label);
@@ -244,7 +255,7 @@ class TimelineApp implements TimelineAppHandle {
         try {
             this.incidents = await this.api.listIncidents();
         } catch (error) {
-            this.notify(`The incidents could not be loaded. ${messageOf(error)}`);
+            this.notify(`The incidents could not be loaded. ${messageOf(error, this.strings)}`);
             return;
         }
         this.fillPicker();
@@ -277,6 +288,8 @@ class TimelineApp implements TimelineAppHandle {
             ...this.options.timeline,
             api: this.api,
             incidentId,
+            strings: this.options.strings,
+            locale: this.options.locale,
             theme: ThemeMode.Auto,
             themeToggle: false,
             preferences: this.options.preferences,
@@ -286,18 +299,19 @@ class TimelineApp implements TimelineAppHandle {
 
     private renderEmpty(): void {
         const icons = this.icons;
+        const words = this.strings.app;
         if (!this.permissions.canCreate) {
             this.elements.empty.replaceChildren(
                 icons.element(Icon.Timeline),
-                h("p", "tlg-empty-title", {}, ["No incidents to show"]),
-                h("p", "tlg-empty-hint", {}, ["Incidents appear here once they are recorded."])
+                h("p", "tlg-empty-title", {}, [words.noMatchTitle]),
+                h("p", "tlg-empty-hint", {}, [words.noIncidentsBody])
             );
             return;
         }
-        const title = h("input", "tlg-input", { type: "text", placeholder: "What happened, in a few words", "aria-label": "Incident title", required: "" });
+        const title = h("input", "tlg-input", { type: "text", placeholder: words.incidentTitleHint, "aria-label": words.incidentTitle, required: "" });
         const form = h("form", "tlg-app-quick", {}, [
             title,
-            h("button", "tlg-button tlg-button-primary", { type: "submit" }, [icons.element(Icon.Plus), "Open the incident"])
+            h("button", "tlg-button tlg-button-primary", { type: "submit" }, [icons.element(Icon.Plus), words.openIncident])
         ]);
         form.addEventListener("submit", event => {
             event.preventDefault();
@@ -305,8 +319,8 @@ class TimelineApp implements TimelineAppHandle {
         });
         this.elements.empty.replaceChildren(
             icons.element(Icon.Timeline),
-            h("p", "tlg-empty-title", {}, ["No incidents yet"]),
-            h("p", "tlg-empty-hint", {}, ["Give the incident a title to start its timeline. Everything else can be filled in later."]),
+            h("p", "tlg-empty-title", {}, [words.noIncidentsTitle]),
+            h("p", "tlg-empty-hint", {}, [words.noIncidentsHint]),
             form
         );
     }
@@ -324,25 +338,27 @@ class TimelineApp implements TimelineAppHandle {
 
     private report(failure: unknown, error: HTMLElement | null): void {
         if (error) {
-            error.textContent = messageOf(failure);
+            error.textContent = messageOf(failure, this.strings);
             error.hidden = false;
         } else {
-            this.notify(messageOf(failure));
+            this.notify(messageOf(failure, this.strings));
         }
     }
 
     private showCreate(): void {
+        const words = this.strings.app;
         const draft: IncidentUpdateInput = {};
-        this.openDialog("New incident", this.incidentFields(null, draft, false), "Open the incident", error => this.createIncident(draft, error), null);
+        this.openDialog(words.newIncident, this.incidentFields(null, draft, false), words.openIncident, error => this.createIncident(draft, error), null);
     }
 
     private showDetails(): void {
+        const words = this.strings.app;
         const incident = this.incidents.find(candidate => candidate.id === this.openId);
         if (!incident) return;
         const draft: IncidentUpdateInput = {};
         const save = this.permissions.canEdit ? (error: HTMLElement): Promise<void> => this.saveIncident(incident.id, draft, error) : null;
         const remove = this.permissions.canDelete ? (error: HTMLElement): Promise<void> => this.deleteIncident(incident.id, error) : null;
-        this.openDialog("Incident details", this.incidentFields(incident, draft, !this.permissions.canEdit), save ? "Save" : null, save, remove);
+        this.openDialog(words.incidentDetails, this.incidentFields(incident, draft, !this.permissions.canEdit), save ? words.save : null, save, remove);
     }
 
     private async saveIncident(incidentId: RecordId, draft: IncidentUpdateInput, error: HTMLElement): Promise<void> {
@@ -377,20 +393,21 @@ class TimelineApp implements TimelineAppHandle {
         const impactChoices: Choice<string>[] = this.catalog
             ? impactLevelsOf(this.catalog.impactScale).map(level => ({ value: level.level, label: level.label }))
             : [];
-        const title = textInput(incident?.title ?? null, value => { draft.title = value ?? ""; }, "What happened, in a few words");
+        const words = this.strings.app;
+        const title = textInput(incident?.title ?? null, value => { draft.title = value ?? ""; }, words.incidentTitleHint);
         title.required = true;
         const fields: HTMLElement[] = [
-            field("Title", title),
+            field(words.incidentTitle, title),
             row(
-                field("Reference", textInput(incident?.referenceId ?? null, value => { draft.referenceId = value; }, "Ticket or case number")),
-                field("Impact", select(incident?.impact ?? this.catalog?.impactScale.unassessed.level ?? null, impactChoices, value => { if (value) draft.impact = value; }))
+                field(words.reference, textInput(incident?.referenceId ?? null, value => { draft.referenceId = value; }, words.referenceHint)),
+                field(words.impact, select(incident?.impact ?? this.catalog?.impactScale.unassessed.level ?? null, impactChoices, value => { if (value) draft.impact = value; }))
             )
         ];
         if (incident) {
             fields.push(
                 row(
-                    field("Scope", textInput(incident.scope, value => { draft.scope = value; }, "Organisation or business unit")),
-                    field("Classifications", tagsInput(incident.classifications, values => { draft.classifications = values; }))
+                    field(words.scope, textInput(incident.scope, value => { draft.scope = value; }, words.scopeHint)),
+                    field(words.classifications, tagsInput(incident.classifications, values => { draft.classifications = values; }, this.strings.forms))
                 )
             );
             if (incident.externalId) {
@@ -411,19 +428,20 @@ class TimelineApp implements TimelineAppHandle {
         remove: ((error: HTMLElement) => Promise<void>) | null
     ): void {
         const icons = this.icons;
+        const words = this.strings.app;
         const error = h("p", "tlg-dialog-error", { role: "alert" });
         error.hidden = true;
-        const close = h("button", "tlg-button tlg-button-quiet", { type: "button" }, ["Cancel"]);
+        const close = h("button", "tlg-button tlg-button-quiet", { type: "button" }, [words.cancel]);
         close.addEventListener("click", () => this.closeDialog());
 
         const confirm = h("div", "tlg-dialog-confirm");
         confirm.hidden = true;
-        const removeButton = remove ? h("button", "tlg-button tlg-button-danger", { type: "button" }, [icons.element(Icon.Trash), "Delete"]) : null;
+        const removeButton = remove ? h("button", "tlg-button tlg-button-danger", { type: "button" }, [icons.element(Icon.Trash), words.delete]) : null;
         if (remove && removeButton) {
-            const really = h("button", "tlg-button tlg-button-danger", { type: "button" }, ["Delete the incident and its timeline"]);
-            const keep = h("button", "tlg-button tlg-button-quiet", { type: "button" }, ["Keep it"]);
+            const really = h("button", "tlg-button tlg-button-danger", { type: "button" }, [words.deleteIncident]);
+            const keep = h("button", "tlg-button tlg-button-quiet", { type: "button" }, [words.keepIt]);
             // Keep it takes the place of Delete, so a double click cannot delete
-            confirm.replaceChildren(keep, h("span", null, {}, ["This cannot be undone."]), really);
+            confirm.replaceChildren(keep, h("span", null, {}, [words.deleteWarning]), really);
             removeButton.addEventListener("click", () => { confirm.hidden = false; removeButton.hidden = true; keep.focus(); });
             keep.addEventListener("click", () => { confirm.hidden = true; removeButton.hidden = false; removeButton.focus(); });
             really.addEventListener("click", () => void remove(error));

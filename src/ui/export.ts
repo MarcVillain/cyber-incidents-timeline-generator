@@ -5,6 +5,7 @@
 import { SVG_NS } from "./svg.js";
 import { FONT_STACK } from "./theme.js";
 import { PAGE_HEIGHT, PAGE_WIDTH } from "./viewport.js";
+import { DEFAULT_STRINGS, type DeckStrings } from "./strings.js";
 
 export enum ExportFormat {
     Png = "png",
@@ -92,13 +93,13 @@ export async function exportPng(pages: readonly SVGGElement[], name: string, bac
  * A single file holding every slide, with the keyboard moving between them. Opens anywhere and needs
  * nothing from the application.
  */
-export function standaloneHtml(pages: readonly SVGGElement[], title: string): string {
+export function standaloneHtml(pages: readonly SVGGElement[], title: string, strings: DeckStrings = DEFAULT_STRINGS.deck, locale = "en"): string {
     const slides = pages
         .map((page, index) => `<figure class="slide" id="slide-${index}"${index === 0 ? "" : " hidden"}>${serialize(page)}</figure>`)
         .join("\n");
 
     return `<!doctype html>
-<html lang="en">
+<html lang="${escapeHtml(locale)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -127,10 +128,10 @@ export function standaloneHtml(pages: readonly SVGGElement[], title: string): st
 <header>
   <h1>${escapeHtml(title)}</h1>
   <nav>
-    <button type="button" data-step="-1">Previous</button>
+    <button type="button" data-step="-1">${escapeHtml(strings.previous)}</button>
     <span id="counter">1 / ${pages.length}</span>
-    <button type="button" data-step="1">Next</button>
-    <button type="button" id="print">Print</button>
+    <button type="button" data-step="1">${escapeHtml(strings.next)}</button>
+    <button type="button" id="print">${escapeHtml(strings.print)}</button>
   </nav>
 </header>
 <main>
@@ -163,8 +164,8 @@ ${slides}
 </html>`;
 }
 
-export async function exportHtml(pages: readonly SVGGElement[], name: string, title: string): Promise<void> {
-    download(new Blob([standaloneHtml(pages, title)], { type: "text/html" }), `${slug(name)}.html`);
+export async function exportHtml(pages: readonly SVGGElement[], name: string, title: string, strings: DeckStrings = DEFAULT_STRINGS.deck, locale = "en"): Promise<void> {
+    download(new Blob([standaloneHtml(pages, title, strings, locale)], { type: "text/html" }), `${slug(name)}.html`);
 }
 
 /**

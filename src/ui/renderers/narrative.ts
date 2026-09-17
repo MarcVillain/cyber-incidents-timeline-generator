@@ -3,12 +3,12 @@
 
 import { AttackTactic, Representation, ResponsePhase, Side, StepOutcome } from "../../core/enums.js";
 import { Icon } from "../../core/icon.js";
-import { formatDuration, formatMoment } from "../../core/time.js";
 import { outcomeColor } from "../cards.js";
 import { CONTENT, frame } from "../chrome.js";
 import type { TimelineStep } from "../diagram-store.js";
 import { circle, group, line, rect, stripTags, text, truncate, wrap } from "../svg.js";
 import { defineRenderer, type RenderContext } from "./registry.js";
+import type { Strings } from "../strings.js";
 
 const SUMMARY_PAD = 18;
 const SUMMARY_HEADER = 30;
@@ -40,13 +40,15 @@ interface PlacedColumn extends ColumnDefinition {
     size: number;
 }
 
-const COLUMNS: readonly ColumnDefinition[] = [
-    { key: ColumnKey.When, label: "When", share: 0.16 },
-    { key: ColumnKey.Who, label: "Who", share: 0.16 },
-    { key: ColumnKey.What, label: "What happened", share: 0.40 },
-    { key: ColumnKey.Where, label: "On what", share: 0.16 },
-    { key: ColumnKey.Stage, label: "Stage", share: 0.12 }
-];
+function tableColumns(strings: Strings): readonly ColumnDefinition[] {
+    return [
+        { key: ColumnKey.When, label: strings.scene.when, share: 0.16 },
+        { key: ColumnKey.Who, label: strings.scene.who, share: 0.16 },
+        { key: ColumnKey.What, label: strings.scene.whatHappened, share: 0.40 },
+        { key: ColumnKey.Where, label: strings.scene.onWhat, share: 0.16 },
+        { key: ColumnKey.Stage, label: strings.scene.stage, share: 0.12 }
+    ];
+}
 
 interface NarrativePage {
     summary: string[] | null;
@@ -63,11 +65,12 @@ function lower(value: string): string {
 }
 
 function nodeSuffix(context: RenderContext, step: TimelineStep): string {
+    const words = context.strings.narrative;
     const source = context.store.node(step.sourceNodeId);
     const target = context.store.node(step.targetNodeId);
-    if (source && target) return `, by ${source.name} against ${target.name}`;
-    if (source) return `, by ${source.name}`;
-    if (target) return `, against ${target.name}`;
+    if (source && target) return words.byAgainst(source.name, target.name);
+    if (source) return words.by(source.name);
+    if (target) return words.against(target.name);
     return "";
 }
 
@@ -76,10 +79,11 @@ function nodeSuffix(context: RenderContext, step: TimelineStep): string {
  */
 function summarise(context: RenderContext): string[] {
     const { store } = context;
+    const words = context.strings.narrative;
     const steps = store.visibleSteps();
     const first = steps[0];
     if (!first) {
-        return ["Nothing has been recorded for this incident yet."];
+        return [words.nothingRecorded];
     }
 
     const attacker = steps.filter(step => step.side === Side.Attacker);
@@ -87,34 +91,33 @@ function summarise(context: RenderContext): string[] {
     const compromised = store.nodes.filter(node => node.compromised);
     const sentences: string[] = [];
 
-    sentences.push(`The first recorded action, ${lower(first.title)}, happened on ${formatMoment(first)}${nodeSuffix(context, first)}.`);
+    sentences.push(words.firstAction(lower(first.title), context.time.formatMoment(first), nodeSuffix(context, first)));
 
     if (attacker.length > 0) {
         const tactics = [...new Set(attacker.map(step => step.attackTactic).filter(tactic => tactic !== AttackTactic.None))]
             .map(tactic => store.tacticInfo(tactic).label);
-        const across = tactics.length > 0 ? ` across ${tactics.length} tactic(s): ${tactics.join(", ")}` : "";
-        sentences.push(`${attacker.length} attacker action(s) were recorded${across}.`);
+        sentences.push(words.attackerActions(attacker.length, tactics));
     }
 
-    const dwell = formatDuration(store.metrics.dwellHours);
+    const dwell = context.time.formatDuration(store.metrics.dwellHours);
     if (dwell) {
-        sentences.push(`The intrusion went unnoticed for ${dwell} before it was detected.`);
+        sentences.push(words.dwell(dwell));
     }
 
     if (defender.length > 0) {
         const phases = [...new Set(defender.map(step => step.responsePhase).filter(phase => phase !== ResponsePhase.None))]
             .map(phase => store.responseInfo(phase).label);
-        sentences.push(`The response took ${defender.length} recorded action(s)${phases.length > 0 ? `, covering ${phases.join(", ")}` : ""}.`);
+        sentences.push(words.responseActions(defender.length, phases));
     }
 
     if (compromised.length > 0) {
-        const named = compromised.slice(0, COMPROMISED_NAMED).map(node => node.name).join(", ");
-        sentences.push(`${compromised.length} record(s) are marked as compromised: ${named}${compromised.length > COMPROMISED_NAMED ? " and others" : ""}.`);
+        const named = compromised.slice(0, COMPROMISED_NAMED).map(node => node.name);
+        sentences.push(words.compromisedRecords(compromised.length, named, compromised.length > COMPROMISED_NAMED));
     }
 
     const stopped = steps.filter(step => step.outcome === StepOutcome.Blocked || step.outcome === StepOutcome.Failed);
     if (stopped.length > 0) {
-        sentences.push(`${stopped.length} attempt(s) were blocked or failed.`);
+        sentences.push(words.stoppedAttempts(stopped.length));
     }
     return sentences;
 }
@@ -153,7 +156,7 @@ function table(context: RenderContext, rows: readonly TimelineStep[], x: number,
     const { store, palette } = context;
     const node = group();
     let cursor = x;
-    const columns: PlacedColumn[] = COLUMNS.map(column => {
+    const columns: PlacedColumn[] = tableColumns(context.strings).map(column => {
         const placed = { ...column, x: cursor, size: width * column.share };
         cursor += placed.size;
         return placed;
@@ -190,7 +193,7 @@ function table(context: RenderContext, rows: readonly TimelineStep[], x: number,
         if (when) {
             row.appendChild(rect(when.x, centerY - 7, 3, 14, { rx: 1.5, fill: palette.sides[step.side].color }));
         }
-        cell(ColumnKey.When, formatMoment(step), 10.5, palette.inkMuted);
+        cell(ColumnKey.When, context.time.formatMoment(step), 10.5, palette.inkMuted);
         cell(ColumnKey.Who, store.node(step.sourceNodeId)?.name ?? "-", 11, palette.ink);
         cell(ColumnKey.What, stripTags(step.title), 11.5, palette.ink, 600);
         cell(ColumnKey.Where, store.node(step.targetNodeId)?.name ?? "-", 11, palette.inkMuted);

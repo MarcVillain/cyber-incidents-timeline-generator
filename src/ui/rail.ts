@@ -5,7 +5,7 @@ import type { NodeKindInfo } from "../core/catalog.js";
 import { LinkKind, NodeCategory, NodeKind, RecordType, Side } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { DiagramLink, DiagramNode, RecordId } from "../core/models.js";
-import { formatDateTime, formatWallClock, millisecondsFromHours, momentBetween } from "../core/time.js";
+import { formatWallClock, millisecondsFromHours, momentBetween } from "../core/time.js";
 import type { TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
 import type { PanelContext, PendingRecord } from "./panels.js";
@@ -86,19 +86,20 @@ export class Rail {
     render(): void {
         const { store } = this.context;
         const fragment = document.createDocumentFragment();
+        const words = this.context.strings.rail;
         const nodes = store.nodes;
         const containers = nodes.filter(node => nodes.some(candidate => candidate.parentId === node.id));
         const containerIds = new Set(containers.map(node => node.id));
         const loose = (category: NodeCategory): DiagramNode[] => nodes.filter(node => node.category === category && !containerIds.has(node.id) && node.parentId === null);
 
-        this.appendGroup(fragment, "Groups", containers.filter(node => this.nodeMatches(node)), container => [
+        this.appendGroup(fragment, words.groups, containers.filter(node => this.nodeMatches(node)), container => [
             this.nodeRow(container, false),
             ...nodes.filter(node => node.parentId === container.id).map(member => this.nodeRow(member, true))
         ]);
-        this.appendGroup(fragment, "Parties", loose(NodeCategory.Actor).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)]);
-        this.appendGroup(fragment, "Resources", loose(NodeCategory.Resource).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)]);
-        this.appendGroup(fragment, "Steps", store.steps.filter(step => this.matches(step.title) || this.matches(step.description)), step => [this.stepRow(step)]);
-        this.appendGroup(fragment, "Relationships", store.links.filter(link => this.linkMatches(link)), link => [this.linkRow(link)]);
+        this.appendGroup(fragment, words.parties, loose(NodeCategory.Actor).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)]);
+        this.appendGroup(fragment, words.resources, loose(NodeCategory.Resource).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)]);
+        this.appendGroup(fragment, words.steps, store.steps.filter(step => this.matches(step.title) || this.matches(step.description)), step => [this.stepRow(step)]);
+        this.appendGroup(fragment, words.relationships, store.links.filter(link => this.linkMatches(link)), link => [this.linkRow(link)]);
 
         if (this.pending) {
             fragment.append(this.quickAddRow(this.pending));
@@ -175,7 +176,7 @@ export class Rail {
 
         const bin = control("tlg-record-delete-trigger", `Delete ${name}`, Icon.Trash);
         const confirm = control("tlg-record-delete-confirm", `Confirm deleting ${name}`, Icon.Check);
-        const cancel = control("tlg-record-delete-cancel", "Keep it", Icon.Close);
+        const cancel = control("tlg-record-delete-cancel", this.context.strings.rail.keepIt, Icon.Close);
         const reset = (): void => holder.classList.remove("is-asking");
 
         bin.addEventListener("click", () => {
@@ -203,7 +204,7 @@ export class Rail {
 
     private stepRow(step: TimelineStep): HTMLDivElement {
         const { store } = this.context;
-        const meta = [formatDateTime(step.at), store.node(step.sourceNodeId)?.name ?? null].filter(Boolean).join(" - ");
+        const meta = [this.context.time.formatDateTime(step.at), store.node(step.sourceNodeId)?.name ?? null].filter(Boolean).join(" - ");
         return this.row({ type: RecordType.Step, id: step.id, icon: store.stepIcon(step), side: step.side, name: step.title, meta, child: false });
     }
 
@@ -260,15 +261,16 @@ export class Rail {
     private menuContent(): DocumentFragment {
         const { store } = this.context;
         const fragment = document.createDocumentFragment();
+        const words = this.context.strings.rail;
 
-        fragment.append(h("div", "tlg-addmenu-section", {}, ["What happened"]));
+        fragment.append(h("div", "tlg-addmenu-section", {}, [words.whatHappened]));
         fragment.append(h("div", "tlg-addmenu-grid", {}, [
-            this.menuTile(Icon.Timeline, "Step", () => void this.beginStep()),
-            this.menuTile(Icon.Link, "Relationship", () => void this.beginLink())
+            this.menuTile(Icon.Timeline, words.step, () => void this.beginStep()),
+            this.menuTile(Icon.Link, words.relationship, () => void this.beginLink())
         ]));
 
         [NodeCategory.Actor, NodeCategory.Resource].forEach(category => {
-            fragment.append(h("div", "tlg-addmenu-section", {}, [category === NodeCategory.Actor ? "People and organisations" : "Resources"]));
+            fragment.append(h("div", "tlg-addmenu-section", {}, [category === NodeCategory.Actor ? words.partiesHint : words.resources]));
             fragment.append(h("div", "tlg-addmenu-grid", {}, store.catalog.nodeKinds
                 .filter(kind => kind.category === category)
                 .map(kind => this.menuTile(kind.icon, kind.label, () => this.beginNode(kind)))));
@@ -292,7 +294,7 @@ export class Rail {
         this.closeMenu();
         const id = await this.context.actions.create({
             type: RecordType.Step,
-            input: { title: "New step", timestamp: formatWallClock(this.newStepMoment()), side: Side.Attacker }
+            input: { title: this.context.strings.rail.newStep, timestamp: formatWallClock(this.newStepMoment()), side: Side.Attacker }
         });
         if (id !== null) this.context.store.setSelection({ type: RecordType.Step, id });
     }
@@ -316,7 +318,7 @@ export class Rail {
         this.closeMenu();
         const [first, second] = this.context.store.nodes;
         if (!first || !second) {
-            this.context.actions.notify("Add at least two records before linking them.");
+            this.context.actions.notify(this.context.strings.rail.needTwoRecords);
             return;
         }
         const id = await this.context.actions.create({

@@ -85,37 +85,90 @@ export function millisecondsFromHours(hours: number): number {
     return hours * MILLISECONDS_PER_HOUR;
 }
 
-// The interface is written in English, so the dates on a slide are too, whatever the browser is set to
-const LOCALE = "en-GB";
-const DATE_FORMAT = new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short", year: "numeric" });
-const TIME_FORMAT = new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit", hour12: false });
-const DATE_FORMAT_SHORT = new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short" });
+/** The dates on a slide read the same everywhere until a host asks for its own locale. */
+export const DEFAULT_LOCALE = "en-GB";
 
 const MINUTES_PER_HOUR = 60;
 const HOURS_SHOWN_AS_HOURS = 48;
 const HOURS_PER_DAY = 24;
 
+/**
+ * Dates and durations in one locale. Built once and carried, rather than read from a global, so two
+ * workspaces on one page can speak different languages.
+ */
+export class TimeFormats {
+    readonly locale: string;
+    private readonly date: Intl.DateTimeFormat;
+    private readonly time: Intl.DateTimeFormat;
+    private readonly dateShort: Intl.DateTimeFormat;
+    private readonly units: DurationUnits;
+
+    constructor(locale: string = DEFAULT_LOCALE, units: DurationUnits = DEFAULT_DURATION_UNITS) {
+        this.locale = locale;
+        this.date = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric" });
+        this.time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+        this.dateShort = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short" });
+        this.units = units;
+    }
+
+    formatDate(date: Date | null): string {
+        return date ? this.date.format(date) : "";
+    }
+
+    formatDateShort(date: Date | null): string {
+        return date ? this.dateShort.format(date) : "";
+    }
+
+    formatTime(date: Date | null): string {
+        return date ? this.time.format(date) : "";
+    }
+
+    formatDateTime(date: Date | null): string {
+        return date ? `${this.date.format(date)} ${this.time.format(date)}` : "";
+    }
+
+    formatDuration(hours: number | null): string | null {
+        if (hours === null) return null;
+        if (hours < 1) return `${Math.round(hours * MINUTES_PER_HOUR)}${this.units.minutes}`;
+        if (hours < HOURS_SHOWN_AS_HOURS) return `${Math.round(hours * 10) / 10}${this.units.hours}`;
+        return `${Math.round(hours / HOURS_PER_DAY)}${this.units.days}`;
+    }
+
+    formatMoment(moment: Moment): string {
+        if (!moment.at) return "";
+        return moment.timeKnown ? this.formatDateTime(moment.at) : this.formatDate(moment.at);
+    }
+}
+
+/** The suffixes a duration is written with, which no Intl format covers. */
+export interface DurationUnits {
+    minutes: string;
+    hours: string;
+    days: string;
+}
+
+export const DEFAULT_DURATION_UNITS: DurationUnits = { minutes: "min", hours: "h", days: "d" };
+
+const DEFAULT_FORMATS = new TimeFormats();
+
 export function formatDate(date: Date | null): string {
-    return date ? DATE_FORMAT.format(date) : "";
+    return DEFAULT_FORMATS.formatDate(date);
 }
 
 export function formatDateShort(date: Date | null): string {
-    return date ? DATE_FORMAT_SHORT.format(date) : "";
+    return DEFAULT_FORMATS.formatDateShort(date);
 }
 
 export function formatTime(date: Date | null): string {
-    return date ? TIME_FORMAT.format(date) : "";
+    return DEFAULT_FORMATS.formatTime(date);
 }
 
 export function formatDateTime(date: Date | null): string {
-    return date ? `${DATE_FORMAT.format(date)} ${TIME_FORMAT.format(date)}` : "";
+    return DEFAULT_FORMATS.formatDateTime(date);
 }
 
 export function formatDuration(hours: number | null): string | null {
-    if (hours === null) return null;
-    if (hours < 1) return `${Math.round(hours * MINUTES_PER_HOUR)}min`;
-    if (hours < HOURS_SHOWN_AS_HOURS) return `${Math.round(hours * 10) / 10}h`;
-    return `${Math.round(hours / HOURS_PER_DAY)}d`;
+    return DEFAULT_FORMATS.formatDuration(hours);
 }
 
 export interface Moment {
@@ -127,6 +180,5 @@ export interface Moment {
  * How a step announces when it happened: the day alone when nobody recorded a time.
  */
 export function formatMoment(moment: Moment): string {
-    if (!moment.at) return "";
-    return moment.timeKnown ? formatDateTime(moment.at) : formatDate(moment.at);
+    return DEFAULT_FORMATS.formatMoment(moment);
 }

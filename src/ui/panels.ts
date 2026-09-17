@@ -1,8 +1,10 @@
 import type { NodeKindInfo } from "../core/catalog.js";
 import type { RecordType } from "../core/enums.js";
 import type { LinkCreateInput, LinkUpdateInput, NodeCreateInput, NodeUpdateInput, RecordId, StepCreateInput, StepUpdateInput } from "../core/models.js";
+import type { TimeFormats } from "../core/time.js";
 import type { DiagramStore } from "./diagram-store.js";
 import type { IconSet } from "./icons/icon-set.js";
+import type { Strings } from "./strings.js";
 
 export interface TimelinePermissions {
     canCreate: boolean;
@@ -36,6 +38,8 @@ export interface PanelContext {
     actions: WorkspaceActions;
     permissions: TimelinePermissions;
     icons: IconSet;
+    strings: Strings;
+    time: TimeFormats;
     signal: AbortSignal;
 }
 

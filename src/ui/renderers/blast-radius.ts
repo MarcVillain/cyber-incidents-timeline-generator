@@ -135,6 +135,7 @@ export const blastRadius = defineRenderer<BlastPage>({
 
     draw(context, page, pageIndex, pageCount) {
         const { store, palette, icons } = context;
+        const words = context.strings.scene;
         const attacker = palette.sides[Side.Attacker].color;
 
         const { root, content } = frame(context, {
@@ -142,16 +143,16 @@ export const blastRadius = defineRenderer<BlastPage>({
             pageCount,
             subtitle: page.origin ? `${page.compromised} of ${page.total} records marked compromised` : null,
             legend: [
-                { label: "Compromised", color: attacker },
-                { label: "Reached, not compromised", color: palette.sides[Side.Victim].color },
-                { label: "Untouched", color: palette.borderStrong },
-                { label: "Recorded relationship", color: palette.border }
+                { label: words.compromised, color: attacker },
+                { label: words.reachedNotCompromised, color: palette.sides[Side.Victim].color },
+                { label: words.untouched, color: palette.borderStrong },
+                { label: words.recordedRelationship, color: palette.border }
             ]
         });
 
         const origin = page.origin;
         if (!origin) {
-            content.appendChild(placeholder(context, "No starting point yet", "Mark what the attacker reached first, and the spread draws from there."));
+            content.appendChild(placeholder(context, words.emptyBlastRadiusTitle, words.emptyBlastRadiusHint));
             return root;
         }
 

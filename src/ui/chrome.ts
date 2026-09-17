@@ -95,7 +95,7 @@ interface DetailCell extends SlideDetail {
  */
 export function frame(context: RenderContext, { page, pageCount, subtitle, legend }: FrameOptions): Frame {
     const { store, palette, representation } = context;
-    const headerContext = { incident: store.incident, store, palette, representation, page, pageCount, viewSubtitle: subtitle };
+    const headerContext = { incident: store.incident, store, palette, representation, page, pageCount, viewSubtitle: subtitle, strings: context.strings };
     const defaults = defaultSlideHeader(headerContext);
     const header = context.slideHeader ? context.slideHeader(defaults, headerContext) : defaults;
 

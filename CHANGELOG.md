@@ -18,6 +18,14 @@ All notable changes to this project are documented here. The format follows
   `milestone_taken` code, naming the step that holds it. The package ships no vocabulary of its own, so
   what counts as a milestone stays the host's to say.
 - `code` on a validation issue, so a host can act on a named refusal without reading the English.
+- Words of its own. `DEFAULT_STRINGS` holds every string the interface says, grouped by where it appears,
+  and `TimelineOptions.strings` writes over any of them. The catalog already carried the vocabulary of the
+  domain; this carries the chrome around it, down to the legends and empty states the representations draw.
+- `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
+  module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
+  speak different languages.
+- `RendererDefinition.options` accepts a function of the strings, which is how the built in representations
+  declare their toolbar settings. An array still works.
 
 ## [0.1.1] - 2026-09-16
 

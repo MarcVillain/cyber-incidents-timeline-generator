@@ -5,6 +5,7 @@ import type { DiagramNode, RecordId } from "../core/models.js";
 import type { WallClockParts } from "../core/time.js";
 import { h, uniqueId } from "./dom.js";
 import type { IconSet } from "./icons/icon-set.js";
+import { DEFAULT_STRINGS, type FormStrings } from "./strings.js";
 
 export interface Choice<TValue extends string> {
     value: TValue;
@@ -59,7 +60,7 @@ export function select<TValue extends string>(
     value: TValue | null,
     choices: readonly Choice<TValue>[],
     onChange: (value: TValue | null) => void,
-    { allowEmpty = false, emptyLabel = "None" }: SelectOptions = {}
+    { allowEmpty = false, emptyLabel = DEFAULT_STRINGS.forms.none }: SelectOptions = {}
 ): HTMLSelectElement {
     const input = h("select", "tlg-select", { id: uniqueId("select") });
     if (allowEmpty) {
@@ -78,7 +79,7 @@ export function recordSelect(
     value: RecordId | null,
     nodes: readonly DiagramNode[],
     onChange: (value: RecordId | null) => void,
-    { allowEmpty = false, emptyLabel = "None" }: SelectOptions = {}
+    { allowEmpty = false, emptyLabel = DEFAULT_STRINGS.forms.none }: SelectOptions = {}
 ): HTMLSelectElement {
     const input = h("select", "tlg-select", { id: uniqueId("record") });
     if (allowEmpty) {
@@ -101,10 +102,10 @@ export function checkbox(label: string, value: boolean, onChange: (value: boolea
  * A date and, beside it, a time that may be left blank. Incidents are often reconstructed from records
  * that only carry the day, and saying nothing is more honest than inventing midnight.
  */
-export function dateAndTime(parts: WallClockParts, onChange: (parts: WallClockParts) => void): HTMLDivElement {
+export function dateAndTime(parts: WallClockParts, onChange: (parts: WallClockParts) => void, strings: FormStrings = DEFAULT_STRINGS.forms): HTMLDivElement {
     const dateInput = h("input", "tlg-input", { type: "date", id: uniqueId("date") });
     dateInput.value = parts.date ?? "";
-    const timeInput = h("input", "tlg-input", { type: "time", id: uniqueId("time"), "aria-label": "Time, may be left empty" });
+    const timeInput = h("input", "tlg-input", { type: "time", id: uniqueId("time"), "aria-label": strings.timeHint });
     timeInput.value = parts.time ?? "";
 
     const report = (): void => onChange({ date: dateInput.value || null, time: timeInput.value || null });
@@ -119,8 +120,8 @@ export function dateAndTime(parts: WallClockParts, onChange: (parts: WallClockPa
 /**
  * Free text tags, one per comma.
  */
-export function tagsInput(values: readonly string[], onChange: (values: string[]) => void): HTMLInputElement {
-    const input = h("input", "tlg-input", { type: "text", id: uniqueId("tags"), placeholder: "Comma separated" });
+export function tagsInput(values: readonly string[], onChange: (values: string[]) => void, strings: FormStrings = DEFAULT_STRINGS.forms): HTMLInputElement {
+    const input = h("input", "tlg-input", { type: "text", id: uniqueId("tags"), placeholder: strings.tagsHint });
     input.value = values.join(", ");
     input.addEventListener("change", () => onChange(input.value.split(",").map(part => part.trim()).filter(Boolean)));
     return input;

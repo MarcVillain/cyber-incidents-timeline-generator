@@ -99,18 +99,19 @@ function laneMetrics(packed: readonly PackedLane[], available: number): LaneMetr
  * ones land on the first slide.
  */
 function buildLanes(context: RenderContext, steps: readonly TimelineStep[]): Lane[] {
-    const { store } = context;
+    const { store, strings } = context;
     const lanes = new Map<RecordId | null, Lane>();
 
     steps.forEach(step => {
         const key = step.sourceNodeId;
         let lane = lanes.get(key);
+        const words = strings.scene;
         if (!lane) {
             const node = store.node(key);
             lane = {
                 node,
-                label: node ? node.name : "Unattributed",
-                subtitle: node ? node.role ?? store.kindInfo(node.kind).label : "No party recorded",
+                label: node ? node.name : words.unattributed,
+                subtitle: node ? node.role ?? store.kindInfo(node.kind).label : words.noPartyRecorded,
                 side: node ? node.side : Side.Unknown,
                 steps: [],
                 weight: 1
@@ -312,11 +313,11 @@ export const actorSwimlanes = defineRenderer<Lane[]>({
             page: pageIndex,
             pageCount,
             subtitle: first && last ? `${formatDate(first.at)} to ${formatDate(last.at)}` : null,
-            legend: [...sideLegend(context, steps), { label: "Led to", color: palette.borderStrong, stroke: LegendStroke.Dashed }]
+            legend: [...sideLegend(context, steps), { label: context.strings.scene.ledTo, color: palette.borderStrong, stroke: LegendStroke.Dashed }]
         });
 
         if (lanes.length === 0) {
-            content.appendChild(placeholder(context, "No steps recorded yet", "Say who did what and the lanes appear."));
+            content.appendChild(placeholder(context, context.strings.scene.emptySwimlanesTitle, context.strings.scene.emptySwimlanesHint));
             return root;
         }
 
@@ -337,7 +338,7 @@ export const actorSwimlanes = defineRenderer<Lane[]>({
         });
         const bottom = cursor;
 
-        content.appendChild(timeAxis(palette, scale, { x: trackX, width: trackWidth, top, bottom }));
+        content.appendChild(timeAxis(palette, scale, { x: trackX, width: trackWidth, top, bottom }, context.time));
 
         packed.forEach((entry, index) => {
             if (index % 2 === 1) {

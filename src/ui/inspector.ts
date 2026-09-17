@@ -7,7 +7,7 @@ import { impactLevelsOf } from "../core/catalog.js";
 import { Involvement, RecordType, Side } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { DiagramLink, DiagramNode, LinkUpdateInput, NodeUpdateInput, StepUpdateInput } from "../core/models.js";
-import { formatMoment, joinWallClock, splitWallClock } from "../core/time.js";
+import { joinWallClock, splitWallClock } from "../core/time.js";
 import type { Selection, TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
 import { button, checkbox, dateAndTime, field, recordSelect, row, select, tagsInput, textArea, textInput, type Choice } from "./forms.js";
@@ -130,7 +130,7 @@ export class Inspector {
         badge.style.background = `var(${store.sideInfo(this.sideOf(inspected)).colorToken})`;
 
         const close = button(icons, "", "tlg-button tlg-button-quiet", () => store.setSelection(null), Icon.Close);
-        close.setAttribute("aria-label", "Close");
+        close.setAttribute("aria-label", this.context.strings.inspector.close);
         return h("div", "tlg-inspector-head", {}, [badge, h("div", "tlg-inspector-title", {}, [this.titleFor(inspected)]), close]);
     }
 
@@ -156,11 +156,12 @@ export class Inspector {
 
     private readOnly(inspected: InspectedRecord): HTMLDListElement {
         const { store } = this.context;
+        const w = this.context.strings.inspector;
         const entries: [string, string | null][] = inspected.type === RecordType.Node
-            ? [["Kind", store.kindInfo(inspected.record.kind).label], ["Side", store.sideInfo(inspected.record.side).label], ["Identifier", inspected.record.identifier], ["Role", inspected.record.role], ["Notes", inspected.record.description]]
+            ? [[w.kind, store.kindInfo(inspected.record.kind).label], [w.side, store.sideInfo(inspected.record.side).label], [w.identifier, inspected.record.identifier], [w.role, inspected.record.role], [w.notes, inspected.record.description]]
             : inspected.type === RecordType.Step
-                ? [["When", formatMoment(inspected.record)], ["Side", store.sideInfo(inspected.record.side).label], ["Outcome", store.outcomeInfo(inspected.record.outcome).label], ["Notes", inspected.record.description]]
-                : [["Relationship", store.linkKindInfo(inspected.record.kind).label], ["Label", inspected.record.label], ["Confidence", inspected.record.confidence]];
+                ? [[w.when, this.context.time.formatMoment(inspected.record)], [w.side, store.sideInfo(inspected.record.side).label], [w.outcome, store.outcomeInfo(inspected.record.outcome).label], [w.notes, inspected.record.description]]
+                : [[w.relationship, store.linkKindInfo(inspected.record.kind).label], [w.label, inspected.record.label], [w.confidence, inspected.record.confidence]];
 
         const list = h("dl", "tlg-readonly");
         entries.forEach(([label, value]) => {
@@ -171,6 +172,7 @@ export class Inspector {
 
     private nodeFields(container: HTMLElement, node: DiagramNode): void {
         const { store, actions } = this.context;
+        const w = this.context.strings.inspector;
         const save = (patch: NodeUpdateInput): void => actions.edit(node.id, { type: RecordType.Node, patch });
         const catalog = store.catalog;
         const kinds: Choice<typeof node.kind>[] = catalog.nodeKinds.map(entry => ({ value: entry.kind, label: entry.label }));
@@ -179,64 +181,65 @@ export class Inspector {
         const others = store.nodes.filter(candidate => candidate.id !== node.id);
 
         container.append(
-            field("Name", textInput(node.name, value => { if (value) save({ name: value }); })),
+            field(w.name, textInput(node.name, value => { if (value) save({ name: value }); })),
             row(
-                field("Kind", select(node.kind, kinds, value => { if (value) save({ kind: value }); })),
-                field("Side", select(node.side, sides, value => { if (value) save({ side: value }); }))
+                field(w.kind, select(node.kind, kinds, value => { if (value) save({ kind: value }); })),
+                field(w.side, select(node.side, sides, value => { if (value) save({ side: value }); }))
             ),
-            field("Identifier", textInput(node.identifier, value => save({ identifier: value }), "Hostname, address, hash")),
-            field("Role", textInput(node.role, value => save({ role: value }), "What it is for")),
+            field(w.identifier, textInput(node.identifier, value => save({ identifier: value }), w.identifierHint)),
+            field(w.role, textInput(node.role, value => save({ role: value }), w.roleHint)),
             row(
-                field("Belongs to", recordSelect(node.parentId, others, value => save({ parentId: value }), { allowEmpty: true, emptyLabel: "Nothing" })),
-                field("Criticality", select(node.criticality, impacts, value => { if (value) save({ criticality: value }); }))
+                field(w.belongsTo, recordSelect(node.parentId, others, value => save({ parentId: value }), { allowEmpty: true, emptyLabel: w.nothing })),
+                field(w.criticality, select(node.criticality, impacts, value => { if (value) save({ criticality: value }); }))
             ),
-            checkbox("Compromised", node.compromised, value => save({ compromised: value })),
-            field("Notes", textArea(node.description, value => save({ description: value })))
+            checkbox(w.compromised, node.compromised, value => save({ compromised: value })),
+            field(w.notes, textArea(node.description, value => save({ description: value })))
         );
     }
 
     private stepFields(container: HTMLElement, step: TimelineStep): void {
         const { store, actions } = this.context;
+        const w = this.context.strings.inspector;
         const save = (patch: StepUpdateInput): void => actions.edit(step.id, { type: RecordType.Step, patch });
         const catalog = store.catalog;
         const nodes = store.nodes;
 
         container.append(
-            field("What happened", textInput(step.title, value => { if (value) save({ title: value }); })),
-            field("When", dateAndTime(splitWallClock(step.at, step.timeKnown), value => {
+            field(w.whatHappened, textInput(step.title, value => { if (value) save({ title: value }); })),
+            field(w.when, dateAndTime(splitWallClock(step.at, step.timeKnown), value => {
                 if (!value.date) return;
                 save({ timestamp: joinWallClock(value.date, value.time), timeKnown: value.time !== null });
-            })),
-            field("Until", dateAndTime(splitWallClock(step.until, step.timeKnown), value => {
+            }, this.context.strings.forms)),
+            field(w.until, dateAndTime(splitWallClock(step.until, step.timeKnown), value => {
                 save({ endTimestamp: value.date ? joinWallClock(value.date, value.time) : null });
-            })),
+            }, this.context.strings.forms)),
             row(
-                field("Side", select(step.side, catalog.sides.map(entry => ({ value: entry.side, label: entry.label })), value => { if (value) save({ side: value }); })),
-                field("Outcome", select(step.outcome, catalog.outcomes.map(entry => ({ value: entry.outcome, label: entry.label })), value => { if (value) save({ outcome: value }); }))
+                field(w.side, select(step.side, catalog.sides.map(entry => ({ value: entry.side, label: entry.label })), value => { if (value) save({ side: value }); })),
+                field(w.outcome, select(step.outcome, catalog.outcomes.map(entry => ({ value: entry.outcome, label: entry.label })), value => { if (value) save({ outcome: value }); }))
             ),
             row(
-                field("Performed by", recordSelect(step.sourceNodeId, nodes, value => save({ sourceNodeId: value }), { allowEmpty: true, emptyLabel: "Nobody recorded" })),
-                field("Performed on", recordSelect(step.targetNodeId, nodes, value => save({ targetNodeId: value }), { allowEmpty: true, emptyLabel: "Nothing recorded" }))
+                field(w.performedBy, recordSelect(step.sourceNodeId, nodes, value => save({ sourceNodeId: value }), { allowEmpty: true, emptyLabel: w.nobodyRecorded })),
+                field(w.performedOn, recordSelect(step.targetNodeId, nodes, value => save({ targetNodeId: value }), { allowEmpty: true, emptyLabel: w.nothingRecorded }))
             ),
             row(
-                field("ATT&CK tactic", select(step.attackTactic, catalog.attackTactics.map(entry => ({ value: entry.tactic, label: entry.label })), value => { if (value) save({ attackTactic: value }); })),
-                field("Technique", textInput(step.mitreTechniqueId, value => save({ mitreTechniqueId: value }), "T1566.001"))
+                field(w.attackTactic, select(step.attackTactic, catalog.attackTactics.map(entry => ({ value: entry.tactic, label: entry.label })), value => { if (value) save({ attackTactic: value }); })),
+                field(w.technique, textInput(step.mitreTechniqueId, value => save({ mitreTechniqueId: value }), w.techniqueHint))
             ),
             row(
-                field("Response phase", select(step.responsePhase, catalog.responsePhases.map(entry => ({ value: entry.phase, label: entry.label })), value => { if (value) save({ responsePhase: value }); })),
-                field("Severity", select(step.severity, impactLevelsOf(catalog.impactScale).map(entry => ({ value: entry.level, label: entry.label })), value => { if (value) save({ severity: value }); }))
+                field(w.responsePhase, select(step.responsePhase, catalog.responsePhases.map(entry => ({ value: entry.phase, label: entry.label })), value => { if (value) save({ responsePhase: value }); })),
+                field(w.severity, select(step.severity, impactLevelsOf(catalog.impactScale).map(entry => ({ value: entry.level, label: entry.label })), value => { if (value) save({ severity: value }); }))
             ),
             row(
-                field("Confidence", select(step.confidence, catalog.confidences, value => { if (value) save({ confidence: value }); })),
-                field("Audience", select(step.audience, catalog.audiences, value => { if (value) save({ audience: value }); }))
+                field(w.confidence, select(step.confidence, catalog.confidences, value => { if (value) save({ confidence: value }); })),
+                field(w.audience, select(step.audience, catalog.audiences, value => { if (value) save({ audience: value }); }))
             ),
-            field("Evidence source", textInput(step.evidenceSource, value => save({ evidenceSource: value }), "EDR, SIEM, user report")),
-            checkbox("Milestone", step.isMilestone, value => save({ isMilestone: value })),
+            field(w.evidenceSource, textInput(step.evidenceSource, value => save({ evidenceSource: value }), w.evidenceSourceHint)),
+            checkbox(w.milestone, step.isMilestone, value => save({ isMilestone: value })),
             ...(catalog.milestones.length
-                ? [field("Named milestone", select(step.milestoneKey ?? "", catalog.milestones.map(entry => ({ value: entry.key, label: entry.label })), value => save({ milestoneKey: value || null }), { allowEmpty: true, emptyLabel: "None" }))]
+                ? [field(w.namedMilestone, select(step.milestoneKey ?? "", catalog.milestones.map(entry => ({ value: entry.key, label: entry.label })), value => save({ milestoneKey: value || null }), { allowEmpty: true, emptyLabel: w.none }))]
                 : []),
-            field("Tags", tagsInput(step.tags, value => save({ tags: value }))),
-            field("Notes", textArea(step.description, value => save({ description: value }), 4)),
+            field(w.tags, tagsInput(step.tags, value => save({ tags: value }), this.context.strings.forms)),
+            field(w.notes, textArea(step.description, value => save({ description: value }), 4)),
             this.involvements(step)
         );
     }
@@ -245,7 +248,7 @@ export class Inspector {
         const { store, actions, icons } = this.context;
         const list = h("div", "tlg-chips");
         const picker = h("div");
-        const container = h("div", "tlg-field", {}, [h("label", null, {}, ["Also involved"]), list, picker]);
+        const container = h("div", "tlg-field", {}, [h("label", null, {}, [this.context.strings.inspector.alsoInvolved]), list, picker]);
 
         const paint = (): void => {
             const current = store.step(step.id) ?? step;
@@ -266,7 +269,7 @@ export class Inspector {
             const available = store.nodes.filter(node => !taken.has(node.id) && node.id !== current.sourceNodeId && node.id !== current.targetNodeId);
             picker.replaceChildren(recordSelect(null, available, value => {
                 if (value !== null) save([...current.involvements, { nodeId: value, involvement: Involvement.Involved }]);
-            }, { allowEmpty: true, emptyLabel: "Add a record" }));
+            }, { allowEmpty: true, emptyLabel: this.context.strings.inspector.addRecord }));
         };
 
         paint();
@@ -275,17 +278,18 @@ export class Inspector {
 
     private linkFields(container: HTMLElement, link: DiagramLink): void {
         const { store, actions } = this.context;
+        const w = this.context.strings.inspector;
         const save = (patch: LinkUpdateInput): void => actions.edit(link.id, { type: RecordType.Link, patch });
         const nodes = store.nodes;
 
         container.append(
             row(
-                field("From", recordSelect(link.sourceNodeId, nodes, value => { if (value !== null) save({ sourceNodeId: value }); })),
-                field("To", recordSelect(link.targetNodeId, nodes, value => { if (value !== null) save({ targetNodeId: value }); }))
+                field(w.from, recordSelect(link.sourceNodeId, nodes, value => { if (value !== null) save({ sourceNodeId: value }); })),
+                field(w.to, recordSelect(link.targetNodeId, nodes, value => { if (value !== null) save({ targetNodeId: value }); }))
             ),
-            field("Relationship", select(link.kind, store.catalog.linkKinds.map(entry => ({ value: entry.kind, label: entry.label })), value => { if (value) save({ kind: value }); })),
-            field("Label", textInput(link.label, value => save({ label: value }), "Wording on the edge")),
-            field("Confidence", select(link.confidence, store.catalog.confidences, value => { if (value) save({ confidence: value }); }))
+            field(w.relationship, select(link.kind, store.catalog.linkKinds.map(entry => ({ value: entry.kind, label: entry.label })), value => { if (value) save({ kind: value }); })),
+            field(w.label, textInput(link.label, value => save({ label: value }), w.labelHint)),
+            field(w.confidence, select(link.confidence, store.catalog.confidences, value => { if (value) save({ confidence: value }); }))
         );
     }
 
@@ -295,15 +299,16 @@ export class Inspector {
      */
     private footer(inspected: InspectedRecord): HTMLDivElement {
         const { store, actions, permissions, icons } = this.context;
-        const close = button(icons, "Close", "tlg-button", () => store.setSelection(null));
+        const w = this.context.strings.inspector;
+        const close = button(icons, w.close, "tlg-button", () => store.setSelection(null));
         const foot = h("div", "tlg-inspector-foot", {}, [close]);
         if (!permissions.canDelete) {
             return foot;
         }
 
-        const remove = button(icons, "Delete", "tlg-button tlg-button-danger", () => showQuestion(), Icon.Trash);
-        const keep = button(icons, "Keep it", "tlg-button", () => showActions());
-        const confirm = button(icons, "Delete", "tlg-button tlg-button-danger tlg-inspector-delete-confirm", () => void actions.remove(inspected.type, inspected.record.id), Icon.Trash);
+        const remove = button(icons, w.delete, "tlg-button tlg-button-danger", () => showQuestion(), Icon.Trash);
+        const keep = button(icons, w.keepIt, "tlg-button", () => showActions());
+        const confirm = button(icons, w.delete, "tlg-button tlg-button-danger tlg-inspector-delete-confirm", () => void actions.remove(inspected.type, inspected.record.id), Icon.Trash);
         const question = h("p", "tlg-inspector-question", {}, [`Delete "${this.titleFor(inspected)}"? This cannot be undone.`]);
 
         const showActions = (): void => {

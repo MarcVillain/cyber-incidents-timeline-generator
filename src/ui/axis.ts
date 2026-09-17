@@ -1,6 +1,8 @@
 // Horizontal time axis with ticks and gridlines, shared by the lane based representations.
 
-import { formatDate, formatTime } from "../core/time.js";
+import { TimeFormats } from "../core/time.js";
+
+const DEFAULT_TIME = new TimeFormats();
 import { timeTicks, type TimeScale } from "./geometry.js";
 import { group, line, rect, text } from "./svg.js";
 import type { Palette } from "./theme.js";
@@ -16,11 +18,11 @@ export interface AxisLayout {
 
 const DEFAULT_TICKS = 7;
 
-export function timeAxis(palette: Palette, scale: TimeScale, { x, width, top, bottom, ticks = DEFAULT_TICKS, showGrid = true }: AxisLayout): SVGGElement {
+export function timeAxis(palette: Palette, scale: TimeScale, { x, width, top, bottom, ticks = DEFAULT_TICKS, showGrid = true }: AxisLayout, time: TimeFormats = DEFAULT_TIME): SVGGElement {
     const node = group();
 
     if (scale.collapsed) {
-        const label = scale.start ? `${formatDate(scale.start)} ${formatTime(scale.start)}` : "";
+        const label = scale.start ? `${time.formatDate(scale.start)} ${time.formatTime(scale.start)}` : "";
         node.appendChild(text(label, x + width / 2, top - 10, { "font-size": 11, "text-anchor": "middle", fill: palette.inkMuted }));
         return node;
     }
@@ -35,8 +37,8 @@ export function timeAxis(palette: Palette, scale: TimeScale, { x, width, top, bo
             node.appendChild(line(position, top, position, bottom, { stroke: palette.border, "stroke-width": 1, "stroke-dasharray": "2 5" }));
         }
 
-        const day = formatDate(moment);
-        node.appendChild(text(formatTime(moment), position, top - 10, { "font-size": 10.5, "text-anchor": "middle", fill: palette.inkMuted }));
+        const day = time.formatDate(moment);
+        node.appendChild(text(time.formatTime(moment), position, top - 10, { "font-size": 10.5, "text-anchor": "middle", fill: palette.inkMuted }));
         if (day !== previousDay) {
             node.appendChild(text(day, position, top - 24, { "font-size": 10.5, "font-weight": 700, "text-anchor": "middle", fill: palette.ink }));
             previousDay = day;

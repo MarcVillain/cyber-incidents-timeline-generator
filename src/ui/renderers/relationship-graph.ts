@@ -10,6 +10,7 @@ import { arrowMarkers, circle, group, markerId, path, rect, text, truncate, wrap
 import type { Palette } from "../theme.js";
 import type { Point } from "../viewport.js";
 import { defineRenderer, optionValue, type RenderContext, type RendererOption } from "./registry.js";
+import type { Strings } from "../strings.js";
 
 enum GraphLayout {
     Bands = "bands",
@@ -21,25 +22,29 @@ enum GraphLabels {
     Hidden = "hidden"
 }
 
-const LAYOUT_OPTION: RendererOption<GraphLayout> = {
-    id: "layout",
-    label: "Layout",
-    fallback: GraphLayout.Bands,
-    choices: [
-        { value: GraphLayout.Bands, label: "Bands" },
-        { value: GraphLayout.Network, label: "Network" }
-    ]
-};
+function layoutOption(strings: Strings): RendererOption<GraphLayout> {
+    return {
+        id: "layout",
+        label: strings.options.layout,
+        fallback: GraphLayout.Bands,
+        choices: [
+            { value: GraphLayout.Bands, label: strings.options.layoutBands },
+            { value: GraphLayout.Network, label: strings.options.layoutNetwork }
+        ]
+    };
+}
 
-const LABELS_OPTION: RendererOption<GraphLabels> = {
-    id: "labels",
-    label: "Labels",
-    fallback: GraphLabels.Shown,
-    choices: [
-        { value: GraphLabels.Shown, label: "Labels shown" },
-        { value: GraphLabels.Hidden, label: "Labels hidden" }
-    ]
-};
+function labelsOption(strings: Strings): RendererOption<GraphLabels> {
+    return {
+        id: "labels",
+        label: strings.options.labels,
+        fallback: GraphLabels.Shown,
+        choices: [
+            { value: GraphLabels.Shown, label: strings.options.labelsShown },
+            { value: GraphLabels.Hidden, label: strings.options.labelsHidden }
+        ]
+    };
+}
 
 const BAND_ORDER: readonly Side[] = [Side.Attacker, Side.ThirdParty, Side.Unknown, Side.Victim, Side.Defender];
 const BAND_GAP = 46;
@@ -142,7 +147,7 @@ function linkColor(context: RenderContext, link: DiagramLink): string {
 }
 
 function labelsShown(context: RenderContext): boolean {
-    return optionValue(context, LABELS_OPTION) === GraphLabels.Shown;
+    return optionValue(context, labelsOption(context.strings)) === GraphLabels.Shown;
 }
 
 /**
@@ -429,7 +434,7 @@ function drawBands(context: RenderContext, bands: readonly BandColumn[], pageInd
 
     const drawable = bands.filter(band => band.clusters.length > 0);
     if (drawable.length === 0) {
-        content.appendChild(placeholder(context, "Nothing to connect yet", "Add the parties and the machines they own to build the map."));
+        content.appendChild(placeholder(context, context.strings.scene.emptyGraphTitle, context.strings.scene.emptyGraphHint));
         return root;
     }
 
@@ -672,7 +677,7 @@ function drawNetwork(context: RenderContext, nodes: readonly DiagramNode[]): SVG
     });
 
     if (nodes.length === 0) {
-        content.appendChild(placeholder(context, "Nothing to connect yet", "Add the parties and the machines they own to build the map."));
+        content.appendChild(placeholder(context, context.strings.scene.emptyGraphTitle, context.strings.scene.emptyGraphHint));
         return root;
     }
 
@@ -725,13 +730,13 @@ function drawNetwork(context: RenderContext, nodes: readonly DiagramNode[]): SVG
 export const relationshipGraph = defineRenderer<GraphPage>({
     representation: Representation.RelationshipGraph,
     draggable: true,
-    options: [LAYOUT_OPTION, LABELS_OPTION],
+    options: strings => [layoutOption(strings), labelsOption(strings)],
 
     pages(context) {
         const nodes = context.store.visibleNodes();
         // The ring holds everything at once. Splitting it would cut relationships in half, which is the
         // one thing this layout exists to show.
-        if (optionValue(context, LAYOUT_OPTION) === GraphLayout.Network) {
+        if (optionValue(context, layoutOption(context.strings)) === GraphLayout.Network) {
             return [{ layout: GraphLayout.Network, nodes }];
         }
 

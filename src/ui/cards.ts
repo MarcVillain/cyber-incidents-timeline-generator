@@ -7,7 +7,9 @@
 import { AttackTactic, Confidence, ResponsePhase, Side, StepOutcome } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { DiagramNode } from "../core/models.js";
-import { formatDate, formatDateShort, formatDuration, formatMoment, formatTime, hoursBetween } from "../core/time.js";
+import { TimeFormats, hoursBetween } from "../core/time.js";
+
+const DEFAULT_TIME = new TimeFormats();
 import type { TimelineStep } from "./diagram-store.js";
 import type { RenderContext } from "./renderers/registry.js";
 import { circle, el, group, line, measure, path, rect, roundedPath, stripTags, text, topRoundedPath, truncate, wrap } from "./svg.js";
@@ -250,7 +252,7 @@ export function headerStrip(context: RenderContext, step: TimelineStep, x: numbe
 
     // A narrow card cannot hold both, and the date is the one that always has to be there
     const room = width - 32;
-    const variants = momentVariants(step).map(value => value.toUpperCase());
+    const variants = momentVariants(step, context.time).map(value => value.toUpperCase());
     const stamp = variants.find(value => value.length * STAMP_CHAR <= room) ?? variants.at(-1) ?? "";
     const showBadge = badge !== null && stamp.length * STAMP_CHAR + badgeWidth + 56 <= width;
 
@@ -272,21 +274,21 @@ export function headerStrip(context: RenderContext, step: TimelineStep, x: numbe
  * shorter wording of the same thing rather than a stamp running off the edge, hence the ladder from
  * the full range down to the bare start date.
  */
-export function momentVariants(step: TimelineStep): string[] {
+export function momentVariants(step: TimelineStep, time: TimeFormats = DEFAULT_TIME): string[] {
     if (!step.at) return [""];
-    const start = formatMoment(step);
+    const start = time.formatMoment(step);
     if (!step.until) return [start];
 
     const sameDay = step.until.toDateString() === step.at.toDateString();
-    const end = sameDay && step.timeKnown ? formatTime(step.until) : formatMoment({ at: step.until, timeKnown: step.timeKnown });
+    const end = sameDay && step.timeKnown ? time.formatTime(step.until) : time.formatMoment({ at: step.until, timeKnown: step.timeKnown });
 
     const variants = [`${start} to ${end}`];
     if (!sameDay) {
-        variants.push(`${start} to ${formatDateShort(step.until)}`);
-        variants.push(`${formatDateShort(step.at)} to ${formatDateShort(step.until)}`);
+        variants.push(`${start} to ${time.formatDateShort(step.until)}`);
+        variants.push(`${time.formatDateShort(step.at)} to ${time.formatDateShort(step.until)}`);
     }
     variants.push(start);
-    variants.push(formatDate(step.at));
+    variants.push(time.formatDate(step.at));
     return variants;
 }
 
@@ -301,7 +303,7 @@ function labelsFor(context: RenderContext, step: TimelineStep): MicroLabel[] {
     if (step.outcome !== StepOutcome.Unknown) {
         entries.push({ label: store.outcomeInfo(step.outcome).label, color: outcomeColor(palette, step) });
     }
-    const lasted = formatDuration(hoursBetween(step.at, step.until));
+    const lasted = context.time.formatDuration(hoursBetween(step.at, step.until));
     if (step.until && lasted) {
         entries.push({ label: `lasted ${lasted}`, color: palette.inkMuted });
     }

@@ -17,6 +17,7 @@ import { paginate } from "../geometry.js";
 import { arrowMarker, el, group, line, rect, text } from "../svg.js";
 import type { Palette } from "../theme.js";
 import { defineRenderer, optionValue, type RenderContext, type RendererOption } from "./registry.js";
+import type { Strings } from "../strings.js";
 
 enum Density {
     Comfortable = "comfortable",
@@ -43,17 +44,19 @@ const DENSITIES: Readonly<Record<Density, DensityLayout>> = {
     [Density.Rows]: { cardWidth: 238, slot: 126, rows: 2, alternate: true, marker: 14, gap: 22 }
 };
 
-const DENSITY_OPTION: RendererOption<Density> = {
-    id: "density",
-    label: "Density",
-    fallback: Density.Comfortable,
-    choices: [
-        { value: Density.Comfortable, label: "Comfortable" },
-        { value: Density.Compact, label: "Compact" },
-        { value: Density.Stacked, label: "Stacked" },
-        { value: Density.Rows, label: "Rows" }
-    ]
-};
+function densityOption(strings: Strings): RendererOption<Density> {
+    return {
+        id: "density",
+        label: strings.options.density,
+        fallback: Density.Comfortable,
+        choices: [
+            { value: Density.Comfortable, label: strings.options.densityComfortable },
+            { value: Density.Compact, label: strings.options.densityCompact },
+            { value: Density.Stacked, label: strings.options.densityStacked },
+            { value: Density.Rows, label: strings.options.densityRows }
+        ]
+    };
+}
 
 // What a card spends before its subtext, leaving aside the title, whose height varies
 const CARD_CHROME = 51;
@@ -66,7 +69,7 @@ const GAP_LABEL_MIN_HOURS = 0.5;
 const GAP_LABEL_MIN_ROOM = 74;
 
 function densityOf(context: RenderContext): DensityLayout {
-    return DENSITIES[optionValue(context, DENSITY_OPTION)];
+    return DENSITIES[optionValue(context, densityOption(context.strings))];
 }
 
 function perRow(density: DensityLayout): number {
@@ -149,7 +152,7 @@ function axis(palette: Palette, steps: readonly TimelineStep[], positions: reado
 
 export const sequentialTimeline = defineRenderer<TimelineStep[]>({
     representation: Representation.SequentialTimeline,
-    options: [DENSITY_OPTION],
+    options: strings => [densityOption(strings)],
 
     pages(context) {
         const density = densityOf(context);
@@ -170,7 +173,7 @@ export const sequentialTimeline = defineRenderer<TimelineStep[]>({
         });
 
         if (pageSteps.length === 0) {
-            content.appendChild(placeholder(context, "No steps recorded yet", "Add what happened and the timeline draws itself."));
+            content.appendChild(placeholder(context, context.strings.scene.emptyTimelineTitle, context.strings.scene.emptyTimelineHint));
             return root;
         }
 

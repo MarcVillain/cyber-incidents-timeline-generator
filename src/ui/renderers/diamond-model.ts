@@ -9,6 +9,7 @@ import { CONTENT, frame, placeholder } from "../chrome.js";
 import { circle, group, line, measure, path, rect, text, truncate } from "../svg.js";
 import type { Palette } from "../theme.js";
 import { defineRenderer, type RenderContext } from "./registry.js";
+import type { Strings } from "../strings.js";
 
 enum Corner {
     Top = "top",
@@ -30,12 +31,14 @@ interface VertexPage extends VertexDefinition {
     total: number;
 }
 
-const VERTICES: readonly VertexDefinition[] = [
-    { vertex: DiamondVertex.Adversary, label: "Adversary", icon: Icon.ThreatActor, side: Side.Attacker, corner: Corner.Top },
-    { vertex: DiamondVertex.Capability, label: "Capability", icon: Icon.Tool, side: Side.Attacker, corner: Corner.Left },
-    { vertex: DiamondVertex.Infrastructure, label: "Infrastructure", icon: Icon.Server, side: Side.ThirdParty, corner: Corner.Right },
-    { vertex: DiamondVertex.Victim, label: "Victim", icon: Icon.Target, side: Side.Victim, corner: Corner.Bottom }
-];
+function vertices(strings: Strings): readonly VertexDefinition[] {
+    return [
+        { vertex: DiamondVertex.Adversary, label: strings.scene.adversary, icon: Icon.ThreatActor, side: Side.Attacker, corner: Corner.Top },
+        { vertex: DiamondVertex.Capability, label: strings.scene.capability, icon: Icon.Tool, side: Side.Attacker, corner: Corner.Left },
+        { vertex: DiamondVertex.Infrastructure, label: strings.scene.infrastructure, icon: Icon.Server, side: Side.ThirdParty, corner: Corner.Right },
+        { vertex: DiamondVertex.Victim, label: strings.scene.victim, icon: Icon.Target, side: Side.Victim, corner: Corner.Bottom }
+    ];
+}
 
 const PANEL_WIDTH = 420;
 const PANEL_HEIGHT = 236;
@@ -131,7 +134,7 @@ export const diamondModel = defineRenderer<VertexPage[]>({
 
     pages(context) {
         const nodes = context.store.visibleNodes();
-        const grouped = VERTICES.map(vertex => ({ vertex, members: nodes.filter(node => node.diamondVertex === vertex.vertex) }));
+        const grouped = vertices(context.strings).map(vertex => ({ vertex, members: nodes.filter(node => node.diamondVertex === vertex.vertex) }));
         const depth = Math.max(1, ...grouped.map(entry => entry.members.length));
         const pageCount = Math.max(1, Math.ceil(depth / MAX_ROWS));
 
@@ -156,7 +159,7 @@ export const diamondModel = defineRenderer<VertexPage[]>({
         });
 
         if (total === 0) {
-            content.appendChild(placeholder(context, "Nothing to place yet", "Add the parties and the tooling, and each one lands on its vertex."));
+            content.appendChild(placeholder(context, context.strings.scene.emptyDiamondTitle, context.strings.scene.emptyDiamondHint));
             return root;
         }
 

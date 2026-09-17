@@ -66,13 +66,14 @@ function marker(context: RenderContext, step: TimelineStep, x: number, axisY: nu
 function metricsStrip(context: RenderContext, x: number, y: number): SVGGElement {
     const { palette, icons, store } = context;
     const metrics = store.metrics;
+    const words = context.strings.scene;
     const node = group();
 
     const entries: MetricTile[] = [
-        { label: "Dwell time", value: formatDuration(metrics.dwellHours), icon: Icon.ThreatActor, color: palette.sides[Side.Attacker].color },
-        { label: "Time to detect", value: formatDuration(metrics.timeToDetectHours), icon: Icon.Search, color: palette.sides[Side.Defender].color },
-        { label: "Time to contain", value: formatDuration(metrics.timeToContainHours), icon: Icon.Shield, color: palette.sides[Side.Defender].color },
-        { label: "Time to recover", value: formatDuration(metrics.timeToRecoverHours), icon: Icon.Recover, color: palette.good }
+        { label: words.dwellTime, value: context.time.formatDuration(metrics.dwellHours), icon: Icon.ThreatActor, color: palette.sides[Side.Attacker].color },
+        { label: words.timeToDetect, value: context.time.formatDuration(metrics.timeToDetectHours), icon: Icon.Search, color: palette.sides[Side.Defender].color },
+        { label: words.timeToContain, value: context.time.formatDuration(metrics.timeToContainHours), icon: Icon.Shield, color: palette.sides[Side.Defender].color },
+        { label: words.timeToRecover, value: context.time.formatDuration(metrics.timeToRecoverHours), icon: Icon.Recover, color: palette.good }
     ];
 
     const width = (CONTENT.width - (entries.length - 1) * TILE_GAP) / entries.length;
@@ -120,7 +121,7 @@ export const attackerDefender = defineRenderer<TimelineStep[]>({
         });
 
         if (pageSteps.length === 0) {
-            content.appendChild(placeholder(context, "No attacker or defender steps yet", "Mark a step as an attacker or a defender action to build this view."));
+            content.appendChild(placeholder(context, context.strings.scene.emptyDuelTitle, context.strings.scene.emptyDuelHint));
             return root;
         }
 
@@ -145,7 +146,7 @@ export const attackerDefender = defineRenderer<TimelineStep[]>({
             }));
         }
 
-        content.appendChild(timeAxis(palette, scale, { x: left, width: right - left, top: trackTop, bottom: trackTop + trackHeight, showGrid: false }));
+        content.appendChild(timeAxis(palette, scale, { x: left, width: right - left, top: trackTop, bottom: trackTop + trackHeight, showGrid: false }, context.time));
         content.appendChild(rect(left, axisY - 3, right - left, 6, { rx: 3, fill: palette.borderStrong, opacity: 0.35 }));
         content.appendChild(text(attacker.label.toUpperCase(), CONTENT.x + 4, trackTop + 16, {
             "font-size": 10.5, "font-weight": 700, "letter-spacing": 1, fill: attacker.color

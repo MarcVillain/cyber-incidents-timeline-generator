@@ -22,6 +22,7 @@ import type { TimelineStep } from "../diagram-store.js";
 import { group, rect, text, truncate, wrap } from "../svg.js";
 import type { Palette } from "../theme.js";
 import { defineRenderer, optionValue, type RenderContext, type RendererOption } from "./registry.js";
+import type { Strings } from "../strings.js";
 
 const TILE_HEIGHT = 122;
 const TILE_GAP = 14;
@@ -41,17 +42,19 @@ enum View {
     Causes = "causes"
 }
 
-const VIEW_OPTION: RendererOption<View> = {
-    id: "view",
-    label: "Compare",
-    fallback: View.Breakdown,
-    choices: [
-        { value: View.Breakdown, label: "Where the time went" },
-        { value: View.Target, label: "Against target" },
-        { value: View.History, label: "Against our history" },
-        { value: View.Causes, label: "What let it run" }
-    ]
-};
+function viewOption(strings: Strings): RendererOption<View> {
+    return {
+        id: "view",
+        label: strings.options.compare,
+        fallback: View.Breakdown,
+        choices: [
+            { value: View.Breakdown, label: strings.options.compareBreakdown },
+            { value: View.Target, label: strings.options.compareAgainstTarget },
+            { value: View.History, label: strings.options.compareAgainstHistory },
+            { value: View.Causes, label: strings.options.compareCauses }
+        ]
+    };
+}
 
 interface Objective {
     label: string;
@@ -61,12 +64,14 @@ interface Objective {
 
 // What a response aims for when nobody has recorded a target of its own. Named so a reader can tell these
 // are defaults rather than this team's commitments.
-const DEFAULT_OBJECTIVES: readonly Objective[] = [
-    { label: "Detect", hours: 24, actual: points => hoursBetween(points.firstAttack, points.firstNoticed) },
-    { label: "Contain", hours: 72, actual: points => hoursBetween(points.firstNoticed, points.contained) },
-    { label: "Eradicate", hours: 168, actual: points => hoursBetween(points.firstNoticed, points.eradicated) },
-    { label: "Recover", hours: 336, actual: points => hoursBetween(points.firstNoticed, points.recovered) }
-];
+function defaultObjectives(strings: Strings): readonly Objective[] {
+    return [
+        { label: strings.scene.detect, hours: 24, actual: points => hoursBetween(points.firstAttack, points.firstNoticed) },
+        { label: strings.scene.contain, hours: 72, actual: points => hoursBetween(points.firstNoticed, points.contained) },
+        { label: strings.scene.eradicate, hours: 168, actual: points => hoursBetween(points.firstNoticed, points.eradicated) },
+        { label: strings.scene.recover, hours: 336, actual: points => hoursBetween(points.firstNoticed, points.recovered) }
+    ];
+}
 
 interface Figure {
     label: string;
@@ -108,39 +113,41 @@ type Episode = ResponseEpisode<TimelineStep>;
 /**
  * The figures worth quoting whichever comparison is on screen.
  */
-function figures(palette: Palette, steps: readonly TimelineStep[], points: ResponsePoints, episodes: readonly Episode[]): Figure[] {
+function figures(context: RenderContext, steps: readonly TimelineStep[], points: ResponsePoints, episodes: readonly Episode[]): Figure[] {
+    const { palette, time } = context;
+    const words = context.strings.scene;
     const unseen = longestUnseen(steps);
     const responseEnd = episodes.at(-1)?.to ?? null;
     const failed = episodes.filter(episode => episode.failed).length;
 
     return [
         {
-            label: "Time undetected",
-            value: formatDuration(unseen ? unseen.hours : null),
+            label: words.timeUndetected,
+            value: time.formatDuration(unseen ? unseen.hours : null),
             icon: Icon.ThreatActor,
             color: palette.sides[Side.Attacker].color,
-            hint: unseen ? `${formatDate(unseen.from)} to ${formatDate(unseen.to)}` : "nothing was ever noticed"
+            hint: unseen ? words.unseenRange(time.formatDate(unseen.from), time.formatDate(unseen.to)) : words.nothingNoticed
         },
         {
-            label: "Incident span",
-            value: formatDuration(hoursBetween(points.firstAttack, responseEnd)),
+            label: words.incidentSpan,
+            value: time.formatDuration(hoursBetween(points.firstAttack, responseEnd)),
             icon: Icon.Timeline,
             color: palette.sides[Side.Victim].color,
-            hint: "first attacker action to the last thing the response did"
+            hint: words.incidentSpanHint
         },
         {
-            label: "Response span",
-            value: formatDuration(hoursBetween(points.firstNoticed, responseEnd)),
+            label: words.responseSpan,
+            value: time.formatDuration(hoursBetween(points.firstNoticed, responseEnd)),
             icon: Icon.Recover,
             color: palette.good,
-            hint: "from the first time anyone noticed"
+            hint: words.responseSpanHint
         },
         {
-            label: "Investigations",
+            label: words.investigations,
             value: episodes.length > 0 ? String(episodes.length) : null,
             icon: Icon.Microscope,
             color: palette.sides[Side.Defender].color,
-            hint: failed > 0 ? `${failed} of them left the threat in place` : "every one of them closed out"
+            hint: failed > 0 ? words.investigationsFailed(failed) : words.investigationsClosed
         }
     ];
 }
@@ -177,22 +184,24 @@ function tiles(context: RenderContext, entries: readonly Figure[], x: number, y:
  * through, each sized by how long it really took. The first segment is the point of it: on most
  * incidents the time before anyone knew dwarfs the response that followed.
  */
-function breakdown(palette: Palette, points: ResponsePoints, episodes: readonly Episode[], unseen: Stretch | null, top: number, height: number): SVGGElement {
+function breakdown(context: RenderContext, points: ResponsePoints, episodes: readonly Episode[], unseen: Stretch | null, top: number, height: number): SVGGElement {
+    const { palette } = context;
+    const words = context.strings.scene;
     const node = group();
     const responseEnd = episodes.at(-1)?.to ?? null;
     // Only the two states the incident was ever in, and the split is the detection that held rather than
     // the first alarm: a notice whose remediation failed left the intruder exactly as hidden as before
     const known = points.detected ?? points.firstNoticed;
     const candidates: { label: string; from: Date | null; to: Date | null; color: string }[] = [
-        { label: "Before anyone knew", from: points.firstAttack, to: known, color: palette.sides[Side.Attacker].color },
-        { label: "Known and being worked", from: known, to: responseEnd, color: palette.sides[Side.Defender].color }
+        { label: words.beforeAnyoneKnew, from: points.firstAttack, to: known, color: palette.sides[Side.Attacker].color },
+        { label: words.knownAndWorked, from: known, to: responseEnd, color: palette.sides[Side.Defender].color }
     ];
     const phases = candidates.filter((phase): phase is Phase => phase.from !== null && phase.to !== null && phase.to.getTime() > phase.from.getTime());
 
     const first = phases[0];
     const last = phases.at(-1);
     if (!first || !last) {
-        node.appendChild(text("The recorded dates do not form a sequence yet.", CONTENT.x, top + 30, { "font-size": 12, fill: palette.inkMuted }));
+        node.appendChild(text(words.noSequence, CONTENT.x, top + 30, { "font-size": 12, fill: palette.inkMuted }));
         return node;
     }
 
@@ -235,11 +244,11 @@ function breakdown(palette: Palette, points: ResponsePoints, episodes: readonly 
     return node;
 }
 
-function againstObjectives(palette: Palette, points: ResponsePoints): Comparison {
+function againstObjectives(strings: Strings, palette: Palette, points: ResponsePoints): Comparison {
     return {
-        caption: "Against a default objective, until this team records targets of its own",
-        referenceLabel: "Objective",
-        rows: DEFAULT_OBJECTIVES.map(objective => ({
+        caption: strings.scene.objectiveCaption,
+        referenceLabel: strings.scene.objective,
+        rows: defaultObjectives(strings).map(objective => ({
             label: objective.label,
             actual: objective.actual(points),
             reference: objective.hours,
@@ -248,17 +257,17 @@ function againstObjectives(palette: Palette, points: ResponsePoints): Comparison
     };
 }
 
-function againstHistory(palette: Palette, benchmark: ResponseBenchmark, points: ResponsePoints): Comparison {
+function againstHistory(strings: Strings, palette: Palette, benchmark: ResponseBenchmark, points: ResponsePoints): Comparison {
     if (benchmark.sampleSize === 0) {
-        return { caption: null, referenceLabel: "Usually", rows: [] };
+        return { caption: null, referenceLabel: strings.scene.usually, rows: [] };
     }
     return {
-        caption: `Middle of the last ${benchmark.sampleSize} incident(s)${benchmark.scope ? ` of ${benchmark.scope}` : ""}`,
-        referenceLabel: "Usually",
+        caption: strings.scene.benchmarkCaption(benchmark.sampleSize, benchmark.scope),
+        referenceLabel: strings.scene.usually,
         rows: [
-            { label: "Detect", actual: hoursBetween(points.firstAttack, points.firstNoticed), reference: benchmark.medianTimeToDetectHours, color: palette.sides[Side.Defender].color },
-            { label: "Contain", actual: hoursBetween(points.firstNoticed, points.contained), reference: benchmark.medianTimeToContainHours, color: palette.sides[Side.Victim].color },
-            { label: "Recover", actual: hoursBetween(points.firstNoticed, points.recovered), reference: benchmark.medianTimeToRecoverHours, color: palette.good }
+            { label: strings.scene.detect, actual: hoursBetween(points.firstAttack, points.firstNoticed), reference: benchmark.medianTimeToDetectHours, color: palette.sides[Side.Defender].color },
+            { label: strings.scene.contain, actual: hoursBetween(points.firstNoticed, points.contained), reference: benchmark.medianTimeToContainHours, color: palette.sides[Side.Victim].color },
+            { label: strings.scene.recover, actual: hoursBetween(points.firstNoticed, points.recovered), reference: benchmark.medianTimeToRecoverHours, color: palette.good }
         ]
     };
 }
@@ -338,7 +347,7 @@ function causes(context: RenderContext, steps: readonly TimelineStep[], episodes
         .forEach(step => entries.push({ title: step.title, at: step.at, cost: null, note: "recorded as failed" }));
 
     if (entries.length === 0) {
-        node.appendChild(text("Nothing in the record is marked as failed, so there is no lost time to attribute.", CONTENT.x, top + 30, { "font-size": 12, fill: palette.inkMuted }));
+        node.appendChild(text(context.strings.scene.noLostTime, CONTENT.x, top + 30, { "font-size": 12, fill: palette.inkMuted }));
         return node;
     }
 
@@ -368,7 +377,7 @@ function causes(context: RenderContext, steps: readonly TimelineStep[], episodes
 
 export const responseMetrics = defineRenderer<ResponseMetrics>({
     representation: Representation.ResponseMetrics,
-    options: [VIEW_OPTION],
+    options: strings => [viewOption(strings)],
 
     pages(context) {
         return [context.store.metrics];
@@ -379,34 +388,34 @@ export const responseMetrics = defineRenderer<ResponseMetrics>({
         const steps = store.visibleSteps();
         const points = responsePoints(steps);
         const episodes = responseEpisodes(steps);
-        const view = optionValue(context, VIEW_OPTION);
+        const view = optionValue(context, viewOption(context.strings));
 
         const { root, content } = frame(context, {
             page: pageIndex,
             pageCount,
-            subtitle: VIEW_OPTION.choices.find(choice => choice.value === view)?.label ?? null,
+            subtitle: viewOption(context.strings).choices.find(choice => choice.value === view)?.label ?? null,
             legend: []
         });
 
         if (!points.firstAttack && !points.firstNoticed) {
-            content.appendChild(placeholder(context, "Not enough dates to measure", "Record when the attacker acted and when the response noticed."));
+            content.appendChild(placeholder(context, context.strings.scene.notEnoughDates, context.strings.scene.recordAttackAndResponse));
             return root;
         }
 
-        content.appendChild(tiles(context, figures(palette, steps, points, episodes), CONTENT.x, CONTENT.y));
+        content.appendChild(tiles(context, figures(context, steps, points, episodes), CONTENT.x, CONTENT.y));
 
         const top = CONTENT.y + TILE_HEIGHT + BODY_TOP;
         const height = CONTENT.bottom - top;
 
         switch (view) {
             case View.Breakdown:
-                content.appendChild(breakdown(palette, points, episodes, longestUnseen(steps), top, height));
+                content.appendChild(breakdown(context, points, episodes, longestUnseen(steps), top, height));
                 break;
             case View.Target:
-                content.appendChild(comparison(palette, againstObjectives(palette, points), top, height, "No objective applies until the response has a detection recorded."));
+                content.appendChild(comparison(palette, againstObjectives(context.strings, palette, points), top, height, context.strings.scene.noObjective));
                 break;
             case View.History:
-                content.appendChild(comparison(palette, againstHistory(palette, store.benchmark, points), top, height, "No earlier incident of this scope has a detection step to compare against."));
+                content.appendChild(comparison(palette, againstHistory(context.strings, palette, store.benchmark, points), top, height, context.strings.scene.noHistory));
                 break;
             case View.Causes:
                 content.appendChild(causes(context, steps, episodes, top, height));

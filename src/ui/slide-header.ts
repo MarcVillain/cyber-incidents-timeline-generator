@@ -4,9 +4,9 @@
 import type { RepresentationInfo } from "../core/catalog.js";
 import type { Incident } from "../core/models.js";
 import type { DiagramStore } from "./diagram-store.js";
+import type { Strings } from "./strings.js";
 import type { Palette } from "./theme.js";
 
-const IMPACT_SUFFIX = "IMPACT";
 const CLASSIFICATION_SEPARATOR = "  /  ";
 const KICKER_SEPARATOR = "   |   ";
 
@@ -56,6 +56,8 @@ export interface SlideHeaderContext {
     pageCount: number;
     /** What the representation says about this slide, such as the dates it covers. */
     viewSubtitle: string | null;
+    /** The words of the interface, so a rewritten header speaks the same language as the rest. */
+    strings: Strings;
 }
 
 /**
@@ -77,7 +79,7 @@ export function defaultSlideHeader(context: SlideHeaderContext): SlideHeader {
         reference: incident.referenceId ?? `#${incident.id}`,
         impact: assessed ? {
             level: incident.impact,
-            label: `${level.label.toUpperCase()} ${IMPACT_SUFFIX}`,
+            label: `${level.label.toUpperCase()} ${context.strings.slide.impactSuffix}`,
             color: palette.impactColor(incident.impact),
             showScale: true
         } : null,

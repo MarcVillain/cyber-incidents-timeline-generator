@@ -9,6 +9,12 @@ export * from "./storage/sourced-store.js";
 export { mountTimeline, ThemeMode, type TimelineHandle, type TimelineOptions } from "./ui/workspace.js";
 export { mountTimelineApp, type TimelineAppHandle, type TimelineAppOptions } from "./ui/app.js";
 export { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./ui/theme-detection.js";
+export {
+    DEFAULT_STRINGS, buildStrings,
+    type AppStrings, type DeckStrings, type FormStrings, type InspectorStrings, type NarrativeStrings,
+    type OptionStrings, type RailStrings, type SceneStrings, type SlideStrings, type Strings,
+    type StringsOverride, type WorkspaceStrings
+} from "./ui/strings.js";
 export type { TimelinePermissions } from "./ui/panels.js";
 export { ExportFormat, standaloneHtml, serialize } from "./ui/export.js";
 export { IconSet } from "./ui/icons/icon-set.js";

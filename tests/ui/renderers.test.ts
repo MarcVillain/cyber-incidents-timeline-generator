@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 import { Representation } from "../../src/core/enums.js";
 import type { Diagram } from "../../src/core/models.js";
+import { TimeFormats } from "../../src/core/time.js";
 import { DiagramStore } from "../../src/ui/diagram-store.js";
+import { DEFAULT_STRINGS } from "../../src/ui/strings.js";
 import { IconSet } from "../../src/ui/icons/icon-set.js";
 import { BUILT_IN_RENDERERS } from "../../src/ui/renderers/index.js";
 import type { RenderContext, Renderer } from "../../src/ui/renderers/registry.js";
@@ -25,6 +27,8 @@ function contextFor(store: DiagramStore, renderer: Renderer, options: ReadonlyMa
         palette: new Palette(store.catalog),
         icons: new IconSet(),
         representation: store.representationInfo(renderer.representation),
+        strings: DEFAULT_STRINGS,
+        time: new TimeFormats(),
         options,
         slideHeader
     };
@@ -35,7 +39,7 @@ function contextFor(store: DiagramStore, renderer: Renderer, options: ReadonlyMa
  */
 function optionSets(renderer: Renderer): ReadonlyMap<string, string>[] {
     let sets: Map<string, string>[] = [new Map()];
-    renderer.options.forEach(option => {
+    renderer.options(DEFAULT_STRINGS).forEach(option => {
         sets = sets.flatMap(set => option.choices.map(choice => new Map([...set, [option.id, choice.value]])));
     });
     return sets;

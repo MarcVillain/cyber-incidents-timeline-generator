@@ -101,13 +101,13 @@ export const killChainBoard = defineRenderer<BoardPage>({
             pageCount,
             subtitle: `${covered} of ${page.columns.length} phases observed`,
             legend: [
-                { label: "Observed", color: attackerColor },
-                { label: "Nothing recorded", color: palette.border }
+                { label: context.strings.scene.observed, color: attackerColor },
+                { label: context.strings.scene.nothingRecorded, color: palette.border }
             ]
         });
 
         if (!page.hasAnything) {
-            content.appendChild(placeholder(context, "No attacker steps classified yet", "Give a step an ATT&CK tactic and it lands in its phase."));
+            content.appendChild(placeholder(context, context.strings.scene.emptyKillChainTitle, context.strings.scene.emptyKillChainHint));
             return root;
         }
 

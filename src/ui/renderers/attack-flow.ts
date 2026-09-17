@@ -136,13 +136,13 @@ export const attackFlow = defineRenderer<TimelineStep[]>({
             pageCount,
             subtitle: `${pageSteps.length} action(s) in causal order`,
             legend: [
-                { label: "Action", color: palette.accent },
-                { label: "Asset touched", color: palette.inkMuted }
+                { label: context.strings.scene.action, color: palette.accent },
+                { label: context.strings.scene.assetTouched, color: palette.inkMuted }
             ]
         });
 
         if (pageSteps.length === 0) {
-            content.appendChild(placeholder(context, "No actions recorded yet", "Each step becomes an action, and the assets it touched hang below it."));
+            content.appendChild(placeholder(context, context.strings.scene.emptyFlowTitle, context.strings.scene.emptyFlowHint));
             return root;
         }
 

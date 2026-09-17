@@ -24,6 +24,9 @@ All notable changes to this project are documented here. The format follows
 - `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
   module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
   speak different languages.
+- Control of the view from outside. `TimelineHandle` gains `state`, `setPage`, `setFilters` and
+  `setOption`, and `TimelineOptions.onStateChange` reports the representation, the slide, the filters and
+  the selection after every change. A host can now carry the view in its own address bar and hand it back.
 - `RendererDefinition.options` accepts a function of the strings, which is how the built in representations
   declare their toolbar settings. An array still works.
 

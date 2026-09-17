@@ -10,7 +10,7 @@ import { linkFieldsOf, nodeFieldsOf, stepFieldsOf } from "../core/mapping.js";
 import type { LinkCreateInput, RecordId, StepInvolvement } from "../core/models.js";
 import type { TimelineApi } from "../core/service.js";
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
-import { DiagramStore, StoreChange, type Selection, type TimelineStep } from "./diagram-store.js";
+import { DiagramStore, StoreChange, type Selection, type StepFilters, type TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
 import { ExportFormat, exportHtml, exportPng, exportSvg, printPages } from "./export.js";
 import { History, type HistoryEntry } from "./history.js";
@@ -56,12 +56,28 @@ export interface TimelineOptions {
     slideHeader?: SlideHeaderCustomizer;
     /** Receives every message the workspace would otherwise show as a toast. */
     onNotify?: (message: string) => void;
+    /** Receives the view state after every change, which is what lets a host own the address bar. */
+    onStateChange?: (state: TimelineState) => void;
     /** The words of the interface. Anything left out keeps the English default. */
     strings?: StringsOverride;
     /** The locale dates are written in. Defaults to en-GB, whatever the browser is set to. */
     locale?: string;
     /** The suffixes durations are written with, which no locale covers. */
     durationUnits?: DurationUnits;
+}
+
+/**
+ * What the workspace is showing. Handed to onStateChange after every change, so a host can carry it in
+ * its own address bar and hand it back through the handle.
+ */
+export interface TimelineState {
+    representation: Representation;
+    pageIndex: number;
+    pageCount: number;
+    filters: StepFilters;
+    /** The settings of the current representation, keyed by option id. */
+    options: ReadonlyMap<string, string>;
+    selection: Selection | null;
 }
 
 export interface TimelineHandle {
@@ -72,6 +88,13 @@ export interface TimelineHandle {
     /** Selects a record and opens its details, or clears the selection when given null. */
     select(selection: Selection | null): void;
     exportAs(format: ExportFormat): Promise<void>;
+    /** What is on screen right now. */
+    readonly state: TimelineState;
+    /** Turns to a slide of the current representation; out of range values are clamped. */
+    setPage(pageIndex: number): void;
+    setFilters(filters: Partial<StepFilters>): void;
+    /** Sets a setting of a representation, such as the density of the timeline. */
+    setOption(representation: Representation, optionId: string, value: string): void;
     destroy(): void;
 }
 
@@ -196,6 +219,7 @@ class Workspace implements TimelineHandle {
     private readonly icons: IconSet;
     private readonly preferences: Preferences;
     private readonly onNotify: ((message: string) => void) | null;
+    private readonly onStateChange: ((state: TimelineState) => void) | null;
     private readonly slideHeader: SlideHeaderCustomizer | null;
     private readonly strings: Strings;
     private readonly time: TimeFormats;
@@ -211,6 +235,7 @@ class Workspace implements TimelineHandle {
     private representation: Representation;
     private theme: ThemeMode;
     private pageIndex = 0;
+    private pageCount = 1;
     private followedSelection: string | null = null;
 
     constructor(root: HTMLElement, options: TimelineOptions) {
@@ -221,6 +246,7 @@ class Workspace implements TimelineHandle {
         this.renderers = options.renderers ?? BUILT_IN_RENDERERS;
         this.icons = options.icons ?? new IconSet();
         this.onNotify = options.onNotify ?? null;
+        this.onStateChange = options.onStateChange ?? null;
         this.slideHeader = options.slideHeader ?? null;
         this.strings = buildStrings(options.strings);
         this.time = new TimeFormats(options.locale, options.durationUnits);
@@ -515,6 +541,41 @@ class Workspace implements TimelineHandle {
         this.store.setSelection(selection);
     }
 
+    get state(): TimelineState {
+        return {
+            representation: this.representation,
+            pageIndex: this.pageIndex,
+            pageCount: this.pageCount,
+            filters: this.store.filters,
+            options: this.preferences.choices(this.representation),
+            selection: this.store.selection
+        };
+    }
+
+    setPage(pageIndex: number): void {
+        const wanted = Math.min(Math.max(Math.trunc(pageIndex), 0), Math.max(0, this.pageCount - 1));
+        if (wanted === this.pageIndex) return;
+        this.pageIndex = wanted;
+        // A page turned by hand is the reader's choice, and the selection must stop pulling them back
+        this.followedSelection = this.selectionKey();
+        this.redraw();
+    }
+
+    setFilters(filters: Partial<StepFilters>): void {
+        this.store.setFilters(filters);
+        this.pageIndex = 0;
+        this.renderFilters();
+        this.redraw();
+    }
+
+    setOption(representation: Representation, optionId: string, value: string): void {
+        this.preferences.setChoice(representation, optionId, value);
+        if (representation !== this.representation) return;
+        this.pageIndex = 0;
+        this.renderFilters();
+        this.redraw();
+    }
+
     selectRepresentation(representation: Representation): void {
         if (!this.renderers.some(renderer => renderer.representation === representation)) return;
         this.representation = representation;
@@ -582,15 +643,22 @@ class Workspace implements TimelineHandle {
         this.markSelection();
         this.renderCaption();
         this.renderPager(pages.count);
+        this.pageCount = pages.count;
+        this.onStateChange?.(this.state);
     }
 
     /**
      * Takes the analyst to the slide a newly picked record is on. It fires once per selection: after that
      * the pager is theirs, so turning the page with something selected sticks instead of being pulled back.
      */
+    private selectionKey(): string | null {
+        const selection = this.store.selection;
+        return selection ? `${selection.type}:${selection.id}` : null;
+    }
+
     private followSelection(pages: Pagination): void {
         const selection = this.store.selection;
-        const key = selection ? `${selection.type}:${selection.id}` : null;
+        const key = this.selectionKey();
         if (!selection || !key) {
             this.followedSelection = null;
             return;

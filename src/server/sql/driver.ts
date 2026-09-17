@@ -55,12 +55,23 @@ export class RowReader {
         return this.raw(column) === null ? null : this.text(column);
     }
 
+    /**
+     * A number, whether the driver hands it over as one or as text. PostgreSQL returns BIGINT as a string
+     * because most of its range does not survive a double, so a reader that insisted on a number could
+     * not read an identity column at all. A value that would lose precision is refused rather than
+     * rounded into a different row.
+     */
     number(column: string): number {
         const value = this.raw(column);
-        if (typeof value !== "number") {
+        if (typeof value === "number") return value;
+        if (typeof value !== "string" || !/^-?\d+(\.\d+)?$/.test(value)) {
             throw new Error(`Column ${column} should hold a number.`);
         }
-        return value;
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || (value.indexOf(".") === -1 && !Number.isSafeInteger(parsed))) {
+            throw new Error(`Column ${column} holds ${value}, which no number can hold exactly.`);
+        }
+        return parsed;
     }
 
     nullableNumber(column: string): number | null {

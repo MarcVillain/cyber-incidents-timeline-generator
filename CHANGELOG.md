@@ -82,6 +82,10 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 
 ### Fixed
 
+- A row whose number arrived as text was refused. PostgreSQL returns BIGINT as a string, because most of
+  its range does not survive a double, so a store on an identity column could not read its own ids. Text
+  that is exactly a number is now read as one, and a value that would lose precision is refused rather
+  than rounded into a different row.
 - The delete question in the record list closed as soon as the pointer left the bin. The two answers
   appear where the bin was, so reaching either one moved the pointer off it. It now closes when the
   pointer leaves the row.

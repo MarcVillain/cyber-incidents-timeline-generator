@@ -7,6 +7,7 @@ import { TimelineService } from "../../src/core/service.js";
 import { readIncidentCreate } from "../../src/core/validation.js";
 import { openSqliteStore } from "../../src/server/index.js";
 import { TableNames } from "../../src/server/sql/schema.js";
+import { RowReader } from "../../src/server/sql/driver.js";
 import { IN_MEMORY_DATABASE } from "../../src/server/sql/sqlite-driver.js";
 import { BrowserStorageTimelineStore, type KeyValueStorage } from "../../src/storage/browser-storage-store.js";
 import { MemoryTimelineStore } from "../../src/storage/memory-store.js";
@@ -105,5 +106,23 @@ describe("SqlTimelineStore table names", () => {
     it("refuses a schema or a prefix that is not a plain identifier", () => {
         assert.throws(() => new TableNames("tlg_", "app; drop table"));
         assert.throws(() => new TableNames("tlg-", "app"));
+    });
+});
+
+describe("reading a row", () => {
+    it("takes a number the driver handed over as text, which is how PostgreSQL returns BIGINT", () => {
+        const read = new RowReader({ id: "9101", ratio: "1.5", missing: null });
+        assert.equal(read.number("id"), 9101);
+        assert.equal(read.number("ratio"), 1.5);
+        assert.equal(read.nullableNumber("missing"), null);
+    });
+
+    it("refuses a value no number can hold exactly, rather than rounding into another row", () => {
+        assert.throws(() => new RowReader({ id: "9007199254740993" }).number("id"));
+    });
+
+    it("refuses text that is not a number", () => {
+        assert.throws(() => new RowReader({ id: "9101; drop table" }).number("id"));
+        assert.throws(() => new RowReader({ id: "" }).number("id"));
     });
 });

@@ -88,6 +88,17 @@ export interface ImpactScale {
 
 export interface CatalogOptions {
     impactScale?: ImpactScale;
+    /** The named moments steps may claim. Empty by default: what counts as a milestone is the host's to say. */
+    milestones?: MilestoneInfo[];
+}
+
+/**
+ * A named moment of an incident, such as the first access or the containment, that at most one step
+ * holds. The package supplies no list of its own, because every deployment reports on different ones.
+ */
+export interface MilestoneInfo {
+    key: string;
+    label: string;
 }
 
 export interface OptionInfo<TValue extends string> {
@@ -121,6 +132,7 @@ export interface Catalog {
     involvements: OptionInfo<Involvement>[];
     audiences: OptionInfo<Audience>[];
     representations: RepresentationInfo[];
+    milestones: MilestoneInfo[];
 }
 
 function nodeKind(kind: NodeKind, category: NodeCategory, label: string, icon: Icon, diamondVertex: DiamondVertex): NodeKindInfo {
@@ -270,6 +282,26 @@ export function checkImpactScale(scale: ImpactScale): void {
 }
 
 /**
+ * Milestone keys end up in host reports and in URLs, so they are held to the same plain identifier as an
+ * impact level, and no key may be claimed twice.
+ */
+export function checkMilestones(milestones: readonly MilestoneInfo[]): void {
+    const seen = new Set<string>();
+    milestones.forEach(entry => {
+        if (!IMPACT_LEVEL_PATTERN.test(entry.key)) {
+            throw new Error(`Milestone "${entry.key}" must be 1 to 40 letters, digits, dashes or underscores.`);
+        }
+        if (seen.has(entry.key)) {
+            throw new Error(`Milestone "${entry.key}" appears twice.`);
+        }
+        if (!entry.label.trim() || entry.label.length > MAX_LABEL_LENGTH) {
+            throw new Error(`Milestone "${entry.key}" needs a label of at most ${MAX_LABEL_LENGTH} characters.`);
+        }
+        seen.add(entry.key);
+    });
+}
+
+/**
  * Every level a rating may hold, the unassessed one first.
  */
 export function impactLevelsOf(scale: ImpactScale): ImpactLevelInfo[] {
@@ -310,6 +342,8 @@ function copies<TInfo extends object>(entries: Readonly<Record<string, TInfo>>):
 export function buildCatalog(settings: CatalogOptions = {}): Catalog {
     const impactScale = structuredClone(settings.impactScale ?? DEFAULT_IMPACT_SCALE);
     checkImpactScale(impactScale);
+    const milestones = structuredClone(settings.milestones ?? []);
+    checkMilestones(milestones);
     return {
         nodeKinds: copies(NODE_KINDS),
         sides: copies(SIDES),
@@ -322,7 +356,8 @@ export function buildCatalog(settings: CatalogOptions = {}): Catalog {
         confidences: options(Confidence),
         involvements: options(Involvement),
         audiences: options(Audience),
-        representations: copies(REPRESENTATIONS)
+        representations: copies(REPRESENTATIONS),
+        milestones
     };
 }
 

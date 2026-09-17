@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS tlg_steps (
     audience TEXT NOT NULL,
     evidence_source TEXT NULL,
     is_milestone SMALLINT NOT NULL,
+    milestone_key TEXT NULL,
     icon TEXT NULL,
     source_node_id BIGINT NULL REFERENCES tlg_nodes(id) ON DELETE SET NULL,
     target_node_id BIGINT NULL REFERENCES tlg_nodes(id) ON DELETE SET NULL,
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS tlg_steps (
 CREATE INDEX IF NOT EXISTS tlg_steps_incident ON tlg_steps(incident_id);
 CREATE INDEX IF NOT EXISTS tlg_steps_timestamp ON tlg_steps(timestamp);
 CREATE INDEX IF NOT EXISTS tlg_steps_external ON tlg_steps(external_id);
+CREATE UNIQUE INDEX IF NOT EXISTS tlg_steps_milestone ON tlg_steps(incident_id, milestone_key) WHERE milestone_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS tlg_step_involvements (
     step_id BIGINT NOT NULL REFERENCES tlg_steps(id) ON DELETE CASCADE,

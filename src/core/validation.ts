@@ -65,10 +65,12 @@ export class FieldLimits {
 export class ValidationRules {
     readonly impactLevels: readonly string[];
     readonly unassessedImpact: string;
+    readonly milestoneKeys: readonly string[];
 
     constructor(catalog: Catalog) {
         this.impactLevels = impactLevelsOf(catalog.impactScale).map(entry => entry.level);
         this.unassessedImpact = catalog.impactScale.unassessed.level;
+        this.milestoneKeys = catalog.milestones.map(entry => entry.key);
     }
 }
 
@@ -189,6 +191,14 @@ class FieldReader {
         if (value === undefined) return undefined;
         if (!isEnumValue(enumObject, value)) return this.fail(field, `must be one of ${Object.values(enumObject).join(", ")}`);
         return value;
+    }
+
+    nullableOneOf(field: string, allowed: readonly string[]): string | null | undefined {
+        const value = this.value(field);
+        if (value === undefined) return undefined;
+        if (value === null) return null;
+        if (!allowed.length) return this.fail(field, "is not available because no value is configured");
+        return this.oneOf(field, allowed);
     }
 
     oneOf(field: string, allowed: readonly string[]): string | undefined {
@@ -350,6 +360,7 @@ function stepDefaults(rules: ValidationRules): Omit<StepFields, "title" | "times
         audience: Audience.Both,
         evidenceSource: null,
         isMilestone: false,
+        milestoneKey: null,
         icon: null,
         sourceNodeId: null,
         targetNodeId: null,
@@ -439,6 +450,7 @@ function readStepPatch(reader: FieldReader, rules: ValidationRules): Partial<Ste
         audience: reader.enumValue("audience", Audience),
         evidenceSource: reader.nullableText("evidenceSource", FieldLimits.EvidenceSource),
         isMilestone: reader.boolean("isMilestone"),
+        milestoneKey: reader.nullableOneOf("milestoneKey", rules.milestoneKeys),
         icon: reader.nullableText("icon", FieldLimits.Icon, ICON_PATTERN),
         sourceNodeId: reader.nullableId("sourceNodeId"),
         targetNodeId: reader.nullableId("targetNodeId"),

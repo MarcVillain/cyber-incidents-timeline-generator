@@ -232,6 +232,9 @@ export class Inspector {
             ),
             field("Evidence source", textInput(step.evidenceSource, value => save({ evidenceSource: value }), "EDR, SIEM, user report")),
             checkbox("Milestone", step.isMilestone, value => save({ isMilestone: value })),
+            ...(catalog.milestones.length
+                ? [field("Named milestone", select(step.milestoneKey ?? "", catalog.milestones.map(entry => ({ value: entry.key, label: entry.label })), value => save({ milestoneKey: value || null }), { allowEmpty: true, emptyLabel: "None" }))]
+                : []),
             field("Tags", tagsInput(step.tags, value => save({ tags: value }))),
             field("Notes", textArea(step.description, value => save({ description: value }), 4)),
             this.involvements(step)

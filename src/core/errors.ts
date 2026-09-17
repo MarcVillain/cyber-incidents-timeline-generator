@@ -1,6 +1,11 @@
 export interface ValidationIssue {
     field: string;
     message: string;
+    /**
+     * A stable name for the refusal, when there is one, so a host can act on it without reading the
+     * English. Absent for the ordinary shape and range checks, whose field already says everything.
+     */
+    code?: string;
 }
 
 export class ValidationError extends Error {

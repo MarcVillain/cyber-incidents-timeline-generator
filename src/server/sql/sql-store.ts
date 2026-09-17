@@ -21,7 +21,7 @@ export interface SqlTimelineStoreOptions {
 
 const INCIDENT_COLUMNS = "id, title, reference_id, impact, scope, external_id, metadata";
 const NODE_COLUMNS = "id, incident_id, name, description, kind, side, parent_id, identifier, role, criticality, compromised, icon, color_override, external_id, canonical_key, metadata";
-const STEP_COLUMNS = "id, incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, icon, source_node_id, target_node_id, external_id, metadata";
+const STEP_COLUMNS = "id, incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, milestone_key, icon, source_node_id, target_node_id, external_id, metadata";
 const LINK_COLUMNS = "id, incident_id, source_node_id, target_node_id, kind, label, confidence, step_id, metadata";
 
 function incidentValues(fields: IncidentFields): SqlValue[] {
@@ -41,7 +41,7 @@ function stepValues(data: StepData): SqlValue[] {
     return [
         data.incidentId, data.timestamp, data.endTimestamp, flag(data.timeKnown), data.orderIndex, data.title,
         data.description, data.side, data.attackTactic, data.responsePhase, data.mitreTechniqueId, data.severity,
-        data.confidence, data.outcome, data.audience, data.evidenceSource, flag(data.isMilestone), data.icon,
+        data.confidence, data.outcome, data.audience, data.evidenceSource, flag(data.isMilestone), data.milestoneKey, data.icon,
         data.sourceNodeId, data.targetNodeId, data.externalId, json(data.metadata)
     ];
 }
@@ -107,6 +107,7 @@ function readStep(row: SqlRow, involvements: StepInvolvement[], tags: string[]):
         audience: read.enumValue("audience", Audience),
         evidenceSource: read.nullableText("evidence_source"),
         isMilestone: read.boolean("is_milestone"),
+        milestoneKey: read.nullableText("milestone_key"),
         icon: read.nullableText("icon"),
         sourceNodeId: read.nullableNumber("source_node_id"),
         targetNodeId: read.nullableNumber("target_node_id"),
@@ -323,7 +324,7 @@ export class SqlTimelineStore implements TimelineStore {
     async insertStep(data: StepData): Promise<StepRecord> {
         return this.driver.transaction(async () => {
             const id = await this.insertReturningId(
-                `INSERT INTO ${this.tables.steps} (incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, icon, source_node_id, target_node_id, external_id, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO ${this.tables.steps} (incident_id, timestamp, end_timestamp, time_known, order_index, title, description, side, attack_tactic, response_phase, mitre_technique_id, severity, confidence, outcome, audience, evidence_source, is_milestone, milestone_key, icon, source_node_id, target_node_id, external_id, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 stepValues(data)
             );
             await this.writeStepChildren(id, data.involvements, data.tags);
@@ -334,7 +335,7 @@ export class SqlTimelineStore implements TimelineStore {
     async updateStep(step: StepRecord): Promise<void> {
         await this.driver.transaction(async () => {
             await this.driver.execute(
-                `UPDATE ${this.tables.steps} SET incident_id = ?, timestamp = ?, end_timestamp = ?, time_known = ?, order_index = ?, title = ?, description = ?, side = ?, attack_tactic = ?, response_phase = ?, mitre_technique_id = ?, severity = ?, confidence = ?, outcome = ?, audience = ?, evidence_source = ?, is_milestone = ?, icon = ?, source_node_id = ?, target_node_id = ?, external_id = ?, metadata = ? WHERE id = ?`,
+                `UPDATE ${this.tables.steps} SET incident_id = ?, timestamp = ?, end_timestamp = ?, time_known = ?, order_index = ?, title = ?, description = ?, side = ?, attack_tactic = ?, response_phase = ?, mitre_technique_id = ?, severity = ?, confidence = ?, outcome = ?, audience = ?, evidence_source = ?, is_milestone = ?, milestone_key = ?, icon = ?, source_node_id = ?, target_node_id = ?, external_id = ?, metadata = ? WHERE id = ?`,
                 [...stepValues(step), step.id]
             );
             await this.writeStepChildren(step.id, step.involvements, step.tags);

@@ -133,6 +133,11 @@ export interface StepRecord {
     evidenceSource: string | null;
     /** Marks the handful of steps that carry the story, so crowded views can drop the rest. */
     isMilestone: boolean;
+    /**
+     * The named moment of the catalog this step holds, such as the containment. One step per key per
+     * incident. Independent of isMilestone, which only says how crowded views should treat the step.
+     */
+    milestoneKey: string | null;
     icon: string | null;
     sourceNodeId: RecordId | null;
     targetNodeId: RecordId | null;

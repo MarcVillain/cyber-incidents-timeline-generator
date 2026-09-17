@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format follows
   can keep its own identifiers and provenance beside a record. Bounded to 100 keys and 16000 characters of
   JSON.
 - `externalId` on a step, which every other record already had.
+- Named milestones. A host declares the moments it reports on through `CatalogOptions.milestones`, and a
+  step claims one with `milestoneKey`. One step holds a key at a time: a second claim is refused with the
+  `milestone_taken` code, naming the step that holds it. The package ships no vocabulary of its own, so
+  what counts as a milestone stays the host's to say.
+- `code` on a validation issue, so a host can act on a named refusal without reading the English.
 
 ## [0.1.1] - 2026-09-16
 

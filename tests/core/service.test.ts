@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AttackTactic, DiamondVertex, Involvement, KillChainPhase, LinkKind, NodeCategory, NodeKind, Representation, Side } from "../../src/core/enums.js";
 import { NotFoundError, ValidationError } from "../../src/core/errors.js";
+import { buildCatalog } from "../../src/core/catalog.js";
 import { TimelineService } from "../../src/core/service.js";
 import { MemoryTimelineStore } from "../../src/storage/memory-store.js";
 import { CUSTOM_SCALE, createIncident, createService, person, seededService } from "../support/fixtures.js";
@@ -162,5 +163,80 @@ describe("TimelineService", () => {
         assert.equal(diagram.metrics.dwellHours, 9);
         assert.equal(diagram.benchmark.sampleSize, 4);
         assert.equal(diagram.benchmark.scope, incident.scope);
+    });
+});
+
+describe("named milestones", () => {
+    const milestones = [{ key: "first_access", label: "First access" }, { key: "containment", label: "Containment" }];
+
+    function milestoneService(): TimelineService {
+        return new TimelineService(new MemoryTimelineStore(), { catalog: buildCatalog({ milestones }) });
+    }
+
+    it("holds no milestone vocabulary of its own", () => {
+        assert.deepEqual(buildCatalog().milestones, []);
+    });
+
+    it("refuses a key when the host declared none", async () => {
+        const { service } = createService();
+        const incident = await createIncident(service);
+        await assert.rejects(
+            () => service.createStep(incident.id, { title: "Step", timestamp: LATER, milestoneKey: "first_access" }),
+            (error: ValidationError) => error.issues[0]?.field === "milestoneKey"
+        );
+    });
+
+    it("refuses a key outside the declared vocabulary", async () => {
+        const service = milestoneService();
+        const incident = await service.createIncident({ title: "Incident" });
+        await assert.rejects(
+            () => service.createStep(incident.id, { title: "Step", timestamp: LATER, milestoneKey: "nope" }),
+            (error: ValidationError) => error.issues[0]?.field === "milestoneKey"
+        );
+    });
+
+    it("keeps one step per key and names the step that holds it", async () => {
+        const service = milestoneService();
+        const incident = await service.createIncident({ title: "Incident" });
+        const held = await service.createStep(incident.id, { title: "Opened", timestamp: LATER, milestoneKey: "first_access" });
+
+        await assert.rejects(
+            () => service.createStep(incident.id, { title: "Also opened", timestamp: LATER, milestoneKey: "first_access" }),
+            (error: ValidationError) => error.issues[0]?.code === "milestone_taken" && error.issues[0].message.includes(String(held.id))
+        );
+
+        const other = await service.createStep(incident.id, { title: "Contained", timestamp: LATER, milestoneKey: "containment" });
+        await assert.rejects(
+            () => service.updateStep(incident.id, other.id, { milestoneKey: "first_access" }),
+            (error: ValidationError) => error.issues[0]?.code === "milestone_taken"
+        );
+    });
+
+    it("lets the holder keep its own key on an update, and hands it on once released", async () => {
+        const service = milestoneService();
+        const incident = await service.createIncident({ title: "Incident" });
+        const held = await service.createStep(incident.id, { title: "Opened", timestamp: LATER, milestoneKey: "first_access" });
+        await service.updateStep(incident.id, held.id, { title: "Renamed", milestoneKey: "first_access" });
+
+        const other = await service.createStep(incident.id, { title: "Second", timestamp: LATER });
+        await service.updateStep(incident.id, held.id, { milestoneKey: null });
+        await service.updateStep(incident.id, other.id, { milestoneKey: "first_access" });
+
+        const steps = (await service.getDiagram(incident.id)).steps;
+        assert.deepEqual(steps.filter(step => step.milestoneKey === "first_access").map(step => step.id), [other.id]);
+    });
+
+    it("scopes a key to its incident", async () => {
+        const service = milestoneService();
+        const first = await service.createIncident({ title: "First" });
+        const second = await service.createIncident({ title: "Second" });
+        await service.createStep(first.id, { title: "Opened", timestamp: LATER, milestoneKey: "first_access" });
+        await service.createStep(second.id, { title: "Opened", timestamp: LATER, milestoneKey: "first_access" });
+    });
+
+    it("refuses a vocabulary that repeats a key or carries an unusable one", () => {
+        assert.throws(() => buildCatalog({ milestones: [...milestones, { key: "containment", label: "Again" }] }));
+        assert.throws(() => buildCatalog({ milestones: [{ key: "not a key", label: "Bad" }] }));
+        assert.throws(() => buildCatalog({ milestones: [{ key: "ok", label: "" }] }));
     });
 });

@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS ${tables.steps} (
     audience TEXT NOT NULL,
     evidence_source TEXT NULL,
     is_milestone INTEGER NOT NULL,
+    milestone_key TEXT NULL,
     icon TEXT NULL,
     source_node_id INTEGER NULL REFERENCES ${tables.nodes}(id) ON DELETE SET NULL,
     target_node_id INTEGER NULL REFERENCES ${tables.nodes}(id) ON DELETE SET NULL,
@@ -112,6 +113,7 @@ CREATE TABLE IF NOT EXISTS ${tables.steps} (
 CREATE INDEX IF NOT EXISTS ${tables.steps}_incident ON ${tables.steps}(incident_id);
 CREATE INDEX IF NOT EXISTS ${tables.steps}_timestamp ON ${tables.steps}(timestamp);
 CREATE INDEX IF NOT EXISTS ${tables.steps}_external ON ${tables.steps}(external_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ${tables.steps}_milestone ON ${tables.steps}(incident_id, milestone_key) WHERE milestone_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS ${tables.involvements} (
     step_id INTEGER NOT NULL REFERENCES ${tables.steps}(id) ON DELETE CASCADE,

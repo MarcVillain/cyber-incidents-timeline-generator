@@ -91,8 +91,8 @@ function chronologically(a: StepRecord, b: StepRecord): number {
     return (time(a) - time(b)) || (a.orderIndex - b.orderIndex) || (a.id - b.id);
 }
 
-function invalid(field: string, message: string): ValidationError {
-    return new ValidationError([{ field, message }]);
+function invalid(field: string, message: string, code?: string): ValidationError {
+    return new ValidationError([{ field, message, ...(code ? { code } : {}) }]);
 }
 
 /**
@@ -234,6 +234,7 @@ export class TimelineService implements TimelineApi {
         return this.store.transaction(async () => {
             await this.requireIncident(incidentId);
             await this.checkStepReferences(incidentId, fields);
+            await this.checkMilestoneKey(incidentId, fields.milestoneKey, null);
             const record = await this.store.insertStep({ ...fields, incidentId });
             return toDiagramStep(record);
         });
@@ -246,6 +247,7 @@ export class TimelineService implements TimelineApi {
             const merged: StepRecord = { ...step, ...patch };
             checkStepTimes(merged);
             await this.checkStepReferences(incidentId, merged);
+            await this.checkMilestoneKey(incidentId, merged.milestoneKey, stepId);
             await this.store.updateStep(merged);
         });
     }
@@ -360,6 +362,18 @@ export class TimelineService implements TimelineApi {
             }
             seen.add(current);
             current = nodes.get(current)?.parentId ?? null;
+        }
+    }
+
+    /**
+     * A named milestone belongs to one step. A second claim is refused naming the step that holds it,
+     * rather than one quietly displacing the other.
+     */
+    private async checkMilestoneKey(incidentId: RecordId, key: string | null, stepId: RecordId | null): Promise<void> {
+        if (key === null) return;
+        const holder = (await this.store.listSteps(incidentId)).find(step => step.milestoneKey === key && step.id !== stepId);
+        if (holder) {
+            throw invalid("milestoneKey", `is already held by step ${holder.id}`, "milestone_taken");
         }
     }
 

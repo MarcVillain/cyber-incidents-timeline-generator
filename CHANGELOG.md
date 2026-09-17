@@ -84,6 +84,9 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 
 ### Fixed
 
+- Building on a Node older than the one the package requires failed inside TypeScript with an error that
+  never mentioned Node. The version is checked before the build starts, `.nvmrc` names it, and
+  `engine-strict` makes an install on the wrong version refuse rather than succeed and break later.
 - A row whose number arrived as text was refused. PostgreSQL returns BIGINT as a string, because most of
   its range does not survive a double, so a store on an identity column could not read its own ids. Text
   that is exactly a number is now read as one, and a value that would lose precision is refused rather

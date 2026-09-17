@@ -74,6 +74,7 @@
     "node": ">=22.13"
   },
   "scripts": {
+    "prebuild": "node scripts/check-node.mjs",
     "build": "tsc -p tsconfig.json",
     "site": "npm run build && node scripts/build-site.mjs",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
-import { RecordType, Representation } from "../../src/core/enums.js";
+import { NodeKind, RecordType, Representation, Side } from "../../src/core/enums.js";
 import { BUILT_IN_RENDERERS } from "../../src/ui/renderers/index.js";
 import { ColorScheme } from "../../src/ui/theme-detection.js";
 import { mountTimeline, ThemeMode } from "../../src/ui/workspace.js";
@@ -17,6 +17,8 @@ const FIRST_STEP = "2026-01-12T08:00:00";
 const SECOND_STEP = "2026-01-12T10:00:00";
 const BETWEEN_STEPS = "2026-01-12T09:00:00";
 const AFTER_LAST_STEP = "2026-01-12T11:00:00";
+const PERSON_NAME = "Alice";
+const EXPLOIT_NAME = "CVE-2026-0001";
 
 async function settle(): Promise<void> {
     for (let round = 0; round < SETTLE_ROUNDS; round += 1) {
@@ -265,6 +267,72 @@ describe("mountTimeline", () => {
 
         handle.select({ type: RecordType.Step, id: second.id });
         assert.deepEqual(await addStep(), [FIRST_STEP, BETWEEN_STEPS, SECOND_STEP, AFTER_LAST_STEP]);
+        handle.destroy();
+    });
+
+    it("saves a record typed in the rail once the line is left, without waiting for Enter", async () => {
+        const { service } = createService();
+        const incident = await createIncident(service);
+        const element = mountPoint();
+        const handle = await mountTimeline(element, { api: service, incidentId: incident.id, preferences: null, renderers: BUILT_IN_RENDERERS.slice(0, 1) });
+
+        element.querySelector<HTMLButtonElement>(".tlg-add")?.click();
+        addMenuItem(element, "Exploit").click();
+        const input = element.querySelector<HTMLInputElement>(".tlg-quickadd input");
+        assert.ok(input);
+        input.value = EXPLOIT_NAME;
+        input.dispatchEvent(syntheticEvent("blur"));
+        await settle();
+
+        const nodes = (await service.getDiagram(incident.id)).nodes;
+        assert.deepEqual(nodes.map(node => [node.name, node.kind, node.side]), [[EXPLOIT_NAME, NodeKind.Exploit, Side.Attacker]]);
+        handle.destroy();
+    });
+
+    it("keeps the kind and side of a record placed in a group when a relationship is added", async () => {
+        const { service } = createService();
+        const incident = await createIncident(service);
+        const element = mountPoint();
+        const handle = await mountTimeline(element, { api: service, incidentId: incident.id, preferences: null, renderers: BUILT_IN_RENDERERS.slice(0, 1) });
+        const addRecord = async (kind: string, name: string): Promise<void> => {
+            element.querySelector<HTMLButtonElement>(".tlg-add")?.click();
+            addMenuItem(element, kind).click();
+            const input = element.querySelector<HTMLInputElement>(".tlg-quickadd input");
+            assert.ok(input);
+            input.value = name;
+            input.dispatchEvent(syntheticEvent("keydown", { key: "Enter" }));
+            await settle();
+        };
+
+        await addRecord("Person", PERSON_NAME);
+        await addRecord("Exploit", EXPLOIT_NAME);
+        const created = (await service.getDiagram(incident.id)).nodes;
+        const owner = created.find(node => node.name === PERSON_NAME);
+        const exploit = created.find(node => node.name === EXPLOIT_NAME);
+        assert.ok(owner && exploit);
+        assert.equal(exploit.kind, NodeKind.Exploit);
+        assert.equal(exploit.side, Side.Attacker);
+
+        handle.select({ type: RecordType.Node, id: exploit.id });
+        const belongsTo = [...element.querySelectorAll<HTMLElement>(".tlg-inspector .tlg-field")]
+            .find(field => field.querySelector("label")?.textContent === "Belongs to")
+            ?.querySelector<HTMLSelectElement>("select");
+        assert.ok(belongsTo);
+        belongsTo.value = String(owner.id);
+        belongsTo.dispatchEvent(syntheticEvent("change"));
+        await settle();
+
+        element.querySelector<HTMLButtonElement>(".tlg-add")?.click();
+        addMenuItem(element, "Relationship").click();
+        await settle();
+
+        const diagram = await service.getDiagram(incident.id);
+        assert.equal(diagram.links.length, 1);
+        const kept = diagram.nodes.find(node => node.id === exploit.id);
+        assert.ok(kept);
+        assert.equal(kept.parentId, owner.id);
+        assert.equal(kept.kind, NodeKind.Exploit);
+        assert.equal(kept.side, Side.Attacker);
         handle.destroy();
     });
 });

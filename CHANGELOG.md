@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [0.2.0]
+## [0.2.0] - 2026-09-17
 
 Every change is additive. Code written against 0.1.1 compiles and behaves the same.
 
@@ -67,6 +67,11 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
   `POST /incidents/{id}/document` into one that already exists, merging or adding, optionally retitled and
   moved in time. The whole import is one transaction, and a milestone another step already holds is
   reported rather than displaced. Offered in the export menu, and opened from the app bar.
+
+### Changed
+
+- A name typed in the quick add line of the record list is saved as soon as the line is left, without
+  waiting for Enter. Escape still discards it.
 
 ### Fixed
 

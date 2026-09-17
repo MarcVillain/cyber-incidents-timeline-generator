@@ -148,7 +148,7 @@ export class Rail {
         if (selection && selection.type === type && selection.id === id) {
             node.classList.add("is-selected");
         }
-        if (permissions.canDelete) {
+        if (permissions.mayDelete(type)) {
             node.append(this.deleteControl(type, id, description.name));
         }
 
@@ -263,11 +263,18 @@ export class Rail {
         const fragment = document.createDocumentFragment();
         const words = this.context.strings.rail;
 
-        fragment.append(h("div", "tlg-addmenu-section", {}, [words.whatHappened]));
-        fragment.append(h("div", "tlg-addmenu-grid", {}, [
-            this.menuTile(Icon.Timeline, words.step, () => void this.beginStep()),
-            this.menuTile(Icon.Link, words.relationship, () => void this.beginLink())
-        ]));
+        const permissions = this.context.permissions;
+        const whatHappened = [
+            permissions.mayCreate(RecordType.Step) ? this.menuTile(Icon.Timeline, words.step, () => void this.beginStep()) : null,
+            permissions.mayCreate(RecordType.Link) ? this.menuTile(Icon.Link, words.relationship, () => void this.beginLink()) : null
+        ].filter((tile): tile is HTMLButtonElement => tile !== null);
+
+        if (whatHappened.length > 0) {
+            fragment.append(h("div", "tlg-addmenu-section", {}, [words.whatHappened]));
+            fragment.append(h("div", "tlg-addmenu-grid", {}, whatHappened));
+        }
+
+        if (!permissions.mayCreate(RecordType.Node)) return fragment;
 
         [NodeCategory.Actor, NodeCategory.Resource].forEach(category => {
             fragment.append(h("div", "tlg-addmenu-section", {}, [category === NodeCategory.Actor ? words.partiesHint : words.resources]));

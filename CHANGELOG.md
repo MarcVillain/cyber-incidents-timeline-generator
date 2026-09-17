@@ -24,6 +24,9 @@ All notable changes to this project are documented here. The format follows
 - `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
   module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
   speak different languages.
+- Finer permissions. `TimelinePermissions` gains `canExport`, `canMove` and a `can(action, type)` callback
+  asked once the matching flag allows the action, so "may add steps, may not delete records" is now
+  expressible. The defaults keep today's behaviour, and `canMove` follows `canEdit` unless it is set.
 - A reading of what a diagram holds. `summarise(diagram)` counts the records, the steps by side, outcome,
   tactic, kill chain phase, response phase, audience and confidence, the links, the techniques and
   evidence sources named, the tags, the span, and which named milestones are claimed and which are still

@@ -136,7 +136,7 @@ export class Inspector {
 
     private body(inspected: InspectedRecord): HTMLDivElement {
         const container = h("div", "tlg-inspector-body");
-        if (!this.context.permissions.canEdit) {
+        if (!this.context.permissions.mayEdit(inspected.type)) {
             container.append(this.readOnly(inspected));
             return container;
         }
@@ -302,7 +302,7 @@ export class Inspector {
         const w = this.context.strings.inspector;
         const close = button(icons, w.close, "tlg-button", () => store.setSelection(null));
         const foot = h("div", "tlg-inspector-foot", {}, [close]);
-        if (!permissions.canDelete) {
+        if (!permissions.mayDelete(inspected.type)) {
             return foot;
         }
 

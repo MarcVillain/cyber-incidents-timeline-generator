@@ -15,7 +15,7 @@ export {
     type OptionStrings, type RailStrings, type SceneStrings, type SlideStrings, type Strings,
     type StringsOverride, type WorkspaceStrings
 } from "./ui/strings.js";
-export type { TimelinePermissions } from "./ui/panels.js";
+export { Access, RecordAction, type TimelinePermissions } from "./ui/panels.js";
 export { ExportFormat, standaloneHtml, serialize } from "./ui/export.js";
 export { IconSet } from "./ui/icons/icon-set.js";
 export { DiagramStore, StoreChange, type TimelineStep, type Selection, type StepFilters } from "./ui/diagram-store.js";

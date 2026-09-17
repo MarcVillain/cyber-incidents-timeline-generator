@@ -11,6 +11,7 @@ import type { KeyValueStorage } from "../storage/browser-storage-store.js";
 import { h } from "./dom.js";
 import { field, row, select, tagsInput, textInput, type Choice } from "./forms.js";
 import { IconSet } from "./icons/icon-set.js";
+import { Access } from "./panels.js";
 import type { TimelinePermissions } from "./panels.js";
 import { Preferences, defaultPreferenceStorage } from "./preferences.js";
 import { ColorScheme, detectPageTheme, watchPageTheme } from "./theme-detection.js";
@@ -101,7 +102,7 @@ class TimelineApp implements TimelineAppHandle {
     private readonly root: HTMLElement;
     private readonly api: TimelineApi;
     private readonly options: TimelineAppOptions;
-    private readonly permissions: TimelinePermissions;
+    private readonly permissions: Access;
     private readonly icons: IconSet;
     private readonly preferences: Preferences;
     private readonly strings: Strings;
@@ -119,7 +120,7 @@ class TimelineApp implements TimelineAppHandle {
         this.api = options.api;
         this.options = options;
         const managed = options.manageIncidents ?? true;
-        this.permissions = { canCreate: managed, canEdit: managed, canDelete: managed, ...(managed ? options.incidentPermissions : {}) };
+        this.permissions = new Access({ canCreate: managed, canEdit: managed, canDelete: managed, ...(managed ? options.incidentPermissions : {}) });
         this.icons = options.timeline?.icons ?? new IconSet();
         this.strings = buildStrings(options.strings);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);

@@ -16,6 +16,7 @@ import { ExportFormat, exportHtml, exportPng, exportSvg, printPages } from "./ex
 import { History, type HistoryEntry } from "./history.js";
 import { IconSet } from "./icons/icon-set.js";
 import { Inspector } from "./inspector.js";
+import { Access } from "./panels.js";
 import type { RecordDraft, RecordEdit, TimelinePermissions, WorkspaceActions } from "./panels.js";
 import { Preferences, defaultPreferenceStorage } from "./preferences.js";
 import { Rail } from "./rail.js";
@@ -208,7 +209,7 @@ interface Elements {
     zoomIn: HTMLButtonElement;
     zoomOut: HTMLButtonElement;
     zoomFit: HTMLButtonElement;
-    exportMenu: HTMLDetailsElement;
+    exportMenu: HTMLDetailsElement | null;
     themeButton: HTMLButtonElement | null;
     stage: HTMLElement;
 }
@@ -217,7 +218,7 @@ class Workspace implements TimelineHandle {
     private readonly root: HTMLElement;
     private readonly api: TimelineApi;
     private readonly incidentId: RecordId;
-    private readonly permissions: TimelinePermissions;
+    private readonly permissions: Access;
     private readonly renderers: readonly Renderer[];
     private readonly icons: IconSet;
     private readonly preferences: Preferences;
@@ -245,7 +246,7 @@ class Workspace implements TimelineHandle {
         this.root = root;
         this.api = options.api;
         this.incidentId = options.incidentId;
-        this.permissions = { canCreate: true, canEdit: true, canDelete: true, ...options.permissions };
+        this.permissions = new Access(options.permissions);
         this.renderers = options.renderers ?? BUILT_IN_RENDERERS;
         this.icons = options.icons ?? new IconSet();
         this.onNotify = options.onNotify ?? null;
@@ -303,10 +304,10 @@ class Workspace implements TimelineHandle {
         const zoomIn = iconButton(Icon.ZoomIn, words.zoomIn);
         const themeButton = themeToggle ? iconButton(themes[this.theme].icon, themes[this.theme].label) : null;
 
-        const exportMenu = h("details", "tlg-menu", {}, [
+        const exportMenu = this.permissions.canExport ? h("details", "tlg-menu", {}, [
             h("summary", "tlg-button", {}, [icons.element(Icon.Download), words.export]),
             h("div", "tlg-menu-list", { role: "menu" }, exportChoices(this.strings).map(entry => h("button", "tlg-menu-item", { type: "button", role: "menuitem", "data-export": entry.format }, [icons.element(entry.icon), entry.label])))
-        ]);
+        ]) : null;
 
         const views = h("div", "tlg-views", { role: "tablist", "aria-label": words.representations });
         const filters = h("div", "tlg-filters");
@@ -396,9 +397,9 @@ class Workspace implements TimelineHandle {
             this.rail.openMenu();
         }, { signal });
 
-        elements.exportMenu.querySelectorAll<HTMLButtonElement>("[data-export]").forEach(control => {
+        elements.exportMenu?.querySelectorAll<HTMLButtonElement>("[data-export]").forEach(control => {
             control.addEventListener("click", () => {
-                elements.exportMenu.open = false;
+                if (elements.exportMenu) elements.exportMenu.open = false;
                 const format = exportChoices(this.strings).find(entry => entry.format === control.getAttribute("data-export"))?.format;
                 if (format) void this.exportAs(format);
             }, { signal });
@@ -643,7 +644,7 @@ class Workspace implements TimelineHandle {
         const pages = this.renderer.paginate(this.renderContext());
         this.followSelection(pages);
         this.pageIndex = Math.min(Math.max(this.pageIndex, 0), pages.count - 1);
-        this.viewport.allowDrag = this.renderer.draggable && this.permissions.canEdit;
+        this.viewport.allowDrag = this.renderer.draggable && this.permissions.canMove;
 
         const info = this.store.representationInfo(this.representation);
         this.viewport.setContent(pages.draw(this.pageIndex), `${info.label} of ${this.store.incident.title}`);

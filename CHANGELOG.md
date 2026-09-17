@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-09-17
+
+### Changed
+
+- A name typed in the quick add line of the record list is saved as soon as the line is left, without
+  waiting for Enter. Escape still discards it.
+
 ## [0.1.1] - 2026-09-16
 
 ### Changed

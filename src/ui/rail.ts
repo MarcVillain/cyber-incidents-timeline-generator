@@ -334,25 +334,30 @@ export class Rail {
             this.render();
         };
 
-        input.addEventListener("keydown", event => {
-            if (event.key === "Escape") {
-                cancel();
-                return;
-            }
-            if (event.key !== "Enter") return;
-
+        // Clearing the line first means a blur following an Enter finds nothing left to save twice
+        const save = (): boolean => {
             const name = input.value.trim();
-            if (!name) {
-                cancel();
-                return;
-            }
+            if (!name) return false;
             input.value = "";
             void this.context.actions.create({
                 type: RecordType.Node,
                 input: { name, kind: pending.kind.kind, side: DEFAULT_SIDES.get(pending.kind.kind) ?? Side.Victim }
             });
+            return true;
+        };
+
+        input.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                // Removing the line blurs it, and that blur must not save what Escape threw away
+                input.value = "";
+                cancel();
+                return;
+            }
+            if (event.key !== "Enter") return;
+            if (!save()) cancel();
         });
         input.addEventListener("blur", () => {
+            save();
             window.setTimeout(() => {
                 if (this.pending && document.activeElement !== input) cancel();
             }, BLUR_GRACE_MS);

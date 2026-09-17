@@ -1,6 +1,6 @@
 {
   "name": "cyber-incidents-timeline-generator",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Incident timeline and attack diagram generator for security teams. Zero runtime dependencies, pluggable storage, runs in any browser.",
   "license": "Apache-2.0",
   "author": "Marc Villain",

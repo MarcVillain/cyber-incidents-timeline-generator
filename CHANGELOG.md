@@ -60,7 +60,6 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
   the selection after every change. A host can now carry the view in its own address bar and hand it back.
 - `RendererDefinition.options` accepts a function of the strings, which is how the built in representations
   declare their toolbar settings. An array still works.
-
 - The marks a renderer draws with. `defineRenderer` was public and `el`, `group`, `rect`, `text`,
   `truncate`, `wrap`, `timeAxis`, the card helpers and `textWidth` were not, so a host could declare a
   representation of its own and had nothing to put on it. All exported.
@@ -76,15 +75,15 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
   reported rather than displaced. Both live in the timeline toolbar: written out from the export menu,
   read back from the button beside it, into the timeline on screen. A record the file names again is
   recognised, so opening the same file twice does not draw everything twice.
-
-### Changed
-
 - Records are dragged into place in the rail. A row answers three questions by where the pointer lands:
   the middle takes the record inside, which is what makes a group, and either edge takes it beside that
   row, at the same level, so a record can be dropped between two others. The Parties and Resources
   headings take a record out of whatever holds it. A drop the service would refuse, or one that would
   change nothing, is not offered: nothing is marked and the browser shows no drop cursor. Steps and
   relationships are not carried, because they belong to the incident rather than to anything in it.
+
+### Changed
+
 - Enter in the quick add line finishes it. It used to save the record and open another empty line of the
   same kind, so adding one record left a line waiting that nobody had asked for. A reader who wants a
   second record picks a kind again.

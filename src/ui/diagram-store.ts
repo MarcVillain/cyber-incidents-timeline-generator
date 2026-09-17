@@ -42,6 +42,7 @@ import type {
 } from "../core/models.js";
 import { parseWallClock } from "../core/time.js";
 import type { Point } from "./viewport.js";
+import { summarise, type DiagramSummary } from "../core/summary.js";
 
 /**
  * A step with its moments parsed once, so renderers compare dates rather than strings.
@@ -314,6 +315,11 @@ export class DiagramStore {
     setSelection(selection: Selection | null): void {
         this.selection = selection;
         this.emit(StoreChange.Selection);
+    }
+
+    /** What the loaded diagram holds, counted. Reads the whole diagram, not the filtered view. */
+    get summary(): DiagramSummary {
+        return summarise(this.diagram);
     }
 
     setFilters(filters: Partial<StepFilters>): void {

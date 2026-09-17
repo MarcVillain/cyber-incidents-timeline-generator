@@ -26,6 +26,7 @@ import type {
 } from "./models.js";
 import type { TimelineStore } from "./store.js";
 import { parseWallClock } from "./time.js";
+import { summarise, type DiagramSummary } from "./summary.js";
 import {
     checkStepTimes,
     readIncidentCreate,
@@ -56,6 +57,9 @@ export interface TimelineApi {
 
     getDiagram(incidentId: RecordId): Promise<Diagram>;
     getCatalog(): Promise<Catalog>;
+
+    /** What the incident holds, counted. The same figures the diagram would draw, without drawing it. */
+    getSummary(incidentId: RecordId): Promise<DiagramSummary>;
 
     createNode(incidentId: RecordId, input: NodeCreateInput): Promise<DiagramNode>;
     updateNode(incidentId: RecordId, nodeId: RecordId, input: NodeUpdateInput): Promise<void>;
@@ -148,6 +152,10 @@ export class TimelineService implements TimelineApi {
 
     async getCatalog(): Promise<Catalog> {
         return structuredClone(this.catalog);
+    }
+
+    async getSummary(incidentId: RecordId): Promise<DiagramSummary> {
+        return summarise(await this.getDiagram(incidentId));
     }
 
     async getDiagram(incidentId: RecordId): Promise<Diagram> {

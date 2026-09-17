@@ -28,6 +28,7 @@ import { ThemeMode } from "./theme-mode.js";
 import { TimeFormats, type DurationUnits } from "../core/time.js";
 import { buildStrings, type Strings, type StringsOverride } from "./strings.js";
 import { Viewport, type Point } from "./viewport.js";
+import type { DiagramSummary } from "../core/summary.js";
 
 export { ThemeMode };
 
@@ -90,6 +91,8 @@ export interface TimelineHandle {
     exportAs(format: ExportFormat): Promise<void>;
     /** What is on screen right now. */
     readonly state: TimelineState;
+    /** What the loaded incident holds, counted. Unaffected by the filters and the chosen representation. */
+    readonly summary: DiagramSummary;
     /** Turns to a slide of the current representation; out of range values are clamped. */
     setPage(pageIndex: number): void;
     setFilters(filters: Partial<StepFilters>): void;
@@ -539,6 +542,10 @@ class Workspace implements TimelineHandle {
 
     select(selection: Selection | null): void {
         this.store.setSelection(selection);
+    }
+
+    get summary(): DiagramSummary {
+        return this.store.summary;
     }
 
     get state(): TimelineState {

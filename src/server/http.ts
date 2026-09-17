@@ -110,6 +110,7 @@ function buildRoutes(api: TimelineApi): Route[] {
         { method: HttpMethod.Put, pattern: incidentPath, permission: Permission.Update, handle: async context => { await api.updateIncident(incident(context), readIncidentUpdate(await context.body(), await context.rules())); return NO_CONTENT; } },
         { method: HttpMethod.Delete, pattern: incidentPath, permission: Permission.Delete, handle: async context => { await api.deleteIncident(incident(context)); return NO_CONTENT; } },
         { method: HttpMethod.Get, pattern: [...incidentPath, "diagram"], permission: Permission.Read, handle: async context => ok(await api.getDiagram(incident(context))) },
+        { method: HttpMethod.Get, pattern: [...incidentPath, "summary"], permission: Permission.Read, handle: async context => ok(await api.getSummary(incident(context))) },
 
         { method: HttpMethod.Post, pattern: [...incidentPath, "nodes"], permission: Permission.Create, handle: async context => created(await api.createNode(incident(context), readNodeCreate(await context.body(), await context.rules()))) },
         { method: HttpMethod.Put, pattern: [...incidentPath, "nodes", Segment.Record], permission: Permission.Update, handle: async context => { await api.updateNode(incident(context), record(context), readNodeUpdate(await context.body(), await context.rules())); return NO_CONTENT; } },

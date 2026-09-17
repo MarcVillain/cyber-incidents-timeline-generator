@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format follows
 - `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
   module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
   speak different languages.
+- A reading of what a diagram holds. `summarise(diagram)` counts the records, the steps by side, outcome,
+  tactic, kill chain phase, response phase, audience and confidence, the links, the techniques and
+  evidence sources named, the tags, the span, and which named milestones are claimed and which are still
+  missing. It is pure, so a scheduled job can call it on the server; `TimelineApi.getSummary`,
+  `GET /incidents/{id}/summary`, `DiagramStore.summary` and `TimelineHandle.summary` all serve it.
 - Control of the view from outside. `TimelineHandle` gains `state`, `setPage`, `setFilters` and
   `setOption`, and `TimelineOptions.onStateChange` reports the representation, the slide, the filters and
   the selection after every change. A host can now carry the view in its own address bar and hand it back.

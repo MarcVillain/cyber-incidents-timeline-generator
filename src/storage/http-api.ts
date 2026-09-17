@@ -18,6 +18,7 @@ import type {
     StepUpdateInput
 } from "../core/models.js";
 import type { TimelineApi } from "../core/service.js";
+import type { DiagramSummary } from "../core/summary.js";
 
 export enum HttpMethod {
     Get = "GET",
@@ -150,6 +151,10 @@ export class HttpTimelineApi implements TimelineApi {
 
     getIncident(incidentId: RecordId): Promise<Incident> {
         return this.read(HttpMethod.Get, this.incident(incidentId));
+    }
+
+    getSummary(incidentId: RecordId): Promise<DiagramSummary> {
+        return this.read(HttpMethod.Get, `${this.incident(incidentId)}/summary`);
     }
 
     createIncident(input: IncidentCreateInput): Promise<Incident> {

@@ -7,6 +7,7 @@ export * from "./time.js";
 export * from "./catalog.js";
 export * from "./validation.js";
 export * from "./metrics.js";
+export * from "./summary.js";
 export * from "./response.js";
 export * from "./store.js";
 export * from "./mapping.js";

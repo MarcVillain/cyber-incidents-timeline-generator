@@ -24,6 +24,12 @@ All notable changes to this project are documented here. The format follows
 - `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
   module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
   speak different languages.
+- Fields of a host's own on an incident. `TimelineAppOptions.incidentFields` declares what the host's
+  incident record holds beyond the package's own, as text, long text, number, choice, flag or date; the
+  dialog renders them and keeps the values in the incident metadata, which the package never reads. Keys
+  the host does not declare are left untouched, so two hosts can share one incident.
+- `schema/postgres-rls.sql`, a worked example of isolating tenants with row level security, and a section
+  in docs/storage.md on the three ways of doing it. The package still holds no opinion about tenancy.
 - A page of any size, and a canvas as tall as its content. `PAGE_WIDTH` and `PAGE_HEIGHT` become the
   default rather than the law: `TimelineOptions.pageSize` and the render entry point take a size, every
   representation lays itself out against it, and the frame, the export and the print sheet follow.

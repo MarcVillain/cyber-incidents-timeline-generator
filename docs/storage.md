@@ -124,3 +124,22 @@ Implement every method of `TimelineStore` from `cyber-incidents-timeline-generat
 - `transaction` is atomic and may be nested.
 
 Run `runStoreContract` against it, as the built in stores do.
+
+## More than one tenant
+
+The package holds no opinion about tenancy. Its tables carry no organisation column and its service
+takes no tenant argument: whoever opens the connection decides what the connection can see.
+
+Three ways, in the order they usually make sense:
+
+1. **A schema per tenant.** One `search_path` per connection, the same tables underneath. Nothing in the
+   package changes, and one tenant's data cannot be read by another even through a bug in a query.
+2. **A prefix per tenant.** `new SqlTimelineStore(driver, { tablePrefix: "acme_tlg_" })`. Cheaper to set
+   up than a schema, and the prefix is checked against a plain identifier before it reaches any SQL.
+3. **A column and row level security.** `schema/postgres-rls.sql` is a worked example: an `org_id` on the
+   incident, a policy on every table reaching it by its incident, and a setting read from the connection.
+   The role running the queries must not own the tables, since an owner is not subject to the policies.
+
+Whichever you pick, the authorization decision belongs to the host. `createTimelineHandler` takes an
+`Authorizer` for the REST layer, and a host embedding `TimelineService` directly should wrap it rather
+than trusting the identifiers arriving in a request.

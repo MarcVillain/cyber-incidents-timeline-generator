@@ -34,6 +34,23 @@ export function textInput(value: string | null, onChange: (value: string | null)
     return input;
 }
 
+export function numberInput(value: number | null, onChange: (value: number | null) => void): HTMLInputElement {
+    const input = h("input", "tlg-input", { type: "number", id: uniqueId("number") });
+    input.value = value === null ? "" : String(value);
+    input.addEventListener("change", () => {
+        const parsed = Number(input.value);
+        onChange(input.value.trim() && Number.isFinite(parsed) ? parsed : null);
+    });
+    return input;
+}
+
+export function dateInput(value: string | null, onChange: (value: string | null) => void): HTMLInputElement {
+    const input = h("input", "tlg-input", { type: "date", id: uniqueId("day") });
+    input.value = value ?? "";
+    input.addEventListener("change", () => onChange(blankToNull(input.value)));
+    return input;
+}
+
 /**
  * Notes grow to fit what is written in them, because a description that is cut off is a description
  * nobody can check.

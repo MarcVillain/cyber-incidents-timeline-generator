@@ -8,6 +8,7 @@ export * from "./storage/http-api.js";
 export * from "./storage/sourced-store.js";
 export { mountTimeline, CanvasMode, ThemeMode, type TimelineHandle, type TimelineOptions, type TimelineState } from "./ui/workspace.js";
 export { mountTimelineApp, type TimelineAppHandle, type TimelineAppOptions } from "./ui/app.js";
+export { IncidentFieldType, checkIncidentFields, fieldValue, withFieldValues, type IncidentFieldChoice, type IncidentFieldDef, type IncidentFieldValue } from "./ui/incident-fields.js";
 export { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./ui/theme-detection.js";
 export {
     DEFAULT_STRINGS, buildStrings,

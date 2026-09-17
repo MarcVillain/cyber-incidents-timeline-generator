@@ -9,7 +9,8 @@ import type { Incident, IncidentUpdateInput, RecordId } from "../core/models.js"
 import type { TimelineApi } from "../core/service.js";
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
 import { h } from "./dom.js";
-import { field, row, select, tagsInput, textInput, type Choice } from "./forms.js";
+import { checkbox, dateInput, field, numberInput, row, select, tagsInput, textArea, textInput, type Choice } from "./forms.js";
+import { checkIncidentFields, fieldValue, withFieldValues, IncidentFieldType, type IncidentFieldDef, type IncidentFieldValue } from "./incident-fields.js";
 import { IconSet } from "./icons/icon-set.js";
 import { Access } from "./panels.js";
 import type { TimelinePermissions } from "./panels.js";
@@ -40,6 +41,11 @@ export interface TimelineAppOptions {
     /** Passed to the workspace of the open incident. */
     timeline?: Omit<TimelineOptions, "api" | "incidentId" | "theme" | "themeToggle" | "preferences" | "onNotify">;
     onNotify?: (message: string) => void;
+    /**
+     * Fields of the host's own incident record, rendered in the dialog and kept in the metadata of the
+     * incident. The package stores them and never reads them.
+     */
+    incidentFields?: readonly IncidentFieldDef[];
     /** The words of the interface, shared with the workspace it opens. */
     strings?: StringsOverride;
     /** The locale dates are written in, shared with the workspace it opens. */
@@ -106,6 +112,7 @@ class TimelineApp implements TimelineAppHandle {
     private readonly icons: IconSet;
     private readonly preferences: Preferences;
     private readonly strings: Strings;
+    private readonly hostFieldDefs: readonly IncidentFieldDef[];
     private readonly elements: AppElements;
     private readonly lifetime = new AbortController();
     private readonly stopWatchingTheme: () => void;
@@ -123,6 +130,8 @@ class TimelineApp implements TimelineAppHandle {
         this.permissions = new Access({ canCreate: managed, canEdit: managed, canDelete: managed, ...(managed ? options.incidentPermissions : {}) });
         this.icons = options.timeline?.icons ?? new IconSet();
         this.strings = buildStrings(options.strings);
+        this.hostFieldDefs = options.incidentFields ?? [];
+        checkIncidentFields(this.hostFieldDefs);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);
         const themeToggle = options.themeToggle ?? true;
         this.theme = (themeToggle ? this.preferences.theme : null) ?? options.theme ?? ThemeMode.Auto;
@@ -415,10 +424,54 @@ class TimelineApp implements TimelineAppHandle {
                 fields.push(h("p", "tlg-dialog-note", {}, [`Linked to ${incident.externalId} in the system that owns the incident.`]));
             }
         }
+        this.hostFields(incident, draft).forEach(node => fields.push(node));
         if (readOnly) {
             fields.forEach(node => node.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select").forEach(control => { control.disabled = true; }));
         }
         return fields;
+    }
+
+    /**
+     * The host's own fields. Their values are collected into one metadata patch, so a field the host
+     * does not declare keeps whatever the incident already carried.
+     */
+    private hostFields(incident: Incident | null, draft: IncidentUpdateInput): HTMLElement[] {
+        const declared = this.hostFieldDefs.filter(entry => incident !== null || entry.onCreate === true);
+        if (declared.length === 0) return [];
+
+        const values = new Map<string, IncidentFieldValue>();
+        const report = (key: string, value: IncidentFieldValue): void => {
+            values.set(key, value);
+            draft.metadata = withFieldValues(incident?.metadata ?? null, values);
+        };
+
+        return declared.map(entry => field(entry.label, this.hostControl(entry, fieldValue(incident?.metadata ?? null, entry), report)));
+    }
+
+    private hostControl(entry: IncidentFieldDef, held: IncidentFieldValue, report: (key: string, value: IncidentFieldValue) => void): HTMLElement {
+        switch (entry.type) {
+            case IncidentFieldType.LongText:
+                return textArea(held === null ? null : String(held), value => report(entry.key, value));
+            case IncidentFieldType.Choice:
+                return select(held === null ? "" : String(held), [...(entry.choices ?? [])], value => report(entry.key, value || null), { allowEmpty: !entry.required, emptyLabel: this.strings.forms.none });
+            case IncidentFieldType.Flag:
+                return checkbox(entry.label, held === true, value => report(entry.key, value));
+            case IncidentFieldType.Number: {
+                const input = numberInput(held === null ? null : Number(held), value => report(entry.key, value));
+                input.required = entry.required === true;
+                return input;
+            }
+            case IncidentFieldType.Date: {
+                const input = dateInput(held === null ? null : String(held), value => report(entry.key, value));
+                input.required = entry.required === true;
+                return input;
+            }
+            default: {
+                const input = textInput(held === null ? null : String(held), value => report(entry.key, value), entry.hint ?? "");
+                input.required = entry.required === true;
+                return input;
+            }
+        }
     }
 
     private openDialog(

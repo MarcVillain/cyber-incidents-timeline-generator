@@ -19,6 +19,7 @@ import type {
 } from "../core/models.js";
 import type { TimelineApi } from "../core/service.js";
 import type { DiagramSummary } from "../core/summary.js";
+import type { ImportOptions, ImportReport, TimelineDocument } from "../core/document.js";
 
 export enum HttpMethod {
     Get = "GET",
@@ -155,6 +156,16 @@ export class HttpTimelineApi implements TimelineApi {
 
     getSummary(incidentId: RecordId): Promise<DiagramSummary> {
         return this.read(HttpMethod.Get, `${this.incident(incidentId)}/summary`);
+    }
+
+    exportDocument(incidentId: RecordId): Promise<TimelineDocument> {
+        return this.read(HttpMethod.Get, `${this.incident(incidentId)}/document`);
+    }
+
+    importDocument(document: unknown, options: ImportOptions & { into?: RecordId } = {}): Promise<ImportReport> {
+        const { into, ...rest } = options;
+        const path = into === undefined ? "/documents" : `${this.incident(into)}/document`;
+        return this.read(HttpMethod.Post, path, { document, ...rest });
     }
 
     createIncident(input: IncidentCreateInput): Promise<Incident> {

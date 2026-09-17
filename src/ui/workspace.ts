@@ -12,7 +12,7 @@ import type { TimelineApi } from "../core/service.js";
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
 import { DiagramStore, StoreChange, type Selection, type StepFilters, type TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
-import { ExportFormat, exportHtml, exportPng, exportSvg, printPages } from "./export.js";
+import { ExportFormat, exportDocumentFile, exportHtml, exportPng, exportSvg, printPages } from "./export.js";
 import { History, type HistoryEntry } from "./history.js";
 import { IconSet } from "./icons/icon-set.js";
 import { Inspector } from "./inspector.js";
@@ -136,7 +136,8 @@ function exportChoices(strings: Strings): readonly { format: ExportFormat; label
         { format: ExportFormat.Png, label: strings.workspace.exportPng, icon: Icon.Image },
         { format: ExportFormat.Svg, label: strings.workspace.exportSvg, icon: Icon.Vector },
         { format: ExportFormat.Html, label: strings.workspace.exportHtml, icon: Icon.Code },
-        { format: ExportFormat.Print, label: strings.workspace.exportPrint, icon: Icon.Print }
+        { format: ExportFormat.Print, label: strings.workspace.exportPrint, icon: Icon.Print },
+        { format: ExportFormat.Document, label: strings.workspace.exportDocument, icon: Icon.Download }
     ];
 }
 
@@ -983,6 +984,15 @@ class Workspace implements TimelineHandle {
 
     async exportAs(format: ExportFormat): Promise<void> {
         if (!this.store.isLoaded) return;
+
+        if (format === ExportFormat.Document) {
+            try {
+                await exportDocumentFile(await this.api.exportDocument(this.incidentId), this.store.incident.title);
+            } catch {
+                this.notify(this.strings.workspace.exportFailed);
+            }
+            return;
+        }
 
         const context = this.renderContext();
         const pages = this.renderer.paginate(context);

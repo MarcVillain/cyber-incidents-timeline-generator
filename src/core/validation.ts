@@ -53,6 +53,8 @@ export class FieldLimits {
     static readonly LinkLabel = 200;
     static readonly LayoutEntries = 1000;
     static readonly Coordinate = 100000;
+    static readonly DocumentKey = 200;
+    static readonly DocumentRecords = 5000;
     static readonly MetadataKeys = 100;
     static readonly MetadataLength = 16000;
 }
@@ -109,7 +111,7 @@ function definedOnly<T extends object>(values: Maybe<T>): Partial<T> {
  * Reads the fields of an untyped payload one by one. Every problem is collected, so a caller learns
  * about all of them at once rather than one per round trip.
  */
-class FieldReader {
+export class FieldReader {
     private readonly source: FieldSource;
     private readonly issues: ValidationIssue[];
     private readonly prefix: string;
@@ -159,6 +161,15 @@ class FieldReader {
             }
         });
         return !this.invalid;
+    }
+
+    /** The payload as it arrived, for a reader that hands part of it to another reader. */
+    get body(): FieldSource {
+        return this.source;
+    }
+
+    raw(field: string): unknown {
+        return this.source[field];
     }
 
     private value(field: string): unknown {

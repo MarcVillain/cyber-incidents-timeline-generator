@@ -61,6 +61,13 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 - `RendererDefinition.options` accepts a function of the strings, which is how the built in representations
   declare their toolbar settings. An array still works.
 
+- A whole timeline as one portable file. `GET /incidents/{id}/document` writes every record, step,
+  relationship and pinned position with no database id and no incident id, naming records after what
+  identifies them; `POST /documents` reads one back into a new incident and
+  `POST /incidents/{id}/document` into one that already exists, merging or adding, optionally retitled and
+  moved in time. The whole import is one transaction, and a milestone another step already holds is
+  reported rather than displaced. Offered in the export menu, and opened from the app bar.
+
 ### Fixed
 
 - The delete question in the record list closed as soon as the pointer left the bin. The two answers

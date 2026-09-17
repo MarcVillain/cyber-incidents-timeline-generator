@@ -69,6 +69,34 @@ describe("REST contract end to end", () => {
         assert.ok((await api.getCatalog()).sides.length > 0);
     });
 
+    it("carries a whole timeline over the wire, out and back in", async () => {
+        const incident = await seedSampleData(api, SAMPLE_START);
+        const document = await api.exportDocument(incident.id);
+        assert.ok(document.nodes.length > 0);
+
+        const report = await api.importDocument(document, { title: "Copied over the wire" });
+        assert.notEqual(report.incidentId, incident.id);
+        assert.equal((await api.getIncident(report.incidentId)).title, "Copied over the wire");
+
+        const before = await api.getSummary(incident.id);
+        const after = await api.getSummary(report.incidentId);
+        assert.equal(after.nodes.total, before.nodes.total);
+        assert.equal(after.steps.total, before.steps.total);
+    });
+
+    it("reads a document into an incident that already exists", async () => {
+        const incident = await seedSampleData(api, SAMPLE_START);
+        const empty = await api.createIncident({ title: "Empty" });
+        const report = await api.importDocument(await api.exportDocument(incident.id), { into: empty.id });
+
+        assert.equal(report.incidentId, empty.id);
+        assert.ok((await api.getSummary(empty.id)).steps.total > 0);
+    });
+
+    it("refuses a document that is not one of ours", async () => {
+        await assert.rejects(api.importDocument({ format: "something-else", version: 1, incident: { title: "x" } }), ValidationError);
+    });
+
     it("updates and deletes through the client", async () => {
         const incident = await api.createIncident({ title: "Over the wire" });
         const node = await api.createNode(incident.id, { name: "Host", kind: NodeKind.Server });

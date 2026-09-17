@@ -42,6 +42,10 @@ the base path, `/api` by default.
 | PUT | `/incidents/{incidentId}/links/{id}` | `LinkUpdateInput` | `204` | Update |
 | DELETE | `/incidents/{incidentId}/links/{id}` | | `204` | Delete |
 | PUT | `/incidents/{incidentId}/layout` | `LayoutInput[]` | `204` | Update |
+| GET | `/incidents/{incidentId}/summary` | | `200 DiagramSummary` | Read |
+| GET | `/incidents/{incidentId}/document` | | `200 TimelineDocument` | Read |
+| POST | `/documents` | `ImportBody` | `201 ImportReport` | Create |
+| POST | `/incidents/{incidentId}/document` | `ImportBody` | `200 ImportReport` | Create |
 
 ### Required fields
 
@@ -52,6 +56,24 @@ the base path, `/api` by default.
 | `StepCreateInput` | `title`, `timestamp` |
 | `LinkCreateInput` | `sourceNodeId`, `targetNodeId` |
 | `LayoutInput` | `nodeId`, `representation`, `x`, `y` (both `null` to release a pinned record) |
+
+### Moving a whole timeline
+
+`GET /incidents/{incidentId}/document` returns every record, step, relationship and pinned position as one
+file. It carries no database id, no incident id and nothing about the deployment: records are named after
+what identifies them, which is what lets an import recognise the same host arriving a second time.
+
+`POST /documents` writes it into a new incident; `POST /incidents/{incidentId}/document` writes it into one
+that already exists. The body is `{ document, mode?, title?, shiftHours? }`:
+
+- `mode` is `merge`, which updates a record the document names again, or `add`, which always writes a new
+  one. Merge is the default.
+- `title` overrides the title the document carries.
+- `shiftHours` moves every moment together, for replaying an exercise on another date.
+
+The whole import runs in one transaction, so a file that turns out to be inconsistent leaves nothing half
+written. A milestone key a step in the incident already holds is reported in `milestonesTaken` and left
+where it was, rather than displacing it.
 
 ### Side effects
 

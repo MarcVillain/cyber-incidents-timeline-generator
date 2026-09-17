@@ -11,7 +11,9 @@ export enum ExportFormat {
     Png = "png",
     Svg = "svg",
     Html = "html",
-    Print = "print"
+    Print = "print",
+    /** The records themselves rather than a picture of them, for moving a timeline to another instance. */
+    Document = "document"
 }
 
 const PNG_SCALE = 2;
@@ -205,6 +207,10 @@ ${slides}
 </script>
 </body>
 </html>`;
+}
+
+export async function exportDocumentFile(document: unknown, name: string): Promise<void> {
+    download(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }), `${slug(name)}.timeline.json`);
 }
 
 export async function exportHtml(pages: readonly SVGGElement[], name: string, title: string, strings: DeckStrings = DEFAULT_STRINGS.deck, locale = "en"): Promise<void> {

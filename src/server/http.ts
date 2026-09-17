@@ -3,7 +3,10 @@ import { Permission } from "../core/enums.js";
 import { ForbiddenError, NotFoundError, ValidationError } from "../core/errors.js";
 import type { RecordId } from "../core/models.js";
 import type { TimelineApi } from "../core/service.js";
+import { ImportMode, type ImportOptions } from "../core/document.js";
 import {
+    FieldLimits,
+    FieldReader,
     readIncidentCreate,
     readIncidentUpdate,
     readLayouts,
@@ -16,6 +19,9 @@ import {
     ValidationRules
 } from "../core/validation.js";
 import { HttpMethod } from "../storage/http-api.js";
+
+// A year either way, which is more than replaying an exercise ever needs and far less than a typo
+const MAX_SHIFT_HOURS = 24 * 366;
 
 export enum HttpStatus {
     Ok = 200,
@@ -97,6 +103,22 @@ function required(value: RecordId | null): RecordId {
     return value;
 }
 
+/**
+ * An import carries the document and how to write it in one body, so the options travel with the file
+ * rather than in a query string that a proxy may drop.
+ */
+function importCall(body: unknown, into?: RecordId): [unknown, ImportOptions & { into?: RecordId }] {
+    const reader = new FieldReader(body);
+    const options: ImportOptions & { into?: RecordId } = {
+        mode: reader.enumValue("mode", ImportMode),
+        title: reader.text("title", FieldLimits.IncidentTitle),
+        shiftHours: reader.integer("shiftHours", -MAX_SHIFT_HOURS, MAX_SHIFT_HOURS),
+        ...(into === undefined ? {} : { into })
+    };
+    reader.throwIfInvalid();
+    return [reader.raw("document"), options];
+}
+
 function buildRoutes(api: TimelineApi): Route[] {
     const incident = (context: RouteContext): RecordId => required(context.params.incidentId);
     const record = (context: RouteContext): RecordId => required(context.params.recordId);
@@ -124,7 +146,11 @@ function buildRoutes(api: TimelineApi): Route[] {
         { method: HttpMethod.Put, pattern: [...incidentPath, "links", Segment.Record], permission: Permission.Update, handle: async context => { await api.updateLink(incident(context), record(context), readLinkUpdate(await context.body())); return NO_CONTENT; } },
         { method: HttpMethod.Delete, pattern: [...incidentPath, "links", Segment.Record], permission: Permission.Delete, handle: async context => { await api.deleteLink(incident(context), record(context)); return NO_CONTENT; } },
 
-        { method: HttpMethod.Put, pattern: [...incidentPath, "layout"], permission: Permission.Update, handle: async context => { await api.saveLayout(incident(context), readLayouts(await context.body())); return NO_CONTENT; } }
+        { method: HttpMethod.Put, pattern: [...incidentPath, "layout"], permission: Permission.Update, handle: async context => { await api.saveLayout(incident(context), readLayouts(await context.body(), await context.rules())); return NO_CONTENT; } },
+
+        { method: HttpMethod.Get, pattern: [...incidentPath, "document"], permission: Permission.Read, handle: async context => ok(await api.exportDocument(incident(context))) },
+        { method: HttpMethod.Post, pattern: ["documents"], permission: Permission.Create, handle: async context => created(await api.importDocument(...importCall(await context.body()))) },
+        { method: HttpMethod.Post, pattern: [...incidentPath, "document"], permission: Permission.Create, handle: async context => ok(await api.importDocument(...importCall(await context.body(), incident(context)))) }
     ];
 }
 

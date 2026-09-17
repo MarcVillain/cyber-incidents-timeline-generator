@@ -22,11 +22,13 @@ import type {
     StepCreateInput,
     StepFields,
     StepRecord,
-    StepUpdateInput
+    StepUpdateInput,
+    WallClock
 } from "./models.js";
 import type { TimelineStore } from "./store.js";
-import { parseWallClock } from "./time.js";
+import { formatWallClock, millisecondsFromHours, parseWallClock } from "./time.js";
 import { summarise, type DiagramSummary } from "./summary.js";
+import { ImportMode, exportDocument, readDocument, type ImportOptions, type ImportReport, type TimelineDocument } from "./document.js";
 import {
     checkStepTimes,
     readIncidentCreate,
@@ -61,6 +63,11 @@ export interface TimelineApi {
     /** What the incident holds, counted. The same figures the diagram would draw, without drawing it. */
     getSummary(incidentId: RecordId): Promise<DiagramSummary>;
 
+    /** The whole timeline as a portable document, addressed by keys rather than database ids. */
+    exportDocument(incidentId: RecordId): Promise<TimelineDocument>;
+    /** Writes a document into a new incident, or into one that already exists. */
+    importDocument(document: unknown, options?: ImportOptions & { into?: RecordId }): Promise<ImportReport>;
+
     createNode(incidentId: RecordId, input: NodeCreateInput): Promise<DiagramNode>;
     updateNode(incidentId: RecordId, nodeId: RecordId, input: NodeUpdateInput): Promise<void>;
     /** Removes the record and the records grouped under it. Steps keep existing without their author or target. */
@@ -93,6 +100,13 @@ function byId<TRecord extends { id: RecordId }>(a: TRecord, b: TRecord): number 
 function chronologically(a: StepRecord, b: StepRecord): number {
     const time = (step: StepRecord): number => parseWallClock(step.timestamp)?.getTime() ?? 0;
     return (time(a) - time(b)) || (a.orderIndex - b.orderIndex) || (a.id - b.id);
+}
+
+/** Every moment of a document moves together, so the shape of the incident survives the move. */
+function shifted(timestamp: WallClock, milliseconds: number): WallClock {
+    if (milliseconds === 0) return timestamp;
+    const moment = parseWallClock(timestamp);
+    return moment ? formatWallClock(new Date(moment.getTime() + milliseconds)) : timestamp;
 }
 
 function invalid(field: string, message: string, code?: string): ValidationError {
@@ -156,6 +170,107 @@ export class TimelineService implements TimelineApi {
 
     async getSummary(incidentId: RecordId): Promise<DiagramSummary> {
         return summarise(await this.getDiagram(incidentId));
+    }
+
+    async exportDocument(incidentId: RecordId): Promise<TimelineDocument> {
+        return exportDocument(await this.getDiagram(incidentId));
+    }
+
+    /**
+     * Writes a document, in one transaction, so a file that turns out to be inconsistent leaves nothing
+     * half imported. Records are matched by the key the document names them with, which is the same key
+     * an export derives from what identifies them.
+     */
+    async importDocument(document: unknown, options: ImportOptions & { into?: RecordId } = {}): Promise<ImportReport> {
+        const parsed = readDocument(document, this.rules);
+        const mode = options.mode ?? ImportMode.Merge;
+        const shift = millisecondsFromHours(options.shiftHours ?? 0);
+
+        return this.store.transaction(async () => {
+            const incidentId = options.into ?? (await this.createIncident({ ...parsed.incident, ...(options.title ? { title: options.title } : {}) })).id;
+            await this.requireIncident(incidentId);
+
+            const existingNodes = await this.store.listNodes(incidentId);
+            const byCanonical = new Map(existingNodes.filter(node => node.canonicalKey !== null).map(node => [node.canonicalKey, node]));
+            const existingSteps = await this.store.listSteps(incidentId);
+            const takenMilestones = new Set(existingSteps.map(step => step.milestoneKey).filter((key): key is string => key !== null));
+
+            const report: ImportReport = { incidentId, created: { nodes: 0, steps: 0, links: 0 }, matched: { nodes: 0, steps: 0 }, milestonesTaken: [] };
+            const nodeIds = new Map<string, RecordId>();
+
+            // Parents are set in a second pass, because a document may name a parent before it carries it
+            for (const node of parsed.nodes) {
+                const { key, parent, ...fields } = node;
+                const match = mode === ImportMode.Merge ? byCanonical.get(key) : undefined;
+                if (match) {
+                    await this.updateNode(incidentId, match.id, { ...fields, parentId: null });
+                    nodeIds.set(key, match.id);
+                    report.matched.nodes += 1;
+                } else {
+                    const created = await this.createNode(incidentId, { ...fields, parentId: null });
+                    nodeIds.set(key, created.id);
+                    report.created.nodes += 1;
+                }
+            }
+            for (const node of parsed.nodes) {
+                const id = nodeIds.get(node.key);
+                const parentId = node.parent === null ? null : nodeIds.get(node.parent) ?? null;
+                if (id !== undefined && parentId !== null) {
+                    await this.updateNode(incidentId, id, { parentId });
+                }
+            }
+
+            const stepIds = new Map<string, RecordId>();
+            for (const step of parsed.steps) {
+                const { key, source, target, involvements, milestoneKey, ...fields } = step;
+                const claim = milestoneKey !== null && takenMilestones.has(milestoneKey);
+                if (claim && milestoneKey !== null) {
+                    report.milestonesTaken.push(milestoneKey);
+                }
+                const created = await this.createStep(incidentId, {
+                    ...fields,
+                    milestoneKey: claim ? null : milestoneKey,
+                    timestamp: shifted(step.timestamp, shift),
+                    endTimestamp: step.endTimestamp === null ? null : shifted(step.endTimestamp, shift),
+                    sourceNodeId: source === null ? null : nodeIds.get(source) ?? null,
+                    targetNodeId: target === null ? null : nodeIds.get(target) ?? null,
+                    involvements: involvements.flatMap(entry => {
+                        const nodeId = nodeIds.get(entry.node);
+                        return nodeId === undefined ? [] : [{ nodeId, involvement: entry.involvement }];
+                    })
+                });
+                if (milestoneKey !== null && !claim) {
+                    takenMilestones.add(milestoneKey);
+                }
+                stepIds.set(key, created.id);
+                report.created.steps += 1;
+            }
+
+            for (const link of parsed.links) {
+                const sourceNodeId = nodeIds.get(link.source);
+                const targetNodeId = nodeIds.get(link.target);
+                if (sourceNodeId === undefined || targetNodeId === undefined) continue;
+                await this.createLink(incidentId, {
+                    sourceNodeId,
+                    targetNodeId,
+                    kind: link.kind,
+                    label: link.label,
+                    confidence: link.confidence,
+                    metadata: link.metadata,
+                    stepId: link.step === null ? null : stepIds.get(link.step) ?? null
+                });
+                report.created.links += 1;
+            }
+
+            const layouts = parsed.layouts.flatMap(layout => {
+                const nodeId = nodeIds.get(layout.node);
+                return nodeId === undefined ? [] : [{ nodeId, representation: layout.representation, x: layout.x, y: layout.y }];
+            });
+            if (layouts.length > 0) {
+                await this.saveLayout(incidentId, layouts);
+            }
+            return report;
+        });
     }
 
     async getDiagram(incidentId: RecordId): Promise<Diagram> {

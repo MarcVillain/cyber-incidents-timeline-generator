@@ -9,7 +9,7 @@ import { formatWallClock, millisecondsFromHours, momentBetween } from "../core/t
 import type { TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
 import type { PanelContext, PendingRecord } from "./panels.js";
-import { canDrop } from "./rail-drag.js";
+import { DropIntent, canDrop, intentAt, targetFor, type Parented } from "./rail-drag.js";
 
 /**
  * The side a new record most likely belongs to, so the common case needs no correction afterwards.
@@ -45,7 +45,16 @@ interface RowDescription {
     name: string;
     meta: string;
     child: boolean;
+    /** What the record belongs to, so a drop beside its row knows which level that is. */
+    parentId?: RecordId | null;
 }
+
+/** What the row wears while a record is held over it, one class per answer. */
+const MARKS: Readonly<Record<DropIntent, string>> = {
+    [DropIntent.Before]: "is-drop-before",
+    [DropIntent.Inside]: "is-drop-inside",
+    [DropIntent.After]: "is-drop-after"
+};
 
 export class Rail {
     private readonly elements: RailElements;
@@ -125,7 +134,7 @@ export class Rail {
         if (records.length === 0) return;
         const title = h("div", "tlg-group-title", {}, [label, h("span", "tlg-count", {}, [String(records.length)])]);
         // The headings of the two record categories are where a record goes to leave the group it is in
-        if (topLevel) this.makeDropTarget(title, null);
+        if (topLevel) this.makeTopLevelDropTarget(title);
         fragment.append(title);
         records.forEach(record => rowsFor(record).forEach(row => fragment.append(row)));
     }
@@ -169,7 +178,7 @@ export class Rail {
 
         if (type === RecordType.Node) {
             this.makeDraggable(node, id);
-            this.makeDropTarget(node, id);
+            this.makeRecordDropTarget(node, { id, parentId: description.parentId ?? null });
         }
         return node;
     }
@@ -197,39 +206,78 @@ export class Rail {
     }
 
     /**
-     * A record dropped on another belongs to it, which is what makes the other a group. A record dropped
-     * on a section heading belongs to nobody and goes back to its category. A drop the service would
-     * refuse is not offered: the row never lights up and the browser shows no drop cursor.
+     * A record row answers three questions by where the pointer is: dropped in the middle it takes the
+     * record inside, which is what makes it a group, and dropped at either edge it takes the record
+     * beside itself, at its own level. A drop the service would refuse is not offered: nothing is marked
+     * and the browser shows no drop cursor.
      */
-    private makeDropTarget(target: HTMLElement, id: RecordId | null): void {
+    private makeRecordDropTarget(row: HTMLElement, node: Parented): void {
+        if (!this.context.permissions.mayEdit(RecordType.Node)) return;
+        const { signal } = this.context;
+
+        const read = (event: DragEvent): { intent: DropIntent; target: RecordId | null } | null => {
+            const box = row.getBoundingClientRect();
+            const intent = intentAt(event.clientY, { top: box.top, height: box.height });
+            const target = targetFor(intent, node);
+            return this.mayDropOn(target) ? { intent, target } : null;
+        };
+
+        row.addEventListener("dragover", event => {
+            const reading = read(event);
+            this.clearDropMarks();
+            if (!reading) return;
+            event.preventDefault();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+            row.classList.add(MARKS[reading.intent]);
+        }, { signal });
+        row.addEventListener("dragleave", () => this.unmark(row), { signal });
+        row.addEventListener("drop", event => {
+            const reading = read(event);
+            if (!reading) return;
+            this.applyDrop(event, reading.target);
+        }, { signal });
+    }
+
+    /** A section heading takes a record out of whatever holds it. */
+    private makeTopLevelDropTarget(target: HTMLElement): void {
         if (!this.context.permissions.mayEdit(RecordType.Node)) return;
         const { signal } = this.context;
 
         target.addEventListener("dragover", event => {
-            if (!this.mayDropOn(id)) return;
+            if (!this.mayDropOn(null)) return;
             event.preventDefault();
             if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-            target.classList.add("is-drop-target");
+            target.classList.add("is-drop-inside");
         }, { signal });
-        target.addEventListener("dragleave", () => target.classList.remove("is-drop-target"), { signal });
+        target.addEventListener("dragleave", () => this.unmark(target), { signal });
         target.addEventListener("drop", event => {
-            if (!this.mayDropOn(id)) return;
-            event.preventDefault();
-            const moved = this.dragging;
-            this.dragging = null;
-            this.clearDropMarks();
-            if (moved !== null) {
-                this.context.actions.edit(moved, { type: RecordType.Node, patch: { parentId: id } });
-            }
+            if (!this.mayDropOn(null)) return;
+            this.applyDrop(event, null);
         }, { signal });
+    }
+
+    private applyDrop(event: DragEvent, parentId: RecordId | null): void {
+        event.preventDefault();
+        const moved = this.dragging;
+        this.dragging = null;
+        this.clearDropMarks();
+        if (moved !== null) {
+            this.context.actions.edit(moved, { type: RecordType.Node, patch: { parentId } });
+        }
     }
 
     private mayDropOn(target: RecordId | null): boolean {
         return this.dragging !== null && canDrop(this.context.store.nodes, this.dragging, target);
     }
 
+    private unmark(element: Element): void {
+        Object.values(MARKS).forEach(mark => element.classList.remove(mark));
+    }
+
     private clearDropMarks(): void {
-        this.elements.list.querySelectorAll(".is-drop-target").forEach(node => node.classList.remove("is-drop-target"));
+        Object.values(MARKS).forEach(mark => {
+            this.elements.list.querySelectorAll(`.${mark}`).forEach(node => node.classList.remove(mark));
+        });
     }
 
     /**
@@ -270,7 +318,7 @@ export class Rail {
     private nodeRow(node: DiagramNode, child: boolean): HTMLDivElement {
         const { store } = this.context;
         const meta = [store.kindInfo(node.kind).label, node.identifier ?? node.role].filter(Boolean).join(" - ");
-        return this.row({ type: RecordType.Node, id: node.id, icon: store.nodeIcon(node), side: node.side, name: node.name, meta, child });
+        return this.row({ type: RecordType.Node, id: node.id, icon: store.nodeIcon(node), side: node.side, name: node.name, meta, child, parentId: node.parentId });
     }
 
     private stepRow(step: TimelineStep): HTMLDivElement {

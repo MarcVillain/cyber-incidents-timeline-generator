@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canDrop } from "../../src/ui/rail-drag.js";
+import { DropIntent, canDrop, intentAt, targetFor } from "../../src/ui/rail-drag.js";
 
 // A company holding a clerk who holds a laptop, and a server standing on its own.
 const NODES = [
@@ -39,5 +39,40 @@ describe("where a record may be dropped", () => {
 
     it("refuses to move a record the diagram does not hold", () => {
         assert.equal(canDrop(NODES, 99, 1), false);
+    });
+});
+
+describe("what a drop between rows means", () => {
+    const row = { top: 100, height: 40 };
+
+    it("puts the record inside the row it lands in the middle of", () => {
+        assert.equal(intentAt(120, row), DropIntent.Inside);
+    });
+
+    it("puts the record beside the row it lands at the top or bottom of", () => {
+        assert.equal(intentAt(102, row), DropIntent.Before);
+        assert.equal(intentAt(138, row), DropIntent.After);
+    });
+
+    it("leaves the middle the larger target, because inside is the commoner answer", () => {
+        const inside = [...Array(row.height).keys()].filter(offset => intentAt(row.top + offset, row) === DropIntent.Inside);
+        assert.ok(inside.length > row.height / 2, `only ${inside.length} of ${row.height} pixels drop inside`);
+    });
+
+    it("keeps an edge a person can hit on a row too short to divide in three", () => {
+        const thin = { top: 0, height: 9 };
+        assert.equal(intentAt(1, thin), DropIntent.Before);
+        assert.equal(intentAt(8, thin), DropIntent.After);
+    });
+
+    it("joins what a row belongs to when dropped beside it, and the row itself when dropped into it", () => {
+        const member = { id: 2, parentId: 1 };
+        assert.equal(targetFor(DropIntent.Inside, member), 2);
+        assert.equal(targetFor(DropIntent.Before, member), 1);
+        assert.equal(targetFor(DropIntent.After, member), 1);
+    });
+
+    it("sends a record dropped beside a loose row to the top level", () => {
+        assert.equal(targetFor(DropIntent.Before, { id: 4, parentId: null }), null);
     });
 });

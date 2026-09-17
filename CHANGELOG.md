@@ -79,11 +79,12 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 
 ### Changed
 
-- Records are dragged into place in the rail. A record dropped on another belongs to it, which is what
-  makes the other a group; a record dropped on the Parties or Resources heading leaves the group it was
-  in. A drop the service would refuse, such as a group onto one of its own members, is not offered: the
-  row does not light up and the browser shows no drop cursor. Steps and relationships are not carried,
-  because they belong to the incident rather than to anything in it.
+- Records are dragged into place in the rail. A row answers three questions by where the pointer lands:
+  the middle takes the record inside, which is what makes a group, and either edge takes it beside that
+  row, at the same level, so a record can be dropped between two others. The Parties and Resources
+  headings take a record out of whatever holds it. A drop the service would refuse, or one that would
+  change nothing, is not offered: nothing is marked and the browser shows no drop cursor. Steps and
+  relationships are not carried, because they belong to the incident rather than to anything in it.
 - Enter in the quick add line finishes it. It used to save the record and open another empty line of the
   same kind, so adding one record left a line waiting that nobody had asked for. A reader who wants a
   second record picks a kind again.

@@ -428,14 +428,40 @@ textarea.tlg-input {
     cursor: grabbing;
 }
 
-.tlg-record.is-drop-target,
-.tlg-group-title.is-drop-target {
+/* Inside is an outline around the whole row; beside is a line where the record would land. The line is
+   drawn inside the row rather than between rows, so nothing shifts while something is dragged over it. */
+.tlg-record.is-drop-inside,
+.tlg-group-title.is-drop-inside {
     box-shadow: inset 0 0 0 2px var(--tlg-accent);
     border-radius: 8px;
 }
 
-.tlg-group-title.is-drop-target {
+.tlg-group-title.is-drop-inside {
     background: var(--tlg-surface-alt);
+}
+
+.tlg-record.is-drop-before,
+.tlg-record.is-drop-after {
+    position: relative;
+}
+
+.tlg-record.is-drop-before::before,
+.tlg-record.is-drop-after::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--tlg-accent);
+}
+
+.tlg-record.is-drop-before::before {
+    top: 0;
+}
+
+.tlg-record.is-drop-after::after {
+    bottom: 0;
 }
 
 .tlg-record:hover {

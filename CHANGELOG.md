@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0]
 
 Every change is additive. Code written against 0.1.1 compiles and behaves the same.
 
@@ -60,6 +60,12 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
   the selection after every change. A host can now carry the view in its own address bar and hand it back.
 - `RendererDefinition.options` accepts a function of the strings, which is how the built in representations
   declare their toolbar settings. An array still works.
+
+### Fixed
+
+- The delete question in the record list closed as soon as the pointer left the bin. The two answers
+  appear where the bin was, so reaching either one moved the pointer off it. It now closes when the
+  pointer leaves the row.
 
 ## [0.1.1] - 2026-09-16
 

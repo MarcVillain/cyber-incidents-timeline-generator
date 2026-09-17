@@ -47,19 +47,21 @@ export function installDom(): void {
 let eventConstructor: typeof Event | null = null;
 
 export interface SyntheticEventInit {
+    bubbles?: boolean;
     clientX?: number;
     clientY?: number;
     key?: string;
 }
 
 /**
- * A bubbling event carrying the pointer or keyboard fields the workspace reads.
+ * An event carrying the pointer or keyboard fields the workspace reads. It bubbles unless told not to,
+ * because some of the events the workspace listens for, such as mouseleave, never do.
  */
 export function syntheticEvent(type: string, init: SyntheticEventInit = {}): Event {
     if (!eventConstructor) {
         throw new Error("installDom has to run first.");
     }
-    const event = new eventConstructor(type, { bubbles: true, cancelable: true });
+    const event = new eventConstructor(type, { bubbles: init.bubbles ?? true, cancelable: true });
     const fields: Readonly<Record<string, unknown>> = { button: 0, pointerId: 1, clientX: init.clientX ?? 0, clientY: init.clientY ?? 0, key: init.key ?? "" };
     for (const [name, value] of Object.entries(fields)) {
         Object.defineProperty(event, name, { value });

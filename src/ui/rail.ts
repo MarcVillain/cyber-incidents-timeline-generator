@@ -149,7 +149,7 @@ export class Rail {
             node.classList.add("is-selected");
         }
         if (permissions.mayDelete(type)) {
-            node.append(this.deleteControl(type, id, description.name));
+            node.append(this.deleteControl(node, type, id, description.name));
         }
 
         node.addEventListener("click", event => {
@@ -167,8 +167,11 @@ export class Rail {
     /**
      * A bin that shows up when the pointer is over the row and asks again once clicked. The way out appears
      * right under the cursor and the confirmation beside it, so a double click cannot delete.
+     *
+     * The question closes when the pointer leaves the row rather than the control: the two answers sit
+     * where the bin was, so reaching for either one means leaving the few pixels the bin occupied.
      */
-    private deleteControl(type: RecordType, id: RecordId, name: string): HTMLSpanElement {
+    private deleteControl(row: HTMLElement, type: RecordType, id: RecordId, name: string): HTMLSpanElement {
         const { icons, actions } = this.context;
         const holder = h("span", "tlg-record-delete");
         const control = (className: string, label: string, icon: Icon): HTMLButtonElement =>
@@ -190,7 +193,7 @@ export class Rail {
             void actions.remove(type, id);
         });
         cancel.addEventListener("click", reset);
-        holder.addEventListener("mouseleave", reset);
+        row.addEventListener("mouseleave", reset, { signal: this.context.signal });
 
         holder.append(bin, h("span", "tlg-record-delete-ask", {}, [confirm, cancel]));
         return holder;

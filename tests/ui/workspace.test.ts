@@ -195,6 +195,26 @@ describe("mountTimeline", () => {
         handle.destroy();
     });
 
+    it("keeps the question open while the pointer is anywhere on the row", async () => {
+        const { service, incident } = await seededService();
+        const element = mountPoint();
+        const handle = await mountTimeline(element, { api: service, incidentId: incident.id, preferences: null });
+        const row = element.querySelector<HTMLElement>(RECORD_ROW);
+        const control = row?.querySelector<HTMLElement>(".tlg-record-delete");
+        assert.ok(row && control);
+
+        control.querySelector<HTMLButtonElement>(".tlg-record-delete-trigger")?.click();
+        assert.ok(control.classList.contains("is-asking"));
+
+        // The answers sit where the bin was, so reaching one means leaving the bin
+        control.dispatchEvent(syntheticEvent("mouseleave", { bubbles: false }));
+        assert.ok(control.classList.contains("is-asking"), "the question closed while the pointer was still on the row");
+
+        row.dispatchEvent(syntheticEvent("mouseleave", { bubbles: false }));
+        assert.equal(control.classList.contains("is-asking"), false, "the question stayed open after the pointer left the row");
+        handle.destroy();
+    });
+
     it("offers only what the permissions allow", async () => {
         const { service, incident } = await seededService();
         const element = mountPoint();

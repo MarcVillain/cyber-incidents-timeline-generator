@@ -28,7 +28,11 @@ export {
     SVG_NS, circle, el, group, line, measure, path, rect, roundedPath, text, truncate, wrap,
     type SvgAttributes, type SvgChild
 } from "./ui/svg.js";
-export { timeAxis, span, type AxisLayout } from "./ui/axis.js";
+export { timeAxis, span, type AxisLayout, type SpanLayout } from "./ui/axis.js";
+export {
+    clamp, packIntoRows, paginate, paginateGroups, spread, timeScale, timeTicks,
+    type Span, type TimeScale, type Weighted
+} from "./ui/geometry.js";
 export {
     CORNER, HEADER_STRIP, cardOutline, cardFooterHeight, fitLines, fitText, headerStrip, iconTile,
     microLabels, momentVariants, nodeBox, nodeColor, outcomeColor, stepBadge, stepCard, stepCardHeight,

@@ -1,5 +1,5 @@
 // The list of records and the way new ones get in. Adding is meant to cost one click and one line of
-// typing: pick a kind, type a name, press Enter, and the next empty line is already waiting.
+// typing: pick a kind, type a name, and either press Enter or leave the line.
 
 import type { NodeKindInfo } from "../core/catalog.js";
 import { LinkKind, NodeCategory, NodeKind, RecordType, Side } from "../core/enums.js";
@@ -366,7 +366,10 @@ export class Rail {
                 return;
             }
             if (event.key !== "Enter") return;
-            if (!save()) cancel();
+            // One record per trip through the menu. Enter finishes the line rather than opening another,
+            // because a reader who wants a second one says so by picking a kind again.
+            save();
+            cancel();
         });
         input.addEventListener("blur", () => {
             save();

@@ -289,6 +289,26 @@ describe("mountTimeline", () => {
         handle.destroy();
     });
 
+    it("closes the quick add line on Enter rather than opening another one", async () => {
+        const { service } = createService();
+        const incident = await createIncident(service);
+        const element = mountPoint();
+        const handle = await mountTimeline(element, { api: service, incidentId: incident.id, preferences: null, renderers: BUILT_IN_RENDERERS.slice(0, 1) });
+
+        element.querySelector<HTMLButtonElement>(".tlg-add")?.click();
+        addMenuItem(element, "Exploit").click();
+        const input = element.querySelector<HTMLInputElement>(".tlg-quickadd input");
+        assert.ok(input);
+        input.value = EXPLOIT_NAME;
+        input.dispatchEvent(syntheticEvent("keydown", { key: "Enter" }));
+        await settle();
+
+        assert.equal(element.querySelector(".tlg-quickadd"), null, "Enter left another empty line waiting");
+        const nodes = (await service.getDiagram(incident.id)).nodes;
+        assert.deepEqual(nodes.map(node => node.name), [EXPLOIT_NAME], "Enter created more than the one record");
+        handle.destroy();
+    });
+
     it("keeps the kind and side of a record placed in a group when a relationship is added", async () => {
         const { service } = createService();
         const incident = await createIncident(service);

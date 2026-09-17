@@ -79,6 +79,9 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 
 ### Changed
 
+- Enter in the quick add line finishes it. It used to save the record and open another empty line of the
+  same kind, so adding one record left a line waiting that nobody had asked for. A reader who wants a
+  second record picks a kind again.
 - A name typed in the quick add line of the record list is saved as soon as the line is left, without
   waiting for Enter. Escape still discards it.
 

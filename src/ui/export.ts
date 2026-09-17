@@ -2,7 +2,7 @@
 // exported slide is the slide, not a second implementation of it. Icons are paths, so a file needs
 // nothing from the application to render.
 
-import { SVG_NS } from "./svg.js";
+import { SVG_NS, svgDocument } from "./svg.js";
 import { FONT_STACK } from "./theme.js";
 import { PAGE_HEIGHT, PAGE_WIDTH } from "./viewport.js";
 import { DEFAULT_STRINGS, type DeckStrings } from "./strings.js";
@@ -26,18 +26,61 @@ function escapeHtml(value: string): string {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-export function serialize(page: SVGGElement): string {
-    const svg = document.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("xmlns", SVG_NS);
-    svg.setAttribute("width", String(PAGE_WIDTH));
-    svg.setAttribute("height", String(PAGE_HEIGHT));
-    svg.setAttribute("viewBox", `0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}`);
+/**
+ * How a page is wrapped into a standalone SVG file. The defaults are the slide as the screen draws it;
+ * a server rendering for a dark page or a branded report supplies its own.
+ */
+export interface SerializeOptions {
+    width?: number;
+    height?: number;
+    /** Painted behind the slide; without it the file is transparent, as it has always been. */
+    background?: string | null;
+    /** Replaces the font rule, for example to embed a face. */
+    styles?: string;
+    /** Turns the tree into text. Defaults to XMLSerializer, which every browser has. */
+    serializer?: XmlSerializer;
+}
 
-    const style = document.createElementNS(SVG_NS, "style");
-    style.textContent = `text{font-family:${FONT_STACK};}`;
+/** The one method of XMLSerializer this needs, so a host on the server can hand over its own. */
+export interface XmlSerializer {
+    serializeToString(node: Node): string;
+}
+
+export function serialize(page: SVGGElement, options: SerializeOptions = {}): string {
+    const width = options.width ?? PAGE_WIDTH;
+    const height = options.height ?? PAGE_HEIGHT;
+    const owner = svgDocument();
+
+    const svg = owner.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("xmlns", SVG_NS);
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    const style = owner.createElementNS(SVG_NS, "style");
+    style.textContent = options.styles ?? `text{font-family:${FONT_STACK};}`;
     svg.appendChild(style);
+
+    if (options.background) {
+        const ground = owner.createElementNS(SVG_NS, "rect");
+        ground.setAttribute("width", String(width));
+        ground.setAttribute("height", String(height));
+        ground.setAttribute("fill", options.background);
+        svg.appendChild(ground);
+    }
+
     svg.appendChild(page.cloneNode(true));
-    return new XMLSerializer().serializeToString(svg);
+    return text(svg, options.serializer);
+}
+
+/**
+ * XMLSerializer is a browser service. A DOM built on the server may have none, and its elements already
+ * serialize themselves, which is why outerHTML is the fallback rather than a failure.
+ */
+function text(svg: SVGSVGElement, serializer: XmlSerializer | undefined): string {
+    if (serializer) return serializer.serializeToString(svg);
+    if (typeof XMLSerializer === "function") return new XMLSerializer().serializeToString(svg);
+    return svg.outerHTML;
 }
 
 function download(blob: Blob, filename: string): void {

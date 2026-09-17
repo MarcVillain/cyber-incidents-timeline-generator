@@ -2,12 +2,36 @@
 
 export const SVG_NS = "http://www.w3.org/2000/svg";
 
+let target: Document | null = null;
+
+/**
+ * The document elements are created in. The page the workspace runs in, unless a headless renderer put
+ * one here for the length of a render.
+ */
+export function svgDocument(): Document {
+    return target ?? document;
+}
+
+/**
+ * Draws with the given document for the length of the work, and puts back whatever was there before, so
+ * a server can render a slide with no page of its own. Nothing else in the package calls this.
+ */
+export function withDocument<TResult>(value: Document, work: () => TResult): TResult {
+    const previous = target;
+    target = value;
+    try {
+        return work();
+    } finally {
+        target = previous;
+    }
+}
+
 export type SvgAttributeValue = string | number | boolean | null | undefined;
 export type SvgAttributes = Readonly<Record<string, SvgAttributeValue>>;
 export type SvgChild = SVGElement | null | false;
 
 export function el<TName extends keyof SVGElementTagNameMap>(name: TName, attrs: SvgAttributes = {}, children: readonly SvgChild[] = []): SVGElementTagNameMap[TName] {
-    const node = document.createElementNS(SVG_NS, name);
+    const node = svgDocument().createElementNS(SVG_NS, name);
     for (const [key, value] of Object.entries(attrs)) {
         if (value === null || value === undefined || value === false) continue;
         node.setAttribute(key, String(value));

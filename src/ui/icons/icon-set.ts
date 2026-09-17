@@ -1,5 +1,5 @@
 import { Icon } from "../../core/icon.js";
-import { SVG_NS } from "../svg.js";
+import { SVG_NS, svgDocument } from "../svg.js";
 import { ICON_SHAPES } from "./shapes.js";
 
 const ICON_BOX = 24;
@@ -35,7 +35,7 @@ export class IconSet {
      */
     draw(name: string, centerX: number, centerY: number, size: number, color: string): SVGGElement {
         const scale = size / ICON_BOX;
-        const group = document.createElementNS(SVG_NS, "g");
+        const group = svgDocument().createElementNS(SVG_NS, "g");
         group.setAttribute("class", "tlg-glyph");
         group.setAttribute("transform", `translate(${centerX - size / 2} ${centerY - size / 2}) scale(${scale})`);
         group.setAttribute("fill", "none");
@@ -44,7 +44,7 @@ export class IconSet {
         group.setAttribute("stroke-linecap", "round");
         group.setAttribute("stroke-linejoin", "round");
         this.paths(name).forEach(d => {
-            const path = document.createElementNS(SVG_NS, "path");
+            const path = svgDocument().createElementNS(SVG_NS, "path");
             path.setAttribute("d", d);
             group.appendChild(path);
         });
@@ -55,7 +55,7 @@ export class IconSet {
      * The icon as an inline element for buttons and lists, taking the colour and size of its text.
      */
     element(name: string): SVGSVGElement {
-        const svg = document.createElementNS(SVG_NS, "svg");
+        const svg = svgDocument().createElementNS(SVG_NS, "svg");
         svg.setAttribute("class", "tlg-icon");
         svg.setAttribute("viewBox", `0 0 ${ICON_BOX} ${ICON_BOX}`);
         svg.setAttribute("fill", "none");
@@ -66,7 +66,7 @@ export class IconSet {
         svg.setAttribute("aria-hidden", "true");
         svg.setAttribute("focusable", "false");
         this.paths(name).forEach(d => {
-            const path = document.createElementNS(SVG_NS, "path");
+            const path = svgDocument().createElementNS(SVG_NS, "path");
             path.setAttribute("d", d);
             svg.appendChild(path);
         });

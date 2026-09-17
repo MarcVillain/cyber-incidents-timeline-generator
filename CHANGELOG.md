@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format follows
 - `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
   module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
   speak different languages.
+- Rendering with no page. A new `cyber-incidents-timeline-generator/render` entry point exports
+  `renderPages`, `renderPage` and `countPages`, which draw any representation into SVG given a document,
+  so a scheduled report or a mail can carry the picture. The document is passed in and put back after, so
+  nothing global is touched. `serialize` takes a size, a background, a stylesheet and a serializer, which
+  is what lets a server render dark or branded; without an `XMLSerializer` it serializes the tree itself.
 - Representations of a host's own. `Representation` keeps its twelve values and `RepresentationKey` widens
   the renderer, the catalog and the stored placements to any plain key, declared through
   `CatalogOptions.representations`. A thirteenth view drawn by the host is now a first class one: it takes

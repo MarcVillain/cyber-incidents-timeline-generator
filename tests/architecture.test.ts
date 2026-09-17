@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const PROJECT_ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
-const BROWSER_FOLDERS = ["src/core", "src/storage", "src/ui"];
+const BROWSER_FOLDERS = ["src/core", "src/storage", "src/ui", "src/render"];
 const NODE_IMPORT = /from\s+["']node:/;
 const SERVER_IMPORT = /from\s+["'][./]*server\//;
 

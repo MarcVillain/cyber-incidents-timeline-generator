@@ -12,19 +12,27 @@ export class TableNames {
     readonly tags: string;
     readonly links: string;
 
-    constructor(prefix: string) {
-        // The prefix ends up inside SQL text, so it is held to a plain identifier
+    /**
+     * A schema qualifies every name, for a host whose application lives in one of its own rather than in
+     * the default search path.
+     */
+    constructor(prefix: string, schema: string | null = null) {
+        // Both end up inside SQL text, so both are held to a plain identifier
         if (!/^[a-z_][a-z0-9_]{0,30}$/.test(prefix)) {
             throw new Error("The table prefix must be a lowercase SQL identifier of at most 31 characters.");
         }
-        this.incidents = `${prefix}incidents`;
-        this.classifications = `${prefix}incident_classifications`;
-        this.nodes = `${prefix}nodes`;
-        this.layouts = `${prefix}node_layouts`;
-        this.steps = `${prefix}steps`;
-        this.involvements = `${prefix}step_involvements`;
-        this.tags = `${prefix}step_tags`;
-        this.links = `${prefix}links`;
+        if (schema !== null && !/^[a-z_][a-z0-9_]{0,30}$/.test(schema)) {
+            throw new Error("The schema must be a lowercase SQL identifier of at most 31 characters.");
+        }
+        const qualified = schema === null ? prefix : `${schema}.${prefix}`;
+        this.incidents = `${qualified}incidents`;
+        this.classifications = `${qualified}incident_classifications`;
+        this.nodes = `${qualified}nodes`;
+        this.layouts = `${qualified}node_layouts`;
+        this.steps = `${qualified}steps`;
+        this.involvements = `${qualified}step_involvements`;
+        this.tags = `${qualified}step_tags`;
+        this.links = `${qualified}links`;
     }
 }
 

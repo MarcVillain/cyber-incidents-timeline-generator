@@ -17,6 +17,8 @@ import type { RepresentationKey } from "../../core/enums.js";
 
 export interface SqlTimelineStoreOptions {
     tablePrefix?: string;
+    /** The schema the tables live in. Left out, they are found through the search path. */
+    schema?: string;
 }
 
 const INCIDENT_COLUMNS = "id, title, reference_id, impact, scope, external_id, metadata";
@@ -160,12 +162,13 @@ function groupBy<TValue>(rows: readonly SqlRow[], keyColumn: string, readValue: 
  * parameterized; the only text ever spliced into SQL is the validated table prefix.
  */
 export class SqlTimelineStore implements TimelineStore {
-    private readonly driver: SqlDriver;
+    /** Reachable by a host that keeps its incidents elsewhere and overrides only those methods. */
+    protected readonly driver: SqlDriver;
     readonly tables: TableNames;
 
     constructor(driver: SqlDriver, options: SqlTimelineStoreOptions = {}) {
         this.driver = driver;
-        this.tables = new TableNames(options.tablePrefix ?? DEFAULT_TABLE_PREFIX);
+        this.tables = new TableNames(options.tablePrefix ?? DEFAULT_TABLE_PREFIX, options.schema ?? null);
     }
 
     private async insertReturningId(sql: string, params: readonly SqlValue[]): Promise<RecordId> {

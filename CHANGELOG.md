@@ -61,6 +61,10 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 - `RendererDefinition.options` accepts a function of the strings, which is how the built in representations
   declare their toolbar settings. An array still works.
 
+- `SqlTimelineStoreOptions.schema`, and a second argument to `TableNames`, so the tables can live in a
+  schema of the host's own rather than in the search path. Held to the same plain identifier as the
+  prefix. `SqlTimelineStore.driver` becomes protected, so a host that keeps its incidents in its own
+  register can override those five methods and keep the rest.
 - A whole timeline as one portable file. `GET /incidents/{id}/document` writes every record, step,
   relationship and pinned position with no database id and no incident id, naming records after what
   identifies them; `POST /documents` reads one back into a new incident and

@@ -6,6 +6,7 @@ import { seedSampleData } from "../../src/core/sample.js";
 import { TimelineService } from "../../src/core/service.js";
 import { readIncidentCreate } from "../../src/core/validation.js";
 import { openSqliteStore } from "../../src/server/index.js";
+import { TableNames } from "../../src/server/sql/schema.js";
 import { IN_MEMORY_DATABASE } from "../../src/server/sql/sqlite-driver.js";
 import { BrowserStorageTimelineStore, type KeyValueStorage } from "../../src/storage/browser-storage-store.js";
 import { MemoryTimelineStore } from "../../src/storage/memory-store.js";
@@ -86,5 +87,23 @@ describe("SqlTimelineStore", () => {
         const incident = await service.createIncident({ title: "Busy" });
         await Promise.all(Array.from({ length: CONCURRENT_WRITES }, (_, index) => service.createNode(incident.id, { name: `Node ${index}`, kind: NodeKind.Server })));
         assert.equal((await service.getDiagram(incident.id)).nodes.length, CONCURRENT_WRITES);
+    });
+});
+
+describe("SqlTimelineStore table names", () => {
+    it("qualifies every table with the schema it was given", () => {
+        const tables = new TableNames("tlg_", "app");
+        assert.equal(tables.incidents, "app.tlg_incidents");
+        assert.equal(tables.steps, "app.tlg_steps");
+        assert.equal(tables.involvements, "app.tlg_step_involvements");
+    });
+
+    it("leaves the tables to the search path when given no schema", () => {
+        assert.equal(new TableNames("tlg_").incidents, "tlg_incidents");
+    });
+
+    it("refuses a schema or a prefix that is not a plain identifier", () => {
+        assert.throws(() => new TableNames("tlg_", "app; drop table"));
+        assert.throws(() => new TableNames("tlg-", "app"));
     });
 });

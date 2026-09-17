@@ -9,6 +9,7 @@ import { formatWallClock, millisecondsFromHours, momentBetween } from "../core/t
 import type { TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
 import type { PanelContext, PendingRecord } from "./panels.js";
+import { canDrop } from "./rail-drag.js";
 
 /**
  * The side a new record most likely belongs to, so the common case needs no correction afterwards.
@@ -51,6 +52,7 @@ export class Rail {
     private readonly context: PanelContext;
     private query = "";
     private pending: PendingRecord | null = null;
+    private dragging: RecordId | null = null;
     private pendingInput: HTMLInputElement | null = null;
 
     constructor(elements: RailElements, context: PanelContext) {
@@ -96,8 +98,8 @@ export class Rail {
             this.nodeRow(container, false),
             ...nodes.filter(node => node.parentId === container.id).map(member => this.nodeRow(member, true))
         ]);
-        this.appendGroup(fragment, words.parties, loose(NodeCategory.Actor).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)]);
-        this.appendGroup(fragment, words.resources, loose(NodeCategory.Resource).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)]);
+        this.appendGroup(fragment, words.parties, loose(NodeCategory.Actor).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)], true);
+        this.appendGroup(fragment, words.resources, loose(NodeCategory.Resource).filter(node => this.nodeMatches(node)), node => [this.nodeRow(node, false)], true);
         this.appendGroup(fragment, words.steps, store.steps.filter(step => this.matches(step.title) || this.matches(step.description)), step => [this.stepRow(step)]);
         this.appendGroup(fragment, words.relationships, store.links.filter(link => this.linkMatches(link)), link => [this.linkRow(link)]);
 
@@ -119,9 +121,12 @@ export class Rail {
         return this.matches(store.node(link.sourceNodeId)?.name ?? null) || this.matches(store.node(link.targetNodeId)?.name ?? null);
     }
 
-    private appendGroup<TRecord>(fragment: DocumentFragment, label: string, records: readonly TRecord[], rowsFor: (record: TRecord) => HTMLElement[]): void {
+    private appendGroup<TRecord>(fragment: DocumentFragment, label: string, records: readonly TRecord[], rowsFor: (record: TRecord) => HTMLElement[], topLevel = false): void {
         if (records.length === 0) return;
-        fragment.append(h("div", "tlg-group-title", {}, [label, h("span", "tlg-count", {}, [String(records.length)])]));
+        const title = h("div", "tlg-group-title", {}, [label, h("span", "tlg-count", {}, [String(records.length)])]);
+        // The headings of the two record categories are where a record goes to leave the group it is in
+        if (topLevel) this.makeDropTarget(title, null);
+        fragment.append(title);
         records.forEach(record => rowsFor(record).forEach(row => fragment.append(row)));
     }
 
@@ -161,7 +166,70 @@ export class Rail {
             event.preventDefault();
             store.setSelection({ type, id });
         }, { signal });
+
+        if (type === RecordType.Node) {
+            this.makeDraggable(node, id);
+            this.makeDropTarget(node, id);
+        }
         return node;
+    }
+
+    /**
+     * Records are carried by their row. Only records: a step and a relationship belong to the incident
+     * rather than to anything in it, so there is nowhere to drop them.
+     */
+    private makeDraggable(row: HTMLElement, id: RecordId): void {
+        if (!this.context.permissions.mayEdit(RecordType.Node)) return;
+        const { signal } = this.context;
+
+        row.setAttribute("draggable", "true");
+        row.addEventListener("dragstart", event => {
+            this.dragging = id;
+            row.classList.add("is-dragging");
+            event.dataTransfer?.setData("text/plain", String(id));
+            if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+        }, { signal });
+        row.addEventListener("dragend", () => {
+            this.dragging = null;
+            row.classList.remove("is-dragging");
+            this.clearDropMarks();
+        }, { signal });
+    }
+
+    /**
+     * A record dropped on another belongs to it, which is what makes the other a group. A record dropped
+     * on a section heading belongs to nobody and goes back to its category. A drop the service would
+     * refuse is not offered: the row never lights up and the browser shows no drop cursor.
+     */
+    private makeDropTarget(target: HTMLElement, id: RecordId | null): void {
+        if (!this.context.permissions.mayEdit(RecordType.Node)) return;
+        const { signal } = this.context;
+
+        target.addEventListener("dragover", event => {
+            if (!this.mayDropOn(id)) return;
+            event.preventDefault();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+            target.classList.add("is-drop-target");
+        }, { signal });
+        target.addEventListener("dragleave", () => target.classList.remove("is-drop-target"), { signal });
+        target.addEventListener("drop", event => {
+            if (!this.mayDropOn(id)) return;
+            event.preventDefault();
+            const moved = this.dragging;
+            this.dragging = null;
+            this.clearDropMarks();
+            if (moved !== null) {
+                this.context.actions.edit(moved, { type: RecordType.Node, patch: { parentId: id } });
+            }
+        }, { signal });
+    }
+
+    private mayDropOn(target: RecordId | null): boolean {
+        return this.dragging !== null && canDrop(this.context.store.nodes, this.dragging, target);
+    }
+
+    private clearDropMarks(): void {
+        this.elements.list.querySelectorAll(".is-drop-target").forEach(node => node.classList.remove("is-drop-target"));
     }
 
     /**

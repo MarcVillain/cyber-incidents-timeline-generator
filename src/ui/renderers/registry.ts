@@ -2,7 +2,7 @@
 // and draws one page at a time, which is what keeps a diagram inside a single slide.
 
 import type { RepresentationInfo } from "../../core/catalog.js";
-import type { Representation } from "../../core/enums.js";
+import type { RepresentationKey } from "../../core/enums.js";
 import type { TimeFormats } from "../../core/time.js";
 import type { DiagramStore } from "../diagram-store.js";
 import type { IconSet } from "../icons/icon-set.js";
@@ -44,7 +44,8 @@ export function optionValue<TValue extends string>(context: RenderContext, optio
 }
 
 export interface RendererDefinition<TPage> {
-    representation: Representation;
+    /** A built in key, or a key the host also declared in CatalogOptions.representations. */
+    representation: RepresentationKey;
     /** A function when the labels are translated, which is how the built in representations declare theirs. */
     options?: readonly RendererOption[] | ((strings: Strings) => readonly RendererOption[]);
     /** Whether records can be pinned by hand in this representation. */
@@ -60,7 +61,7 @@ export interface Pagination {
 }
 
 export interface Renderer {
-    readonly representation: Representation;
+    readonly representation: RepresentationKey;
     options(strings: Strings): readonly RendererOption[];
     readonly draggable: boolean;
     paginate(context: RenderContext): Pagination;

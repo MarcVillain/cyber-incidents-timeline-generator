@@ -5,7 +5,6 @@ import {
     Involvement,
     LinkKind,
     NodeKind,
-    Representation,
     ResponsePhase,
     Side,
     StepOutcome,
@@ -66,11 +65,13 @@ export class ValidationRules {
     readonly impactLevels: readonly string[];
     readonly unassessedImpact: string;
     readonly milestoneKeys: readonly string[];
+    readonly representations: readonly string[];
 
     constructor(catalog: Catalog) {
         this.impactLevels = impactLevelsOf(catalog.impactScale).map(entry => entry.level);
         this.unassessedImpact = catalog.impactScale.unassessed.level;
         this.milestoneKeys = catalog.milestones.map(entry => entry.key);
+        this.representations = catalog.representations.map(entry => entry.representation);
     }
 }
 
@@ -473,9 +474,9 @@ function readLinkPatch(reader: FieldReader): Partial<LinkFields> {
     });
 }
 
-function readLayout(reader: FieldReader): LayoutInput | undefined {
+function readLayout(reader: FieldReader, rules: ValidationRules): LayoutInput | undefined {
     const nodeId = reader.id("nodeId");
-    const representation = reader.enumValue("representation", Representation);
+    const representation = reader.oneOf("representation", rules.representations);
     const x = reader.nullableCoordinate("x");
     const y = reader.nullableCoordinate("y");
     if (nodeId === undefined || representation === undefined || x === undefined || y === undefined) {
@@ -550,10 +551,10 @@ export function readLinkUpdate(value: unknown): LinkUpdateInput {
     return patch;
 }
 
-export function readLayouts(value: unknown): LayoutInput[] {
+export function readLayouts(value: unknown, rules: ValidationRules = DEFAULT_VALIDATION_RULES): LayoutInput[] {
     const issues: ValidationIssue[] = [];
     const reader = new FieldReader({}, issues);
-    const layouts = reader.items(value, "layouts", FieldLimits.LayoutEntries, readLayout);
+    const layouts = reader.items(value, "layouts", FieldLimits.LayoutEntries, entry => readLayout(entry, rules));
     if (!layouts) {
         throw reader.error();
     }

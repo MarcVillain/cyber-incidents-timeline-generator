@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format follows
 - `TimelineOptions.locale` and `durationUnits`. Dates were formatted as en-GB by three formatters built at
   module load; they now belong to a `TimeFormats` the workspace carries, so two workspaces on one page can
   speak different languages.
+- Representations of a host's own. `Representation` keeps its twelve values and `RepresentationKey` widens
+  the renderer, the catalog and the stored placements to any plain key, declared through
+  `CatalogOptions.representations`. A thirteenth view drawn by the host is now a first class one: it takes
+  its own toolbar settings and keeps its own pinned positions. An undeclared key is refused rather than
+  quietly falling back to the sequential timeline.
 - Finer permissions. `TimelinePermissions` gains `canExport`, `canMove` and a `can(action, type)` callback
   asked once the matching flag allows the action, so "may add steps, may not delete records" is now
   expressible. The defaults keep today's behaviour, and `canMove` follows `canEdit` unless it is set.

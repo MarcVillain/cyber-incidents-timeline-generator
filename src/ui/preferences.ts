@@ -1,4 +1,7 @@
-import { Representation, isEnumValue } from "../core/enums.js";
+import { isEnumValue, type RepresentationKey } from "../core/enums.js";
+
+// A stored key is a plain identifier, the same shape the catalog holds a representation to
+const KEY_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
 import { ThemeMode } from "./theme-mode.js";
 
@@ -28,8 +31,8 @@ function readJson(raw: string | null): unknown {
 export class Preferences {
     private readonly storage: KeyValueStorage | null;
     private readonly key: string;
-    private readonly options = new Map<Representation, OptionChoices>();
-    representation: Representation | null = null;
+    private readonly options = new Map<RepresentationKey, OptionChoices>();
+    representation: RepresentationKey | null = null;
     theme: ThemeMode | null = null;
 
     constructor(storage: KeyValueStorage | null, key: string) {
@@ -56,14 +59,14 @@ export class Preferences {
 
     private load(): void {
         const view = this.read("view");
-        this.representation = isEnumValue(Representation, view) ? view : null;
+        this.representation = view !== null && KEY_PATTERN.test(view) ? view : null;
         const theme = this.read("theme");
         this.theme = isEnumValue(ThemeMode, theme) ? theme : null;
 
         const stored = readJson(this.read("options"));
         if (typeof stored !== "object" || stored === null) return;
         for (const [representation, choices] of Object.entries(stored)) {
-            if (!isEnumValue(Representation, representation) || typeof choices !== "object" || choices === null) continue;
+            if (!KEY_PATTERN.test(representation) || typeof choices !== "object" || choices === null) continue;
             const map: OptionChoices = new Map();
             for (const [option, value] of Object.entries(choices)) {
                 if (typeof value === "string") map.set(option, value);
@@ -72,11 +75,11 @@ export class Preferences {
         }
     }
 
-    choices(representation: Representation): ReadonlyMap<string, string> {
+    choices(representation: RepresentationKey): ReadonlyMap<string, string> {
         return this.options.get(representation) ?? new Map();
     }
 
-    setRepresentation(representation: Representation): void {
+    setRepresentation(representation: RepresentationKey): void {
         this.representation = representation;
         this.write("view", representation);
     }
@@ -86,7 +89,7 @@ export class Preferences {
         this.write("theme", theme);
     }
 
-    setChoice(representation: Representation, option: string, value: string): void {
+    setChoice(representation: RepresentationKey, option: string, value: string): void {
         const map = this.options.get(representation) ?? new Map<string, string>();
         map.set(option, value);
         this.options.set(representation, map);

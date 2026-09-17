@@ -1,4 +1,4 @@
-import type { Representation } from "../core/enums.js";
+import type { RepresentationKey } from "../core/enums.js";
 import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, RecordId, StepRecord } from "../core/models.js";
 import type { LinkData, NodeData, StepData, TimelineStore } from "../core/store.js";
 import { MemoryTimelineStore, SNAPSHOT_VERSION, emptySnapshot, type StoreSnapshot } from "./memory-store.js";
@@ -158,7 +158,7 @@ export class BrowserStorageTimelineStore implements TimelineStore {
         return this.write(() => this.memory.saveLayout(layout));
     }
 
-    deleteLayout(nodeId: RecordId, representation: Representation): Promise<void> {
+    deleteLayout(nodeId: RecordId, representation: RepresentationKey): Promise<void> {
         return this.write(() => this.memory.deleteLayout(nodeId, representation));
     }
 

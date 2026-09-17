@@ -10,6 +10,7 @@ import {
     NodeCategory,
     NodeKind,
     Representation,
+    type RepresentationKey,
     ResponsePhase,
     Side,
     StepOutcome,
@@ -90,6 +91,8 @@ export interface CatalogOptions {
     impactScale?: ImpactScale;
     /** The named moments steps may claim. Empty by default: what counts as a milestone is the host's to say. */
     milestones?: MilestoneInfo[];
+    /** Representations of the host's own, added after the built in ones. A key may not be claimed twice. */
+    representations?: RepresentationInfo[];
 }
 
 /**
@@ -107,7 +110,7 @@ export interface OptionInfo<TValue extends string> {
 }
 
 export interface RepresentationInfo {
-    representation: Representation;
+    representation: RepresentationKey;
     label: string;
     icon: string;
     description: string;
@@ -302,6 +305,26 @@ export function checkMilestones(milestones: readonly MilestoneInfo[]): void {
 }
 
 /**
+ * A representation is addressed by key in the address bar, in stored placements and in stored settings,
+ * so a host key is held to the same plain identifier as a milestone, and no key may be claimed twice.
+ */
+export function checkRepresentations(representations: readonly RepresentationInfo[]): void {
+    const seen = new Set<string>();
+    representations.forEach(entry => {
+        if (!IMPACT_LEVEL_PATTERN.test(entry.representation)) {
+            throw new Error(`Representation "${entry.representation}" must be 1 to 40 letters, digits, dashes or underscores.`);
+        }
+        if (seen.has(entry.representation)) {
+            throw new Error(`Representation "${entry.representation}" appears twice.`);
+        }
+        if (!entry.label.trim() || entry.label.length > MAX_LABEL_LENGTH) {
+            throw new Error(`Representation "${entry.representation}" needs a label of at most ${MAX_LABEL_LENGTH} characters.`);
+        }
+        seen.add(entry.representation);
+    });
+}
+
+/**
  * Every level a rating may hold, the unassessed one first.
  */
 export function impactLevelsOf(scale: ImpactScale): ImpactLevelInfo[] {
@@ -344,6 +367,8 @@ export function buildCatalog(settings: CatalogOptions = {}): Catalog {
     checkImpactScale(impactScale);
     const milestones = structuredClone(settings.milestones ?? []);
     checkMilestones(milestones);
+    const representations = [...copies(REPRESENTATIONS), ...structuredClone(settings.representations ?? [])];
+    checkRepresentations(representations);
     return {
         nodeKinds: copies(NODE_KINDS),
         sides: copies(SIDES),
@@ -356,7 +381,7 @@ export function buildCatalog(settings: CatalogOptions = {}): Catalog {
         confidences: options(Confidence),
         involvements: options(Involvement),
         audiences: options(Audience),
-        representations: copies(REPRESENTATIONS),
+        representations,
         milestones
     };
 }

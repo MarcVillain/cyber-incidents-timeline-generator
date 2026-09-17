@@ -300,7 +300,7 @@ export class TimelineService implements TimelineApi {
     }
 
     async saveLayout(incidentId: RecordId, layouts: LayoutInput[]): Promise<void> {
-        const entries = readLayouts(layouts);
+        const entries = readLayouts(layouts, this.rules);
         await this.store.transaction(async () => {
             await this.requireIncident(incidentId);
             const owned = new Set((await this.store.listNodes(incidentId)).map(node => node.id));

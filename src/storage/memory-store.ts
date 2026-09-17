@@ -1,4 +1,4 @@
-import type { Representation } from "../core/enums.js";
+import type { RepresentationKey } from "../core/enums.js";
 import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, RecordId, StepRecord } from "../core/models.js";
 import type { LinkData, NodeData, StepData, TimelineStore } from "../core/store.js";
 
@@ -161,7 +161,7 @@ export class MemoryTimelineStore implements TimelineStore {
         this.state.layouts.push(structuredClone(layout));
     }
 
-    async deleteLayout(nodeId: RecordId, representation: Representation): Promise<void> {
+    async deleteLayout(nodeId: RecordId, representation: RepresentationKey): Promise<void> {
         this.state.layouts = this.state.layouts.filter(layout => layout.nodeId !== nodeId || layout.representation !== representation);
     }
 

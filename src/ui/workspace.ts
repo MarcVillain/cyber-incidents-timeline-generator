@@ -4,7 +4,7 @@
 // Edits are applied here first and saved behind them. That is what lets an open form keep its scroll
 // position and its half typed fields while the drawing updates.
 
-import { Audience, RecordType, Representation } from "../core/enums.js";
+import { Audience, RecordType, type RepresentationKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { linkFieldsOf, nodeFieldsOf, stepFieldsOf } from "../core/mapping.js";
 import type { LinkCreateInput, RecordId, StepInvolvement } from "../core/models.js";
@@ -73,7 +73,7 @@ export interface TimelineOptions {
  * its own address bar and hand it back through the handle.
  */
 export interface TimelineState {
-    representation: Representation;
+    representation: RepresentationKey;
     pageIndex: number;
     pageCount: number;
     filters: StepFilters;
@@ -86,7 +86,7 @@ export interface TimelineHandle {
     reload(): Promise<void>;
     redraw(): void;
     setTheme(mode: ThemeMode): void;
-    selectRepresentation(representation: Representation): void;
+    selectRepresentation(representation: RepresentationKey): void;
     /** Selects a record and opens its details, or clears the selection when given null. */
     select(selection: Selection | null): void;
     exportAs(format: ExportFormat): Promise<void>;
@@ -98,7 +98,7 @@ export interface TimelineHandle {
     setPage(pageIndex: number): void;
     setFilters(filters: Partial<StepFilters>): void;
     /** Sets a setting of a representation, such as the density of the timeline. */
-    setOption(representation: Representation, optionId: string, value: string): void;
+    setOption(representation: RepresentationKey, optionId: string, value: string): void;
     destroy(): void;
 }
 
@@ -236,7 +236,7 @@ class Workspace implements TimelineHandle {
     private readonly viewport: Viewport;
     private readonly rail: Rail;
     private readonly inspector: Inspector;
-    private representation: Representation;
+    private representation: RepresentationKey;
     private theme: ThemeMode;
     private pageIndex = 0;
     private pageCount = 1;
@@ -576,7 +576,7 @@ class Workspace implements TimelineHandle {
         this.redraw();
     }
 
-    setOption(representation: Representation, optionId: string, value: string): void {
+    setOption(representation: RepresentationKey, optionId: string, value: string): void {
         this.preferences.setChoice(representation, optionId, value);
         if (representation !== this.representation) return;
         this.pageIndex = 0;
@@ -584,7 +584,7 @@ class Workspace implements TimelineHandle {
         this.redraw();
     }
 
-    selectRepresentation(representation: Representation): void {
+    selectRepresentation(representation: RepresentationKey): void {
         if (!this.renderers.some(renderer => renderer.representation === representation)) return;
         this.representation = representation;
         // A different view paginates differently, so the selection is worth chasing again

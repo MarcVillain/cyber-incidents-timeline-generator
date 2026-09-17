@@ -19,7 +19,7 @@ const STEP_SELECTOR = "[data-step-id]";
 const RECORD_SELECTOR = "[data-step-id], [data-node-id], [data-link-id]";
 const MIN_TEXTS_ON_A_SLIDE = 5;
 const FULL_SHARE = 100;
-const AGGREGATE_VIEWS: ReadonlySet<Representation> = new Set([Representation.AttackMatrix, Representation.ResponseMetrics]);
+const AGGREGATE_VIEWS: ReadonlySet<string> = new Set([Representation.AttackMatrix, Representation.ResponseMetrics]);
 
 function contextFor(store: DiagramStore, renderer: Renderer, options: ReadonlyMap<string, string>, slideHeader: SlideHeaderCustomizer | null = null): RenderContext {
     return {

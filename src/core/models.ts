@@ -8,7 +8,7 @@ import type {
     LinkKind,
     NodeCategory,
     NodeKind,
-    Representation,
+    RepresentationKey,
     ResponsePhase,
     Side,
     StepOutcome
@@ -180,7 +180,7 @@ export type LinkUpdateInput = Partial<LinkFields>;
  */
 export interface LayoutRecord {
     nodeId: RecordId;
-    representation: Representation;
+    representation: RepresentationKey;
     x: number;
     y: number;
 }
@@ -190,13 +190,13 @@ export interface LayoutRecord {
  */
 export interface LayoutInput {
     nodeId: RecordId;
-    representation: Representation;
+    representation: RepresentationKey;
     x: number | null;
     y: number | null;
 }
 
 export interface NodePlacement {
-    representation: Representation;
+    representation: RepresentationKey;
     x: number;
     y: number;
 }

@@ -143,6 +143,12 @@ export enum LinkKind {
 }
 
 /**
+ * The key of a representation: one of the built in flavours below, or a key a host declared in its
+ * catalog for a representation of its own. Also the key under which manual placements are kept.
+ */
+export type RepresentationKey = Representation | string;
+
+/**
  * The diagram flavours the workspace can draw. Also the key under which manual placements are kept.
  */
 export enum Representation {

@@ -1,4 +1,4 @@
-import type { Representation } from "./enums.js";
+import type { RepresentationKey } from "./enums.js";
 import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, RecordId, StepRecord } from "./models.js";
 
 export type NodeData = Omit<NodeRecord, "id">;
@@ -41,7 +41,7 @@ export interface TimelineStore {
     listLayouts(incidentId: RecordId): Promise<LayoutRecord[]>;
     /** Inserts or replaces the position of one record in one representation. */
     saveLayout(layout: LayoutRecord): Promise<void>;
-    deleteLayout(nodeId: RecordId, representation: Representation): Promise<void>;
+    deleteLayout(nodeId: RecordId, representation: RepresentationKey): Promise<void>;
 
     /**
      * Runs the work atomically: either every change inside it is kept or none is. Calls may nest.

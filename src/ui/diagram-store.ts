@@ -43,6 +43,7 @@ import type {
 import { parseWallClock } from "../core/time.js";
 import type { Point } from "./viewport.js";
 import { summarise, type DiagramSummary } from "../core/summary.js";
+import type { RepresentationKey } from "../core/enums.js";
 
 /**
  * A step with its moments parsed once, so renderers compare dates rather than strings.
@@ -127,7 +128,7 @@ export class DiagramStore {
     private responsePhases = new Map<ResponsePhase, ResponsePhaseInfo>();
     private linkKinds = new Map<LinkKind, LinkKindInfo>();
     private outcomes = new Map<StepOutcome, OutcomeInfo>();
-    private representations = new Map<Representation, RepresentationInfo>();
+    private representations = new Map<RepresentationKey, RepresentationInfo>();
     private nodesById = new Map<RecordId, DiagramNode>();
 
     subscribe(listener: (change: StoreChange) => void): () => void {
@@ -253,8 +254,12 @@ export class DiagramStore {
         return this.catalog.impactScale.levels.findIndex(entry => entry.level === level);
     }
 
-    representationInfo(representation: Representation): RepresentationInfo {
-        return lookup(this.representations, representation, Representation.SequentialTimeline);
+    representationInfo(representation: RepresentationKey): RepresentationInfo {
+        const found = this.representations.get(representation);
+        if (!found) {
+            throw new Error(`The catalog has no representation named ${representation}. A representation of your own must be declared in CatalogOptions.representations.`);
+        }
+        return found;
     }
 
     nodeIcon(node: DiagramNode): string {
@@ -361,7 +366,7 @@ export class DiagramStore {
         return previous;
     }
 
-    setPlacement(nodeId: RecordId, representation: Representation, position: Point | null): void {
+    setPlacement(nodeId: RecordId, representation: RepresentationKey, position: Point | null): void {
         const node = this.node(nodeId);
         if (!node) return;
         node.placements = node.placements.filter(placement => placement.representation !== representation);

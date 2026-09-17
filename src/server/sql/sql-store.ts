@@ -5,7 +5,6 @@ import {
     Involvement,
     LinkKind,
     NodeKind,
-    Representation,
     ResponsePhase,
     Side,
     StepOutcome
@@ -14,6 +13,7 @@ import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, Re
 import type { LinkData, NodeData, StepData, TimelineStore } from "../../core/store.js";
 import { RowReader, flag, json, type SqlDriver, type SqlRow, type SqlValue } from "./driver.js";
 import { DEFAULT_TABLE_PREFIX, TableNames } from "./schema.js";
+import type { RepresentationKey } from "../../core/enums.js";
 
 export interface SqlTimelineStoreOptions {
     tablePrefix?: string;
@@ -137,7 +137,7 @@ function readLayout(row: SqlRow): LayoutRecord {
     const read = new RowReader(row);
     return {
         nodeId: read.number("node_id"),
-        representation: read.enumValue("representation", Representation),
+        representation: read.text("representation"),
         x: read.number("x"),
         y: read.number("y")
     };
@@ -397,7 +397,7 @@ export class SqlTimelineStore implements TimelineStore {
         });
     }
 
-    async deleteLayout(nodeId: RecordId, representation: Representation): Promise<void> {
+    async deleteLayout(nodeId: RecordId, representation: RepresentationKey): Promise<void> {
         await this.driver.execute(`DELETE FROM ${this.tables.layouts} WHERE node_id = ? AND representation = ?`, [nodeId, representation]);
     }
 

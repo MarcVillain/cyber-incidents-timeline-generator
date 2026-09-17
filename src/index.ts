@@ -20,7 +20,20 @@ export { Access, RecordAction, type TimelinePermissions } from "./ui/panels.js";
 export { ExportFormat, exportDocumentFile, standaloneHtml, serialize } from "./ui/export.js";
 export { IconSet } from "./ui/icons/icon-set.js";
 export { DiagramStore, StoreChange, type TimelineStep, type Selection, type StepFilters } from "./ui/diagram-store.js";
-export { Palette, defaultTokenResolver, elementTokenResolver, type TokenResolver } from "./ui/theme.js";
+export { FONT_STACK, Palette, defaultTokenResolver, elementTokenResolver, textWidth, type TokenResolver } from "./ui/theme.js";
+
+// What a renderer draws with. The contract was public and the marks were not, so a host could declare a
+// representation of its own and had nothing to put on it.
+export {
+    SVG_NS, circle, el, group, line, measure, path, rect, roundedPath, text, truncate, wrap,
+    type SvgAttributes, type SvgChild
+} from "./ui/svg.js";
+export { timeAxis, span, type AxisLayout } from "./ui/axis.js";
+export {
+    CORNER, HEADER_STRIP, cardOutline, cardFooterHeight, fitLines, fitText, headerStrip, iconTile,
+    microLabels, momentVariants, nodeBox, nodeColor, outcomeColor, stepBadge, stepCard, stepCardHeight,
+    stepColor, stepMarker, titleLayout, type MicroLabel
+} from "./ui/cards.js";
 export { PAGE_WIDTH, PAGE_HEIGHT, DEFAULT_PAGE_SIZE, type PageSize } from "./ui/viewport.js";
 export { CONTENT, contentArea, pageSize, withPageSize, frame, placeholder, sideLegend, LegendStroke, type LegendEntry } from "./ui/chrome.js";
 export { defaultSlideHeader, type SlideDetail, type SlideHeader, type SlideHeaderContext, type SlideHeaderCustomizer, type SlideImpact } from "./ui/slide-header.js";

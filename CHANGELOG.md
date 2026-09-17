@@ -61,6 +61,9 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 - `RendererDefinition.options` accepts a function of the strings, which is how the built in representations
   declare their toolbar settings. An array still works.
 
+- The marks a renderer draws with. `defineRenderer` was public and `el`, `group`, `rect`, `text`,
+  `truncate`, `wrap`, `timeAxis`, the card helpers and `textWidth` were not, so a host could declare a
+  representation of its own and had nothing to put on it. All exported.
 - `SqlTimelineStoreOptions.schema`, and a second argument to `TableNames`, so the tables can live in a
   schema of the host's own rather than in the search path. Held to the same plain identifier as the
   prefix. `SqlTimelineStore.driver` becomes protected, so a host that keeps its incidents in its own

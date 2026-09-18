@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [0.2.0] - 2026-09-17
+## [0.2.0] - 2026-09-18
 
 Every change is additive. Code written against 0.1.1 compiles and behaves the same.
 

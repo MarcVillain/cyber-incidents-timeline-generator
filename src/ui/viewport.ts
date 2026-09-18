@@ -2,7 +2,7 @@
 // always fits the stage whatever the window does, and zooming is only there to read the detail.
 
 import { uniqueId } from "./dom.js";
-import { el, haloFilter, SVG_NS } from "./svg.js";
+import { el, glowGradient, haloFilter, SVG_NS } from "./svg.js";
 
 export const PAGE_WIDTH = 1600;
 export const PAGE_HEIGHT = 900;
@@ -79,6 +79,7 @@ export class Viewport {
     allowDrag = false;
     private readonly container: HTMLElement;
     private readonly halo: SVGDefsElement;
+    private readonly glow: SVGRadialGradientElement;
     private readonly onNodeMoved: (nodeId: number, position: Point) => void;
     private readonly onTap: (target: Element | null) => void;
     private scale = 1;
@@ -92,7 +93,9 @@ export class Viewport {
 
         const selectedId = uniqueId("halo");
         const hoveredId = uniqueId("halo");
-        this.halo = el("defs", {}, [haloFilter(selectedId, "tlg-halo-selected"), haloFilter(hoveredId, "tlg-halo-hovered")]);
+        const glowId = uniqueId("glow");
+        this.glow = glowGradient(glowId);
+        this.halo = el("defs", {}, [haloFilter(selectedId, "tlg-halo-selected"), haloFilter(hoveredId, "tlg-halo-hovered"), this.glow]);
         this.svg = document.createElementNS(SVG_NS, "svg");
         this.svg.setAttribute("viewBox", `0 0 ${this.page.width} ${this.page.height}`);
         this.svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
@@ -101,9 +104,16 @@ export class Viewport {
         // The stylesheet cannot name a filter whose id differs per workspace, so the canvas carries it
         this.container.style.setProperty("--tlg-halo", `url(#${selectedId})`);
         this.container.style.setProperty("--tlg-halo-hover", `url(#${hoveredId})`);
+        this.container.style.setProperty("--tlg-glow", `url(#${glowId})`);
 
         this.bindPointer(options.signal);
         this.bindWheel(options.signal);
+    }
+
+    /** Moves the light a selected record casts to where that record sits on the page. */
+    glowFrom(point: Point): void {
+        this.glow.setAttribute("cx", String(point.x));
+        this.glow.setAttribute("cy", String(point.y));
     }
 
     /** The size the scene is drawn at. Changing it re-frames the stage around the new page. */

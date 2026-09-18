@@ -189,6 +189,21 @@ export function haloFilter(id: string, floodClass: string): SVGFilterElement {
     ]);
 }
 
+// How far the glow reaches from the record it starts at, in page units. Wide enough to cross a ring or
+// two of the blast radius, so a line fades out rather than stopping at a hard edge.
+const GLOW_REACH = 320;
+
+/**
+ * The light a selected record casts along the lines that touch it. One gradient per workspace, moved to
+ * whichever record is selected, so a line reads as lit from that end rather than painted a flat colour.
+ */
+export function glowGradient(id: string): SVGRadialGradientElement {
+    return el("radialGradient", { id, gradientUnits: "userSpaceOnUse", r: GLOW_REACH, cx: 0, cy: 0 }, [
+        el("stop", { class: "tlg-glow-near", offset: "0" }),
+        el("stop", { class: "tlg-glow-far", offset: "1" })
+    ]);
+}
+
 export function stripTags(value: string | null): string {
     return (value ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }

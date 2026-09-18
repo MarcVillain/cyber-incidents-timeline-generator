@@ -683,7 +683,27 @@ class Workspace implements TimelineHandle {
     private markSelection(): void {
         const selection = this.store.selection;
         if (!selection) return;
-        this.viewport.svg.querySelectorAll(`[${RECORD_ATTRIBUTES[selection.type]}="${selection.id}"]`).forEach(element => element.classList.add("is-selected"));
+        const marked = this.viewport.svg.querySelectorAll(`[${RECORD_ATTRIBUTES[selection.type]}="${selection.id}"]`);
+        marked.forEach(element => element.classList.add("is-selected"));
+        this.lightConnections(selection, marked);
+    }
+
+    /**
+     * A representation that draws the connections of a record names both ends of each line and says where
+     * the light starts. The lines touching the selected record are then lit from it.
+     */
+    private lightConnections(selection: Selection, marked: NodeListOf<Element>): void {
+        if (selection.type !== RecordType.Node) return;
+
+        const origin = [...marked].map(element => element.querySelector(".tlg-glow-origin")).find(found => found !== null);
+        const x = origin?.getAttribute("cx");
+        const y = origin?.getAttribute("cy");
+        if (x === null || x === undefined || y === null || y === undefined) return;
+
+        this.viewport.glowFrom({ x: Number(x), y: Number(y) });
+        this.viewport.svg
+            .querySelectorAll(`[data-from-id="${selection.id}"], [data-to-id="${selection.id}"]`)
+            .forEach(edge => edge.classList.add("is-linked"));
     }
 
     redraw(): void {

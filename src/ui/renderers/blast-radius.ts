@@ -101,7 +101,10 @@ function connections(store: DiagramStore, palette: Palette, placed: ReadonlyMap<
         const key = fromId < toId ? `${fromId}-${toId}` : `${toId}-${fromId}`;
         if (!from || !to || drawn.has(key)) return;
         drawn.add(key);
-        node.appendChild(line(from.x, from.y, to.x, to.y, { stroke: palette.borderStrong, "stroke-width": 1.2, opacity: 0.4 }));
+        node.appendChild(line(from.x, from.y, to.x, to.y, {
+            class: "tlg-edge", "data-from-id": fromId, "data-to-id": toId,
+            stroke: palette.borderStrong, "stroke-width": 1.2, opacity: 0.4
+        }));
     };
 
     store.links.forEach(link => edge(link.sourceNodeId, link.targetNodeId));
@@ -114,7 +117,7 @@ function connections(store: DiagramStore, palette: Palette, placed: ReadonlyMap<
  * carries no selection of its own.
  */
 function selectionRing(palette: Palette, x: number, y: number, radius: number): SVGCircleElement {
-    return circle(x, y, radius, { class: "tlg-orb-ring", fill: "none", stroke: palette.accent, "stroke-width": 2, opacity: 0 });
+    return circle(x, y, radius, { class: "tlg-orb-ring tlg-glow-origin", fill: "none", stroke: palette.accent, "stroke-width": 2, opacity: 0 });
 }
 
 function orb(context: RenderContext, spot: Spot): SVGGElement {

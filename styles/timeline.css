@@ -694,6 +694,23 @@ textarea.tlg-input {
     opacity: 1;
 }
 
+/* The lines touching the selected record, lit from it and fading with the distance from it */
+.tlg-canvas .tlg-edge.is-linked {
+    stroke: var(--tlg-glow);
+    stroke-width: 2.2;
+    opacity: 1;
+}
+
+.tlg-glow-near {
+    stop-color: var(--tlg-accent);
+    stop-opacity: .95;
+}
+
+.tlg-glow-far {
+    stop-color: var(--tlg-accent);
+    stop-opacity: 0;
+}
+
 .tlg-canvas .tlg-node:not(.is-selected):hover,
 .tlg-canvas .tlg-step:not(.is-selected):hover,
 .tlg-canvas .tlg-step-marker:not(.is-selected):hover,

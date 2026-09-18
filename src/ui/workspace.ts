@@ -242,6 +242,7 @@ class Workspace implements TimelineHandle {
     private readonly permissions: Access;
     private readonly renderers: readonly Renderer[];
     private viewPills: HTMLButtonElement[] = [];
+    private lit: RecordId | null = null;
     private readonly icons: IconSet;
     private readonly preferences: Preferences;
     private readonly onNotify: ((message: string) => void) | null;
@@ -422,6 +423,10 @@ class Workspace implements TimelineHandle {
             }
             this.redraw();
         });
+
+        // Over rather than enter, because it bubbles: the pointer reaching the bare canvas reports the
+        // canvas, which is what says the light belongs back on the selected record
+        this.viewport.svg.addEventListener("pointerover", event => this.followPointer(event.target), { signal });
 
         elements.zoomIn.addEventListener("click", () => this.viewport.zoomIn(), { signal });
         elements.zoomOut.addEventListener("click", () => this.viewport.zoomOut(), { signal });
@@ -683,26 +688,44 @@ class Workspace implements TimelineHandle {
     private markSelection(): void {
         const selection = this.store.selection;
         if (!selection) return;
-        const marked = this.viewport.svg.querySelectorAll(`[${RECORD_ATTRIBUTES[selection.type]}="${selection.id}"]`);
-        marked.forEach(element => element.classList.add("is-selected"));
-        this.lightConnections(selection, marked);
+        this.viewport.svg.querySelectorAll(`[${RECORD_ATTRIBUTES[selection.type]}="${selection.id}"]`)
+            .forEach(element => element.classList.add("is-selected"));
+        this.lightConnections(this.selectedNode());
+    }
+
+    private selectedNode(): RecordId | null {
+        const selection = this.store.selection;
+        return selection?.type === RecordType.Node ? selection.id : null;
+    }
+
+    /**
+     * The record the pointer is over answers for as long as it is there, and the selected record answers
+     * the rest of the time, so pointing at one record never leaves the light on another.
+     */
+    private followPointer(target: EventTarget | null): void {
+        const hit = target instanceof Element ? target.closest("[data-node-id]") : null;
+        const id = hit === null ? this.selectedNode() : Number(hit.getAttribute("data-node-id"));
+        if (id === this.lit) return;
+        this.lightConnections(id);
     }
 
     /**
      * A representation that draws the connections of a record names both ends of each line and says where
-     * the light starts. The lines touching the selected record are then lit from it.
+     * the light starts. The lines touching that record are then lit from it.
      */
-    private lightConnections(selection: Selection, marked: NodeListOf<Element>): void {
-        if (selection.type !== RecordType.Node) return;
+    private lightConnections(id: RecordId | null): void {
+        this.lit = id;
+        this.viewport.svg.querySelectorAll(".tlg-edge.is-linked").forEach(edge => edge.classList.remove("is-linked"));
+        if (id === null) return;
 
-        const origin = [...marked].map(element => element.querySelector(".tlg-glow-origin")).find(found => found !== null);
+        const origin = this.viewport.svg.querySelector(`[data-node-id="${id}"] .tlg-glow-origin`);
         const x = origin?.getAttribute("cx");
         const y = origin?.getAttribute("cy");
         if (x === null || x === undefined || y === null || y === undefined) return;
 
         this.viewport.glowFrom({ x: Number(x), y: Number(y) });
         this.viewport.svg
-            .querySelectorAll(`[data-from-id="${selection.id}"], [data-to-id="${selection.id}"]`)
+            .querySelectorAll(`[data-from-id="${id}"], [data-to-id="${id}"]`)
             .forEach(edge => edge.classList.add("is-linked"));
     }
 

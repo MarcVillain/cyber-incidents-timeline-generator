@@ -75,6 +75,11 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
   reported rather than displaced. Both live in the timeline toolbar: written out from the export menu,
   read back from the button beside it, into the timeline on screen. A record the file names again is
   recognised, so opening the same file twice does not draw everything twice.
+- One picker for every list, searchable when the list is long. A field with eight choices or more gains a
+  search box above its options, which is what makes picking one record out of a hundred bearable; a
+  shorter list is the same control without it. Opening one closes whatever was open before it.
+- Tags are chips, and a tag already written elsewhere in the timeline is offered as soon as a letter is
+  typed. An incident is only searchable by tag when the same word is spelled the same way twice.
 - Records are dragged into place in the rail. A row answers three questions by where the pointer lands:
   the middle takes the record inside, which is what makes a group, and either edge takes it beside that
   row, at the same level, so a record can be dropped between two others. The Parties and Resources
@@ -84,6 +89,9 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 
 ### Changed
 
+- The selection is marked by the shape it lands on rather than by one effect for everything: a card or a
+  disc is ringed, a line of a table or of a list is tinted along its whole width. A halo settling on the
+  few painted words of a table row said nothing about which row it was.
 - Enter in the quick add line finishes it. It used to save the record and open another empty line of the
   same kind, so adding one record left a line waiting that nobody had asked for. A reader who wants a
   second record picks a kind again.
@@ -92,6 +100,10 @@ Every change is additive. Code written against 0.1.1 compiles and behaves the sa
 
 ### Fixed
 
+- The selected record showed no halo in Safari, which does not honour the CSS drop shadow shorthand on an
+  SVG group, and every record on the canvas is a group. It is drawn as an SVG filter now.
+- Choosing a representation sent the strip of representations back to its first one, losing the place it
+  had been scrolled to.
 - Building on a Node older than the one the package requires failed inside TypeScript with an error that
   never mentioned Node. The version is checked before the build starts, `.nvmrc` names it, and
   `engine-strict` makes an install on the wrong version refuse rather than succeed and break later.

@@ -172,8 +172,18 @@ export function combobox<TValue extends string>(
     };
 
     caption.textContent = labelOf();
+
+    // Safari does not focus a button that is clicked, so the press blurs the search box and the list has
+    // already closed by the time the click arrives. Pressing the button is what says open or shut, not the
+    // state it happens to be in a moment later. A keyboard press sends no mousedown, so the live state answers.
+    let openWhenPressed: boolean | null = null;
+    toggle.addEventListener("mousedown", () => {
+        openWhenPressed = panel.isOpen();
+    });
     toggle.addEventListener("click", () => {
-        if (panel.isOpen()) panel.close();
+        const wasOpen = openWhenPressed ?? panel.isOpen();
+        openWhenPressed = null;
+        if (wasOpen) panel.close();
         else openPopup();
     });
 

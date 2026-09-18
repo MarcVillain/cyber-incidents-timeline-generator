@@ -4,7 +4,7 @@ import { NodeKind, RecordType, Representation, Side } from "../../src/core/enums
 import { BUILT_IN_RENDERERS } from "../../src/ui/renderers/index.js";
 import { ColorScheme } from "../../src/ui/theme-detection.js";
 import { mountTimeline, ThemeMode } from "../../src/ui/workspace.js";
-import { installDom, syntheticEvent } from "../support/dom.js";
+import { chooseOption, fieldNamed, installDom, syntheticEvent } from "../support/dom.js";
 import { createIncident, createService, seededService } from "../support/fixtures.js";
 
 const VIEW_PILL = ".tlg-view-pill";
@@ -334,12 +334,7 @@ describe("mountTimeline", () => {
         assert.equal(exploit.side, Side.Attacker);
 
         handle.select({ type: RecordType.Node, id: exploit.id });
-        const belongsTo = [...element.querySelectorAll<HTMLElement>(".tlg-inspector .tlg-field")]
-            .find(field => field.querySelector("label")?.textContent === "Belongs to")
-            ?.querySelector<HTMLSelectElement>("select");
-        assert.ok(belongsTo);
-        belongsTo.value = String(owner.id);
-        belongsTo.dispatchEvent(syntheticEvent("change"));
+        chooseOption(fieldNamed(element.querySelector(".tlg-inspector") ?? element, "Belongs to"), PERSON_NAME);
         await settle();
 
         element.querySelector<HTMLButtonElement>(".tlg-add")?.click();

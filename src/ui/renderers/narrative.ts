@@ -172,13 +172,16 @@ function table(context: RenderContext, rows: readonly TimelineStep[], x: number,
     rows.forEach((step, index) => {
         const rowY = y + TABLE_HEADER + index * ROW_HEIGHT;
         const centerY = rowY + ROW_HEIGHT / 2;
-        const row = group({ class: "tlg-step", "data-step-id": step.id });
+        const row = group({ class: "tlg-step tlg-row", "data-step-id": step.id });
 
         // Only painted pixels catch the pointer, so without this the gaps between words would not be clickable
         row.appendChild(rect(x, rowY, width, ROW_HEIGHT, { class: "tlg-hit", fill: "none", "pointer-events": "all" }));
         if (index % 2 === 1) {
             row.appendChild(rect(x, rowY, width, ROW_HEIGHT, { fill: palette.surfaceAlt, opacity: 0.6 }));
         }
+        // A row is a line of a table, so it is marked by tinting the whole line rather than by a halo,
+        // which on flat text only makes the words glow
+        row.appendChild(rect(x, rowY, width, ROW_HEIGHT, { class: "tlg-row-band", fill: palette.accent, opacity: 0 }));
         row.appendChild(line(x, rowY + ROW_HEIGHT, x + width, rowY + ROW_HEIGHT, { stroke: palette.border, "stroke-width": 0.75 }));
 
         const cell = (key: ColumnKey, content: string, size: number, fill: string, weight = 400): void => {

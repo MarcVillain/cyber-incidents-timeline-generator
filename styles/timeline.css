@@ -145,7 +145,8 @@
 .tlg-chip-toggle:focus-visible,
 .tlg-record:focus-visible,
 .tlg-input:focus-visible,
-.tlg-select:focus-visible {
+.tlg-combo-search:focus-visible,
+.tlg-combo-toggle:focus-visible {
     outline: 2px solid var(--tlg-accent);
     outline-offset: 1px;
 }
@@ -194,7 +195,7 @@
 }
 
 .tlg-input,
-.tlg-select {
+.tlg-combo-search {
     width: 100%;
     max-width: 100%;
     border: 1px solid var(--tlg-border);
@@ -230,11 +231,38 @@ textarea.tlg-input {
 
 .tlg-views {
     display: flex;
+    align-items: center;
     gap: .25rem;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: thin;
-    padding-bottom: 2px;
+    scrollbar-color: var(--tlg-border-strong) transparent;
+    padding-bottom: .3rem;
     flex: 1 1 auto;
+}
+
+/* Keeping the bar out of the pills, on the machines that always draw one */
+.tlg-views::-webkit-scrollbar,
+.tlg-combo-list::-webkit-scrollbar,
+.tlg-rail-list::-webkit-scrollbar,
+.tlg-inspector-body::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+}
+
+.tlg-views::-webkit-scrollbar-track,
+.tlg-combo-list::-webkit-scrollbar-track,
+.tlg-rail-list::-webkit-scrollbar-track,
+.tlg-inspector-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tlg-views::-webkit-scrollbar-thumb,
+.tlg-combo-list::-webkit-scrollbar-thumb,
+.tlg-rail-list::-webkit-scrollbar-thumb,
+.tlg-inspector-body::-webkit-scrollbar-thumb {
+    background: var(--tlg-border-strong);
+    border-radius: 999px;
 }
 
 .tlg-actions {
@@ -630,11 +658,47 @@ textarea.tlg-input {
     cursor: pointer;
 }
 
+/* A table line is marked by colouring the line itself, so the glow never lands on bare words */
+.tlg-canvas .tlg-row:hover,
+.tlg-canvas .tlg-row.is-selected {
+    filter: none;
+}
+
+.tlg-canvas .tlg-row-band {
+    pointer-events: none;
+}
+
+.tlg-canvas .tlg-row:hover .tlg-row-band {
+    opacity: .07;
+}
+
+.tlg-canvas .tlg-row.is-selected .tlg-row-band {
+    opacity: .14;
+}
+
+/* A disc is marked by a ring around it, so the name written under it stays plain */
+.tlg-canvas .tlg-orb:hover,
+.tlg-canvas .tlg-orb.is-selected {
+    filter: none;
+}
+
+.tlg-canvas .tlg-orb-ring {
+    pointer-events: none;
+}
+
+.tlg-canvas .tlg-orb:hover .tlg-orb-ring {
+    opacity: .4;
+}
+
+.tlg-canvas .tlg-orb.is-selected .tlg-orb-ring {
+    opacity: 1;
+}
+
 .tlg-canvas .tlg-node:not(.is-selected):hover,
 .tlg-canvas .tlg-step:not(.is-selected):hover,
 .tlg-canvas .tlg-step-marker:not(.is-selected):hover,
 .tlg-canvas .tlg-link:not(.is-selected):hover {
-    filter: drop-shadow(0 0 3px var(--tlg-border-strong));
+    filter: var(--tlg-halo-hover);
 }
 
 /* Links are drawn faint so a dense graph stays readable, so the one being pointed at comes to full strength */
@@ -646,7 +710,17 @@ textarea.tlg-input {
 
 /* A halo rather than a changed colour, so the selected record keeps the colours that carry its meaning */
 .tlg-canvas .is-selected {
-    filter: drop-shadow(0 0 1.5px var(--tlg-accent)) drop-shadow(0 0 6px var(--tlg-accent));
+    filter: var(--tlg-halo);
+}
+
+.tlg-halo-selected {
+    flood-color: var(--tlg-accent);
+    flood-opacity: 1;
+}
+
+.tlg-halo-hovered {
+    flood-color: var(--tlg-border-strong);
+    flood-opacity: 1;
 }
 
 .tlg-stage-foot {
@@ -746,6 +820,7 @@ textarea.tlg-input {
     flex: 1 1 auto;
     padding: .625rem;
     scrollbar-width: thin;
+    scrollbar-color: var(--tlg-border-strong) transparent;
 }
 
 .tlg-inspector-foot {
@@ -828,6 +903,136 @@ textarea.tlg-input {
     padding: 0 .15rem;
     cursor: pointer;
     display: inline-flex;
+}
+
+/* One picker for every list, short or long, with a search box only when the list is worth hunting through */
+.tlg-combo {
+    position: relative;
+    width: 100%;
+}
+
+.tlg-combo-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .4rem;
+    width: 100%;
+    min-height: 1.9rem;
+    text-align: left;
+    border: 1px solid var(--tlg-border);
+    border-radius: 6px;
+    background: var(--tlg-surface);
+    color: var(--tlg-ink);
+    padding: .3rem .5rem;
+    font: inherit;
+    font-size: .82rem;
+    cursor: pointer;
+}
+
+.tlg-combo-toggle:hover {
+    border-color: var(--tlg-border-strong);
+}
+
+.tlg-combo-toggle[aria-expanded="true"] {
+    border-color: var(--tlg-accent);
+}
+
+.tlg-combo-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The same arrow a native select shows, drawn from two borders so no icon has to be loaded */
+.tlg-combo-toggle::after {
+    content: "";
+    flex: 0 0 auto;
+    width: .36rem;
+    height: .36rem;
+    margin-bottom: .18rem;
+    border-right: 1.5px solid var(--tlg-ink-muted);
+    border-bottom: 1.5px solid var(--tlg-ink-muted);
+    transform: rotate(45deg);
+    transition: transform .12s ease;
+}
+
+.tlg-combo-toggle[aria-expanded="true"]::after {
+    margin-bottom: 0;
+    margin-top: .18rem;
+    transform: rotate(225deg);
+}
+
+.tlg-combo-popup {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    border: 1px solid var(--tlg-border);
+    border-radius: 8px;
+    background: var(--tlg-surface);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .16);
+    padding: .25rem;
+}
+
+.tlg-combo-popup > .tlg-combo-search {
+    margin-bottom: .25rem;
+}
+
+.tlg-combo-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 13rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--tlg-border-strong) transparent;
+}
+
+.tlg-combo-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .4rem;
+    padding: .3rem .45rem;
+    border-radius: 5px;
+    font-size: .82rem;
+    color: var(--tlg-ink);
+    cursor: pointer;
+}
+
+.tlg-combo-option:hover,
+.tlg-combo-option.is-active {
+    background: var(--tlg-hover);
+}
+
+.tlg-combo-option[aria-selected="true"] {
+    background: var(--tlg-accent-soft);
+    color: var(--tlg-accent);
+    font-weight: 600;
+}
+
+/* The tick beside the choice in force, drawn the same way as the arrow */
+.tlg-combo-option[aria-selected="true"]::after {
+    content: "";
+    flex: 0 0 auto;
+    width: .3rem;
+    height: .55rem;
+    margin: 0 .1rem .15rem 0;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+}
+
+.tlg-combo-empty {
+    padding: .3rem .45rem;
+    font-size: .8rem;
+    color: var(--tlg-ink-muted);
+}
+
+/* Tags: what the record holds, then one field to write or pick the next */
+.tlg-tag-picker > .tlg-combo > .tlg-combo-popup {
+    padding: .25rem;
 }
 
 .tlg-readonly {
@@ -1015,6 +1220,8 @@ textarea.tlg-input {
 }
 
 .tlg-appbar-picker {
+    flex: 1 1 auto;
+    min-width: 0;
     max-width: 32rem;
 }
 

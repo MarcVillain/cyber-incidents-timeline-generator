@@ -11,6 +11,9 @@ import type { Palette } from "../theme.js";
 import { defineRenderer, type RenderContext } from "./registry.js";
 
 const NODE_RADIUS = 21;
+// The ring that marks the orb under the pointer, or the one selected. It sits outside the disc so the
+// name below it is left alone.
+const RING_GAP = 4;
 const MAX_RINGS = 4;
 const ORIGIN_RADIUS = 40;
 const INNER_RADIUS = 60;
@@ -106,6 +109,14 @@ function connections(store: DiagramStore, palette: Palette, placed: ReadonlyMap<
     return node;
 }
 
+/**
+ * Drawn invisible and lit by the stylesheet, so the mark travels with the orb and an exported drawing
+ * carries no selection of its own.
+ */
+function selectionRing(palette: Palette, x: number, y: number, radius: number): SVGCircleElement {
+    return circle(x, y, radius, { class: "tlg-orb-ring", fill: "none", stroke: palette.accent, "stroke-width": 2, opacity: 0 });
+}
+
 function orb(context: RenderContext, spot: Spot): SVGGElement {
     const { palette, icons, store } = context;
     const { member, x, y } = spot;
@@ -114,7 +125,8 @@ function orb(context: RenderContext, spot: Spot): SVGGElement {
         : (member.compromised ? palette.sides[Side.Attacker].color : palette.sides[Side.Victim].color);
     const name = fitText(member.name, 116, { size: 9.5, minSize: 7 });
 
-    return group({ class: "tlg-node", "data-node-id": member.id }, [
+    return group({ class: "tlg-node tlg-orb", "data-node-id": member.id }, [
+        selectionRing(palette, x, y, NODE_RADIUS + RING_GAP),
         circle(x, y, NODE_RADIUS, { fill: palette.surface, stroke: color, "stroke-width": member.compromised ? 2.5 : 1.5 }),
         icons.draw(store.nodeIcon(member), x, y, 16, color),
         text(name.text, x, spot.labelAbove ? y - NODE_RADIUS - 6 : y + NODE_RADIUS + 11, { "font-size": name.size, "text-anchor": "middle", fill: palette.ink })
@@ -195,7 +207,8 @@ export const blastRadius = defineRenderer<BlastPage>({
             if (spot.member.id !== origin.id) content.appendChild(orb(context, spot));
         });
 
-        content.appendChild(group({ class: "tlg-node", "data-node-id": origin.id }, [
+        content.appendChild(group({ class: "tlg-node tlg-orb", "data-node-id": origin.id }, [
+            selectionRing(palette, centerX, centerY, ORIGIN_RADIUS + RING_GAP),
             circle(centerX, centerY, ORIGIN_RADIUS, { fill: palette.tint(attacker, 0.86), stroke: attacker, "stroke-width": 2 }),
             icons.draw(store.nodeIcon(origin), centerX, centerY - 6, 20, attacker),
             text(truncate(origin.name, 10, 74), centerX, centerY + 16, { "font-size": 10, "font-weight": 700, "text-anchor": "middle", fill: palette.ink })

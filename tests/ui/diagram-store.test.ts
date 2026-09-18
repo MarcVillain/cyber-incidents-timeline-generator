@@ -7,6 +7,8 @@ import { History } from "../../src/ui/history.js";
 import { seededService } from "../support/fixtures.js";
 
 const MISSING_ID = 9999;
+const FIRST_TAG = "credential access";
+const SECOND_TAG = "ransomware";
 
 describe("DiagramStore", () => {
     let sample: Diagram;
@@ -37,6 +39,16 @@ describe("DiagramStore", () => {
 
         store.setFilters({ milestonesOnly: false, audience: Audience.Technical });
         assert.ok(store.visibleSteps().every(step => step.audience !== Audience.Executive));
+    });
+
+    it("gathers the tags of the timeline once each, in order", () => {
+        const store = loaded();
+        const [first, second] = store.steps;
+        assert.ok(first && second);
+        store.patchStep(first.id, { tags: [SECOND_TAG, FIRST_TAG] });
+        store.patchStep(second.id, { tags: [FIRST_TAG] });
+
+        assert.deepEqual(store.tags, [FIRST_TAG, SECOND_TAG]);
     });
 
     it("applies a patch in place, recomputes what depends on it and returns what it replaced", () => {

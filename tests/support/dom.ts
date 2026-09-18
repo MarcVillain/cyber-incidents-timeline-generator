@@ -28,19 +28,6 @@ export function installDom(): void {
     for (const name of ["setPointerCapture", "releasePointerCapture"]) {
         Object.defineProperty(window.HTMLElement.prototype, name, { value: () => undefined, configurable: true });
     }
-    // Browsers let a script pick an option by assigning the value of a select; linkedom only reads it
-    Object.defineProperty(window.HTMLSelectElement.prototype, "value", {
-        configurable: true,
-        get(this: HTMLSelectElement): string {
-            return [...this.querySelectorAll("option")].find(option => option.hasAttribute("selected"))?.getAttribute("value") ?? "";
-        },
-        set(this: HTMLSelectElement, value: string) {
-            this.querySelectorAll("option").forEach(option => {
-                if (option.getAttribute("value") === value) option.setAttribute("selected", "");
-                else option.removeAttribute("selected");
-            });
-        }
-    });
     eventConstructor = window.Event;
 }
 
@@ -67,4 +54,31 @@ export function syntheticEvent(type: string, init: SyntheticEventInit = {}): Eve
         Object.defineProperty(event, name, { value });
     }
     return event;
+}
+
+/**
+ * Picks a value in a picker the way a pointer does: open it, then press the option that reads the label.
+ */
+export function chooseOption(combo: HTMLElement, label: string): void {
+    const toggle = combo.querySelector<HTMLButtonElement>(".tlg-combo-toggle");
+    if (!toggle) {
+        throw new Error("No picker here.");
+    }
+    toggle.dispatchEvent(syntheticEvent("click"));
+    const option = [...combo.querySelectorAll<HTMLElement>(".tlg-combo-option")].find(node => node.textContent?.trim() === label);
+    if (!option) {
+        throw new Error(`No option reads "${label}"`);
+    }
+    option.dispatchEvent(syntheticEvent("mousedown"));
+}
+
+/**
+ * The control of the field carrying the caption given.
+ */
+export function fieldNamed(root: ParentNode, label: string): HTMLElement {
+    const found = [...root.querySelectorAll<HTMLElement>(".tlg-field")].find(field => field.querySelector("label")?.textContent === label);
+    if (!found) {
+        throw new Error(`No field reads "${label}"`);
+    }
+    return found;
 }

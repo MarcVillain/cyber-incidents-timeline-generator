@@ -4,13 +4,14 @@ import { Impact } from "../../src/core/enums.js";
 import { mountTimelineApp } from "../../src/ui/app.js";
 import { ColorScheme } from "../../src/ui/theme-detection.js";
 import { ThemeMode } from "../../src/ui/workspace.js";
-import { installDom, syntheticEvent } from "../support/dom.js";
+import { chooseOption, fieldNamed, installDom, syntheticEvent } from "../support/dom.js";
 import { createService, seededService } from "../support/fixtures.js";
 
 const NEW_TITLE = "Phishing wave on finance";
 const RENAMED = "Phishing wave on finance and legal";
 const REFERENCE = "CASE-42";
 const SETTLE_ROUNDS = 10;
+const CRITICAL_LABEL = "Critical";
 
 function mountPoint(): HTMLElement {
     const element = document.createElement("div");
@@ -30,7 +31,7 @@ function buttonNamed(root: ParentNode, text: string): HTMLButtonElement {
     return found;
 }
 
-function type(control: HTMLInputElement | HTMLSelectElement, value: string): void {
+function type(control: HTMLInputElement, value: string): void {
     control.value = value;
     control.dispatchEvent(syntheticEvent("change"));
 }
@@ -69,7 +70,7 @@ describe("mountTimelineApp", () => {
         assert.equal(incident?.title, NEW_TITLE);
         assert.equal(element.querySelector<HTMLElement>(".tlg-app-empty")?.hidden, true);
         assert.ok(app.timeline);
-        assert.equal(element.querySelector(".tlg-appbar-picker option")?.textContent, NEW_TITLE);
+        assert.equal(element.querySelector(".tlg-appbar-picker .tlg-combo-label")?.textContent, NEW_TITLE);
         app.destroy();
         assert.equal(element.children.length, 0);
     });
@@ -82,11 +83,10 @@ describe("mountTimelineApp", () => {
         buttonNamed(element, "Details").click();
         const form = dialog(element);
         const [title, reference] = form.querySelectorAll<HTMLInputElement>("input.tlg-input");
-        const impact = form.querySelector<HTMLSelectElement>("select");
-        assert.ok(title && reference && impact);
+        assert.ok(title && reference);
         type(title, RENAMED);
         type(reference, REFERENCE);
-        type(impact, Impact.Critical);
+        chooseOption(fieldNamed(form, "Impact"), CRITICAL_LABEL);
         form.dispatchEvent(syntheticEvent("submit"));
         await settle();
 
@@ -95,7 +95,7 @@ describe("mountTimelineApp", () => {
         assert.equal(saved.referenceId, REFERENCE);
         assert.equal(saved.impact, Impact.Critical);
         assert.equal(element.querySelector<HTMLElement>(".tlg-dialog-backdrop")?.hidden, true);
-        assert.equal(element.querySelector(`.tlg-appbar-picker option[value="${incident.id}"]`)?.textContent, `${REFERENCE}, ${RENAMED}`);
+        assert.equal(element.querySelector(".tlg-appbar-picker .tlg-combo-label")?.textContent, `${REFERENCE}, ${RENAMED}`);
 
         buttonNamed(element, "Details").click();
         buttonNamed(element, "Delete").click();

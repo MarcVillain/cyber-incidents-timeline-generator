@@ -6,11 +6,11 @@
 import { impactLevelsOf } from "../core/catalog.js";
 import { Involvement, RecordType, Side } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
-import type { DiagramLink, DiagramNode, LinkUpdateInput, NodeUpdateInput, StepUpdateInput } from "../core/models.js";
+import type { DiagramLink, DiagramNode, LinkUpdateInput, NodeUpdateInput, RecordId, StepUpdateInput } from "../core/models.js";
 import { joinWallClock, splitWallClock } from "../core/time.js";
 import type { Selection, TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
-import { button, checkbox, dateAndTime, field, recordSelect, row, select, tagsInput, textArea, textInput, type Choice } from "./forms.js";
+import { button, checkbox, dateAndTime, field, recordSelect, row, select, tagChips, textArea, textInput, type Choice, type SelectOptions } from "./forms.js";
 import type { PanelContext } from "./panels.js";
 
 type InspectedRecord =
@@ -170,6 +170,18 @@ export class Inspector {
         return list;
     }
 
+    /**
+     * Every picker of the panel is built through these, so a host that translated the workspace also
+     * translated the search box inside a long list.
+     */
+    private pick<TValue extends string>(value: TValue | null, choices: readonly Choice<TValue>[], onChange: (value: TValue | null) => void, options: SelectOptions = {}): HTMLElement {
+        return select(value, choices, onChange, { ...options, strings: this.context.strings.forms });
+    }
+
+    private pickRecord(value: RecordId | null, nodes: readonly DiagramNode[], onChange: (value: RecordId | null) => void, options: SelectOptions = {}): HTMLElement {
+        return recordSelect(value, nodes, onChange, { ...options, strings: this.context.strings.forms });
+    }
+
     private nodeFields(container: HTMLElement, node: DiagramNode): void {
         const { store, actions } = this.context;
         const w = this.context.strings.inspector;
@@ -183,14 +195,14 @@ export class Inspector {
         container.append(
             field(w.name, textInput(node.name, value => { if (value) save({ name: value }); })),
             row(
-                field(w.kind, select(node.kind, kinds, value => { if (value) save({ kind: value }); })),
-                field(w.side, select(node.side, sides, value => { if (value) save({ side: value }); }))
+                field(w.kind, this.pick(node.kind, kinds, value => { if (value) save({ kind: value }); })),
+                field(w.side, this.pick(node.side, sides, value => { if (value) save({ side: value }); }))
             ),
             field(w.identifier, textInput(node.identifier, value => save({ identifier: value }), w.identifierHint)),
             field(w.role, textInput(node.role, value => save({ role: value }), w.roleHint)),
             row(
-                field(w.belongsTo, recordSelect(node.parentId, others, value => save({ parentId: value }), { allowEmpty: true, emptyLabel: w.nothing })),
-                field(w.criticality, select(node.criticality, impacts, value => { if (value) save({ criticality: value }); }))
+                field(w.belongsTo, this.pickRecord(node.parentId, others, value => save({ parentId: value }), { allowEmpty: true, emptyLabel: w.nothing })),
+                field(w.criticality, this.pick(node.criticality, impacts, value => { if (value) save({ criticality: value }); }))
             ),
             checkbox(w.compromised, node.compromised, value => save({ compromised: value })),
             field(w.notes, textArea(node.description, value => save({ description: value })))
@@ -214,31 +226,31 @@ export class Inspector {
                 save({ endTimestamp: value.date ? joinWallClock(value.date, value.time) : null });
             }, this.context.strings.forms)),
             row(
-                field(w.side, select(step.side, catalog.sides.map(entry => ({ value: entry.side, label: entry.label })), value => { if (value) save({ side: value }); })),
-                field(w.outcome, select(step.outcome, catalog.outcomes.map(entry => ({ value: entry.outcome, label: entry.label })), value => { if (value) save({ outcome: value }); }))
+                field(w.side, this.pick(step.side, catalog.sides.map(entry => ({ value: entry.side, label: entry.label })), value => { if (value) save({ side: value }); })),
+                field(w.outcome, this.pick(step.outcome, catalog.outcomes.map(entry => ({ value: entry.outcome, label: entry.label })), value => { if (value) save({ outcome: value }); }))
             ),
             row(
-                field(w.performedBy, recordSelect(step.sourceNodeId, nodes, value => save({ sourceNodeId: value }), { allowEmpty: true, emptyLabel: w.nobodyRecorded })),
-                field(w.performedOn, recordSelect(step.targetNodeId, nodes, value => save({ targetNodeId: value }), { allowEmpty: true, emptyLabel: w.nothingRecorded }))
+                field(w.performedBy, this.pickRecord(step.sourceNodeId, nodes, value => save({ sourceNodeId: value }), { allowEmpty: true, emptyLabel: w.nobodyRecorded })),
+                field(w.performedOn, this.pickRecord(step.targetNodeId, nodes, value => save({ targetNodeId: value }), { allowEmpty: true, emptyLabel: w.nothingRecorded }))
             ),
             row(
-                field(w.attackTactic, select(step.attackTactic, catalog.attackTactics.map(entry => ({ value: entry.tactic, label: entry.label })), value => { if (value) save({ attackTactic: value }); })),
+                field(w.attackTactic, this.pick(step.attackTactic, catalog.attackTactics.map(entry => ({ value: entry.tactic, label: entry.label })), value => { if (value) save({ attackTactic: value }); })),
                 field(w.technique, textInput(step.mitreTechniqueId, value => save({ mitreTechniqueId: value }), w.techniqueHint))
             ),
             row(
-                field(w.responsePhase, select(step.responsePhase, catalog.responsePhases.map(entry => ({ value: entry.phase, label: entry.label })), value => { if (value) save({ responsePhase: value }); })),
-                field(w.severity, select(step.severity, impactLevelsOf(catalog.impactScale).map(entry => ({ value: entry.level, label: entry.label })), value => { if (value) save({ severity: value }); }))
+                field(w.responsePhase, this.pick(step.responsePhase, catalog.responsePhases.map(entry => ({ value: entry.phase, label: entry.label })), value => { if (value) save({ responsePhase: value }); })),
+                field(w.severity, this.pick(step.severity, impactLevelsOf(catalog.impactScale).map(entry => ({ value: entry.level, label: entry.label })), value => { if (value) save({ severity: value }); }))
             ),
             row(
-                field(w.confidence, select(step.confidence, catalog.confidences, value => { if (value) save({ confidence: value }); })),
-                field(w.audience, select(step.audience, catalog.audiences, value => { if (value) save({ audience: value }); }))
+                field(w.confidence, this.pick(step.confidence, catalog.confidences, value => { if (value) save({ confidence: value }); })),
+                field(w.audience, this.pick(step.audience, catalog.audiences, value => { if (value) save({ audience: value }); }))
             ),
             field(w.evidenceSource, textInput(step.evidenceSource, value => save({ evidenceSource: value }), w.evidenceSourceHint)),
             checkbox(w.milestone, step.isMilestone, value => save({ isMilestone: value })),
             ...(catalog.milestones.length
-                ? [field(w.namedMilestone, select(step.milestoneKey ?? "", catalog.milestones.map(entry => ({ value: entry.key, label: entry.label })), value => save({ milestoneKey: value || null }), { allowEmpty: true, emptyLabel: w.none }))]
+                ? [field(w.namedMilestone, this.pick(step.milestoneKey ?? "", catalog.milestones.map(entry => ({ value: entry.key, label: entry.label })), value => save({ milestoneKey: value || null }), { allowEmpty: true, emptyLabel: w.none }))]
                 : []),
-            field(w.tags, tagsInput(step.tags, value => save({ tags: value }), this.context.strings.forms)),
+            field(w.tags, tagChips(step.tags, store.tags, value => save({ tags: value }), this.context.icons, this.context.strings.forms)),
             field(w.notes, textArea(step.description, value => save({ description: value }), 4)),
             this.involvements(step)
         );
@@ -267,7 +279,7 @@ export class Inspector {
 
             const taken = new Set(current.involvements.map(entry => entry.nodeId));
             const available = store.nodes.filter(node => !taken.has(node.id) && node.id !== current.sourceNodeId && node.id !== current.targetNodeId);
-            picker.replaceChildren(recordSelect(null, available, value => {
+            picker.replaceChildren(this.pickRecord(null, available, value => {
                 if (value !== null) save([...current.involvements, { nodeId: value, involvement: Involvement.Involved }]);
             }, { allowEmpty: true, emptyLabel: this.context.strings.inspector.addRecord }));
         };
@@ -284,12 +296,12 @@ export class Inspector {
 
         container.append(
             row(
-                field(w.from, recordSelect(link.sourceNodeId, nodes, value => { if (value !== null) save({ sourceNodeId: value }); })),
-                field(w.to, recordSelect(link.targetNodeId, nodes, value => { if (value !== null) save({ targetNodeId: value }); }))
+                field(w.from, this.pickRecord(link.sourceNodeId, nodes, value => { if (value !== null) save({ sourceNodeId: value }); })),
+                field(w.to, this.pickRecord(link.targetNodeId, nodes, value => { if (value !== null) save({ targetNodeId: value }); }))
             ),
-            field(w.relationship, select(link.kind, store.catalog.linkKinds.map(entry => ({ value: entry.kind, label: entry.label })), value => { if (value) save({ kind: value }); })),
+            field(w.relationship, this.pick(link.kind, store.catalog.linkKinds.map(entry => ({ value: entry.kind, label: entry.label })), value => { if (value) save({ kind: value }); })),
             field(w.label, textInput(link.label, value => save({ label: value }), w.labelHint)),
-            field(w.confidence, select(link.confidence, store.catalog.confidences, value => { if (value) save({ confidence: value }); }))
+            field(w.confidence, this.pick(link.confidence, store.catalog.confidences, value => { if (value) save({ confidence: value }); }))
         );
     }
 

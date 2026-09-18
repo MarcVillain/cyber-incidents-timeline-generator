@@ -241,6 +241,7 @@ class Workspace implements TimelineHandle {
     private readonly incidentId: RecordId;
     private readonly permissions: Access;
     private readonly renderers: readonly Renderer[];
+    private viewPills: HTMLButtonElement[] = [];
     private readonly icons: IconSet;
     private readonly preferences: Preferences;
     private readonly onNotify: ((message: string) => void) | null;
@@ -512,17 +513,26 @@ class Workspace implements TimelineHandle {
         };
     }
 
+    /**
+     * The pills are built once and then only told which of them is the chosen one. Rebuilding them would
+     * send the strip back to its first representation, losing the place the reader had scrolled to.
+     */
     private renderViewSwitcher(): void {
-        const pills = this.renderers.map(renderer => {
-            const info = this.store.representationInfo(renderer.representation);
-            const pill = h("button", "tlg-view-pill", { type: "button", role: "tab", title: info.description, "aria-selected": String(renderer.representation === this.representation) }, [
-                this.icons.element(info.icon),
-                info.label
-            ]);
-            pill.addEventListener("click", () => this.selectRepresentation(renderer.representation));
-            return pill;
+        if (this.viewPills.length === 0) {
+            this.viewPills = this.renderers.map(renderer => {
+                const info = this.store.representationInfo(renderer.representation);
+                const pill = h("button", "tlg-view-pill", { type: "button", role: "tab", title: info.description }, [
+                    this.icons.element(info.icon),
+                    info.label
+                ]);
+                pill.addEventListener("click", () => this.selectRepresentation(renderer.representation));
+                return pill;
+            });
+            this.elements.views.replaceChildren(...this.viewPills);
+        }
+        this.renderers.forEach((renderer, index) => {
+            this.viewPills[index]?.setAttribute("aria-selected", String(renderer.representation === this.representation));
         });
-        this.elements.views.replaceChildren(...pills);
     }
 
     /**

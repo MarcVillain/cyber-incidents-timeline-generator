@@ -108,11 +108,17 @@ function panel(context: RenderContext, vertex: VertexPage, x: number, y: number)
         return node;
     }
 
+    const bandX = x + 8;
+    const bandWidth = PANEL_WIDTH - 16;
     vertex.members.forEach((member, index) => {
         const rowY = y + 48 + index * ROW_HEIGHT;
         const memberColor = nodeColor(palette, member);
-        const row = group({ class: "tlg-node", "data-node-id": member.id });
+        const row = group({ class: "tlg-node tlg-row", "data-node-id": member.id });
 
+        // A row is a line of a list, so the whole line answers the pointer and the whole line is tinted,
+        // rather than a halo settling on the few words that happen to be painted
+        row.appendChild(rect(bandX, rowY - ROW_HEIGHT / 2, bandWidth, ROW_HEIGHT, { class: "tlg-hit", fill: "none", "pointer-events": "all" }));
+        row.appendChild(rect(bandX, rowY - ROW_HEIGHT / 2, bandWidth, ROW_HEIGHT, { class: "tlg-row-band", rx: 6, fill: palette.accent, opacity: 0 }));
         row.appendChild(circle(x + 22, rowY, 8, { fill: palette.tint(memberColor, 0.85) }));
         row.appendChild(icons.draw(store.nodeIcon(member), x + 22, rowY, 10, memberColor));
         // The identifier gets whatever the name leaves, rather than a fixed slice that cuts it while half

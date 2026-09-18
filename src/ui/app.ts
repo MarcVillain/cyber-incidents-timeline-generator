@@ -9,7 +9,7 @@ import type { Incident, IncidentUpdateInput, RecordId } from "../core/models.js"
 import type { TimelineApi } from "../core/service.js";
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
 import { h } from "./dom.js";
-import { checkbox, dateInput, field, numberInput, row, select, tagsInput, textArea, textInput, type Choice } from "./forms.js";
+import { checkbox, dateInput, field, numberInput, row, select, tagChips, textArea, textInput, type Choice } from "./forms.js";
 import { checkIncidentFields, fieldValue, withFieldValues, IncidentFieldType, type IncidentFieldDef, type IncidentFieldValue } from "./incident-fields.js";
 import { IconSet } from "./icons/icon-set.js";
 import { Access } from "./panels.js";
@@ -94,7 +94,7 @@ function addressedIncident(): RecordId | null {
 }
 
 interface AppElements {
-    picker: HTMLSelectElement;
+    picker: HTMLDivElement;
     details: HTMLButtonElement | null;
     create: HTMLButtonElement | null;
     themeButton: HTMLButtonElement | null;
@@ -151,7 +151,7 @@ class TimelineApp implements TimelineAppHandle {
         const icons = this.icons;
         const words = this.strings.app;
         const themes = themeLabels(this.strings);
-        const picker = h("select", "tlg-select tlg-appbar-picker", { "aria-label": words.incidents });
+        const picker = h("div", "tlg-appbar-picker");
         const details = this.permissions.canEdit || this.permissions.canDelete
             ? h("button", "tlg-button", { type: "button" }, [icons.element(Icon.Text), words.details])
             : null;
@@ -184,7 +184,6 @@ class TimelineApp implements TimelineAppHandle {
 
     private bind(): void {
         const signal = this.lifetime.signal;
-        this.elements.picker.addEventListener("change", () => void this.open(Number(this.elements.picker.value)), { signal });
         this.elements.details?.addEventListener("click", () => this.showDetails(), { signal });
         this.elements.create?.addEventListener("click", () => this.showCreate(), { signal });
         this.elements.themeButton?.addEventListener("click", () => this.setTheme(themeLabels(this.strings)[this.theme].next), { signal });
@@ -273,8 +272,10 @@ class TimelineApp implements TimelineAppHandle {
 
     private fillPicker(): void {
         const picker = this.elements.picker;
-        picker.replaceChildren(...this.incidents.map(incident => h("option", null, { value: String(incident.id) }, [incidentLabel(incident)])));
-        picker.value = this.openId === null ? "" : String(this.openId);
+        const choices: Choice<string>[] = this.incidents.map(incident => ({ value: String(incident.id), label: incidentLabel(incident) }));
+        picker.replaceChildren(select(this.openId === null ? null : String(this.openId), choices, value => {
+            if (value !== null) void this.open(Number(value));
+        }, { strings: this.strings.forms, emptyLabel: this.strings.app.incidents }));
         picker.hidden = this.incidents.length === 0;
         if (this.elements.details) this.elements.details.hidden = this.openId === null;
     }
@@ -410,14 +411,14 @@ class TimelineApp implements TimelineAppHandle {
             field(words.incidentTitle, title),
             row(
                 field(words.reference, textInput(incident?.referenceId ?? null, value => { draft.referenceId = value; }, words.referenceHint)),
-                field(words.impact, select(incident?.impact ?? this.catalog?.impactScale.unassessed.level ?? null, impactChoices, value => { if (value) draft.impact = value; }))
+                field(words.impact, select(incident?.impact ?? this.catalog?.impactScale.unassessed.level ?? null, impactChoices, value => { if (value) draft.impact = value; }, { strings: this.strings.forms }))
             )
         ];
         if (incident) {
             fields.push(
                 row(
                     field(words.scope, textInput(incident.scope, value => { draft.scope = value; }, words.scopeHint)),
-                    field(words.classifications, tagsInput(incident.classifications, values => { draft.classifications = values; }, this.strings.forms))
+                    field(words.classifications, tagChips(incident.classifications, [], values => { draft.classifications = values; }, this.icons, this.strings.forms))
                 )
             );
             if (incident.externalId) {
@@ -426,7 +427,7 @@ class TimelineApp implements TimelineAppHandle {
         }
         this.hostFields(incident, draft).forEach(node => fields.push(node));
         if (readOnly) {
-            fields.forEach(node => node.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select").forEach(control => { control.disabled = true; }));
+            fields.forEach(node => node.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>("input, select, button").forEach(control => { control.disabled = true; }));
         }
         return fields;
     }
@@ -453,7 +454,7 @@ class TimelineApp implements TimelineAppHandle {
             case IncidentFieldType.LongText:
                 return textArea(held === null ? null : String(held), value => report(entry.key, value));
             case IncidentFieldType.Choice:
-                return select(held === null ? "" : String(held), [...(entry.choices ?? [])], value => report(entry.key, value || null), { allowEmpty: !entry.required, emptyLabel: this.strings.forms.none });
+                return select(held === null ? "" : String(held), [...(entry.choices ?? [])], value => report(entry.key, value || null), { allowEmpty: !entry.required, emptyLabel: this.strings.forms.none, strings: this.strings.forms });
             case IncidentFieldType.Flag:
                 return checkbox(entry.label, held === true, value => report(entry.key, value));
             case IncidentFieldType.Number: {

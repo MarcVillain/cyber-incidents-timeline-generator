@@ -187,6 +187,16 @@ export class DiagramStore {
         return this.loaded ? this.loaded.links : [];
     }
 
+    /**
+     * Every tag written on a step of this incident, once each, so a field can offer what is already in use
+     * rather than let the same word be spelled two ways.
+     */
+    get tags(): readonly string[] {
+        const seen = new Set<string>();
+        this.steps.forEach(step => step.tags.forEach(tag => seen.add(tag)));
+        return [...seen].sort((left, right) => left.localeCompare(right));
+    }
+
     get metrics(): ResponseMetrics {
         return this.diagram.metrics;
     }

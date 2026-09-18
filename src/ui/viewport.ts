@@ -1,7 +1,8 @@
 // Pan, zoom and record dragging over a fixed size page. The page never changes size, so a diagram
 // always fits the stage whatever the window does, and zooming is only there to read the detail.
 
-import { SVG_NS } from "./svg.js";
+import { uniqueId } from "./dom.js";
+import { el, haloFilter, SVG_NS } from "./svg.js";
 
 export const PAGE_WIDTH = 1600;
 export const PAGE_HEIGHT = 900;
@@ -77,6 +78,7 @@ export class Viewport {
     readonly svg: SVGSVGElement;
     allowDrag = false;
     private readonly container: HTMLElement;
+    private readonly halo: SVGDefsElement;
     private readonly onNodeMoved: (nodeId: number, position: Point) => void;
     private readonly onTap: (target: Element | null) => void;
     private scale = 1;
@@ -88,11 +90,17 @@ export class Viewport {
         this.onNodeMoved = options.onNodeMoved;
         this.onTap = options.onTap;
 
+        const selectedId = uniqueId("halo");
+        const hoveredId = uniqueId("halo");
+        this.halo = el("defs", {}, [haloFilter(selectedId, "tlg-halo-selected"), haloFilter(hoveredId, "tlg-halo-hovered")]);
         this.svg = document.createElementNS(SVG_NS, "svg");
         this.svg.setAttribute("viewBox", `0 0 ${this.page.width} ${this.page.height}`);
         this.svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
         this.svg.setAttribute("role", "img");
         this.container.appendChild(this.svg);
+        // The stylesheet cannot name a filter whose id differs per workspace, so the canvas carries it
+        this.container.style.setProperty("--tlg-halo", `url(#${selectedId})`);
+        this.container.style.setProperty("--tlg-halo-hover", `url(#${hoveredId})`);
 
         this.bindPointer(options.signal);
         this.bindWheel(options.signal);
@@ -106,7 +114,7 @@ export class Viewport {
     }
 
     setContent(node: SVGElement, label: string): void {
-        this.svg.replaceChildren(node);
+        this.svg.replaceChildren(this.halo, node);
         this.svg.setAttribute("aria-label", label);
     }
 

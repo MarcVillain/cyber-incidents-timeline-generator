@@ -149,8 +149,11 @@ export interface InspectorStrings {
 
 export interface FormStrings {
     none: string;
-    tagsHint: string;
     timeHint: string;
+    searchHint: string;
+    noMatch: string;
+    addTag: string;
+    removeTag: string;
 }
 
 export interface DeckStrings {
@@ -441,8 +444,11 @@ export const DEFAULT_STRINGS: Strings = {
     },
     forms: {
         none: "None",
-        tagsHint: "Comma separated",
-        timeHint: "Time, may be left empty"
+        timeHint: "Time, may be left empty",
+        searchHint: "Search",
+        noMatch: "Nothing matches",
+        addTag: "Add a tag, then press Enter",
+        removeTag: "Remove"
     },
     deck: {
         previous: "Previous",

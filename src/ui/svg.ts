@@ -171,6 +171,24 @@ export function arrowMarkers(prefix: string, colors: readonly string[], { refX =
     return el("defs", {}, [...new Set(colors)].map(color => arrowMarker(markerId(prefix, color), color, { refX, size })));
 }
 
+const HALO_SPREAD = 1;
+const HALO_BLUR = 2;
+
+/**
+ * A glow around a record of the canvas, written as an SVG filter rather than a CSS drop shadow. Safari
+ * ignores the CSS shorthand on a group, and every record on the canvas is a group. The colour is left to
+ * the stylesheet, which paints the flood through the class given.
+ */
+export function haloFilter(id: string, floodClass: string): SVGFilterElement {
+    return el("filter", { id, x: "-20%", y: "-20%", width: "140%", height: "140%" }, [
+        el("feMorphology", { in: "SourceAlpha", operator: "dilate", radius: HALO_SPREAD, result: "spread" }),
+        el("feGaussianBlur", { in: "spread", stdDeviation: HALO_BLUR, result: "blurred" }),
+        el("feFlood", { class: floodClass, result: "colour" }),
+        el("feComposite", { in: "colour", in2: "blurred", operator: "in", result: "halo" }),
+        el("feMerge", {}, [el("feMergeNode", { in: "halo" }), el("feMergeNode", { in: "SourceGraphic" })])
+    ]);
+}
+
 export function stripTags(value: string | null): string {
     return (value ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }

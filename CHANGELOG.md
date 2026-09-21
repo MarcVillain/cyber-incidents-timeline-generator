@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-09-21
+
+### Added
+
+- The settings panel of each view has a button that puts its settings back to their defaults, the columns and their names included, along with the audience and milestone filters.
+
+### Fixed
+
+- The sample incident now carries tags and references, so every column of the narrative table shows an example of what it holds.
+
 ## [0.4.0] - 2026-09-21
 
 ### Added

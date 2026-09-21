@@ -101,7 +101,16 @@ export class Preferences {
         const map = this.options.get(representation) ?? new Map<string, string>();
         map.set(option, value);
         this.options.set(representation, map);
+        this.writeChoices();
+    }
 
+    /** Forgets every setting chosen for the representation, so each falls back to its default. */
+    clearChoices(representation: RepresentationKey): void {
+        this.options.delete(representation);
+        this.writeChoices();
+    }
+
+    private writeChoices(): void {
         const serializable: Record<string, Record<string, string>> = {};
         this.options.forEach((choices, key) => {
             serializable[key] = Object.fromEntries(choices);

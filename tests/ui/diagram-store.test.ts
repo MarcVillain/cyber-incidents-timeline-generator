@@ -43,6 +43,7 @@ describe("DiagramStore", () => {
 
     it("gathers the tags of the timeline once each, in order", () => {
         const store = loaded();
+        store.steps.forEach(step => store.patchStep(step.id, { tags: [] }));
         const [first, second] = store.steps;
         assert.ok(first && second);
         store.patchStep(first.id, { tags: [SECOND_TAG, FIRST_TAG] });

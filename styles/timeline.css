@@ -441,6 +441,14 @@ textarea.tlg-input {
     color: var(--tlg-ink-muted);
 }
 
+.tlg-view-settings-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: .7rem;
+    padding-top: .6rem;
+    border-top: 1px solid var(--tlg-border);
+}
+
 .tlg-view-setting-choices {
     display: flex;
     flex-wrap: wrap;

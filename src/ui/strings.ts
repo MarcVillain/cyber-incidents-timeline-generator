@@ -66,6 +66,7 @@ export interface WorkspaceStrings {
     everyStep: string;
     viewsBefore: string;
     viewsAfter: string;
+    resetView: string;
 }
 
 export interface AppStrings {
@@ -536,7 +537,8 @@ export const DEFAULT_STRINGS: Strings = {
         milestones: "Milestones",
         everyStep: "Every step",
         viewsBefore: "Show the views before",
-        viewsAfter: "Show the views after"
+        viewsAfter: "Show the views after",
+        resetView: "Reset to defaults"
     },
     app: {
         title: "Incident timelines",

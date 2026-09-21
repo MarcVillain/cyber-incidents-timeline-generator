@@ -119,6 +119,7 @@ const TOAST_MS = 4000;
 const CONTROL_KEY = "data-control";
 const AUDIENCE_CONTROL = "filter-audience";
 const MILESTONES_CONTROL = "filter-milestones";
+const RESET_CONTROL = "reset";
 // How much of the strip one press of an edge arrow scrolls, leaving a pill of the old view in sight
 const VIEW_SCROLL_SHARE = 0.8;
 // Sub pixel widths never line up exactly, so an edge closer than this counts as reached
@@ -685,11 +686,27 @@ class Workspace implements TimelineHandle {
         const own = this.renderer.options(this.strings).map(setting => this.settingSection(setting.label, setting.description ?? null, setting.kind === OptionKind.List
             ? this.listSetting(setting, chosen.get(setting.id))
             : this.choiceGroup(setting.id, setting.label, setting.choices, this.chosenValue(setting, chosen), value => this.setOption(this.representation, setting.id, value))));
-        panel.replaceChildren(...shared, ...own);
+        const untouched = chosen.size === 0 && filters.audience === Audience.Both && !filters.milestonesOnly;
+        const reset = button(this.icons, words.resetView, "tlg-button tlg-button-quiet", () => this.resetView(), Icon.Undo);
+        reset.setAttribute(CONTROL_KEY, RESET_CONTROL);
+        reset.disabled = untouched;
+        panel.replaceChildren(...shared, ...own, h("div", "tlg-view-settings-foot", {}, [reset]));
 
         if (focused !== null) {
             Array.from(panel.querySelectorAll<HTMLElement>(`[${CONTROL_KEY}]`)).find(control => control.getAttribute(CONTROL_KEY) === focused)?.focus();
         }
+    }
+
+    /**
+     * Puts the view on screen back as it first came: its own settings, columns and their names included,
+     * and the filters it shares with every other view.
+     */
+    private resetView(): void {
+        this.preferences.clearChoices(this.representation);
+        this.store.setFilters({ audience: Audience.Both, milestonesOnly: false });
+        this.pageIndex = 0;
+        this.renderFilters();
+        this.redraw();
     }
 
     private settingSection(label: string, description: string | null, body: HTMLElement): HTMLElement {

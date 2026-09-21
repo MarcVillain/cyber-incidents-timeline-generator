@@ -270,6 +270,22 @@ describe("view settings panel", () => {
         handle.destroy();
     });
 
+    it("puts the view and the shared filters back to their defaults", async () => {
+        const { handle, element } = await mounted();
+        const reset = (): HTMLButtonElement | null => element.querySelector<HTMLButtonElement>("[data-control=\"reset\"]");
+        assert.equal(reset()?.disabled, true);
+        handle.setOption(Representation.Narrative, TABLE_COLUMNS_OPTION_ID, serializeOptionList([{ value: TableColumn.What, label: RENAMED }]));
+        handle.setFilters({ audience: Audience.Executive, milestonesOnly: true });
+        assert.equal(reset()?.disabled, false);
+
+        reset()?.click();
+        assert.equal(handle.state.options.size, 0);
+        assert.equal(handle.state.filters.audience, Audience.Both);
+        assert.equal(handle.state.filters.milestonesOnly, false);
+        assert.equal(reset()?.disabled, true);
+        handle.destroy();
+    });
+
     it("keeps the last column", async () => {
         const { handle, element } = await mounted();
         handle.setOption(Representation.Narrative, TABLE_COLUMNS_OPTION_ID, TableColumn.What);

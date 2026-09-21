@@ -5,6 +5,7 @@
 import { impactLevelsOf, type Catalog } from "../core/catalog.js";
 import { ValidationError } from "../core/errors.js";
 import { Icon } from "../core/icon.js";
+import { DEFAULT_TOKEN_VALUES, ThemeToken } from "../core/theme-token.js";
 import type { Incident, IncidentUpdateInput, RecordId } from "../core/models.js";
 import type { TimelineApi } from "../core/service.js";
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
@@ -15,9 +16,13 @@ import { IconSet } from "./icons/icon-set.js";
 import { Access } from "./panels.js";
 import type { TimelinePermissions } from "./panels.js";
 import { Preferences, defaultPreferenceStorage } from "./preferences.js";
+import { RelabeledTimelineApi } from "./relabeled-api.js";
+import { SettingsScope, isHexColor, settingsCatalog, settingsTokens, type AppSettings } from "./settings.js";
+import { settingsDialog } from "./settings-dialog.js";
 import { ColorScheme, detectPageTheme, watchPageTheme } from "./theme-detection.js";
 import { ThemeMode } from "./theme-mode.js";
 import { buildStrings, type Strings, type StringsOverride } from "./strings.js";
+import { elementTokenResolver } from "./theme.js";
 import { mountTimeline, type TimelineHandle, type TimelineOptions } from "./workspace.js";
 
 export interface TimelineAppOptions {
@@ -36,6 +41,16 @@ export interface TimelineAppOptions {
     theme?: ThemeMode;
     /** Whether the app offers the auto, light and dark toggle, which sets data-theme on the page root. */
     themeToggle?: boolean;
+    /** Whether the app offers a settings dialog beside the theme toggle, kept with the preferences. */
+    settingsButton?: boolean;
+    /**
+     * What the settings may change. Presentation, the default, lays names and icons over whatever catalog the
+     * api serves and leaves the impact scale and milestones to it. Everything also offers those, for a host that
+     * builds its service from loadAppCatalog and rebuilds it when onSettingsSaved is called.
+     */
+    settingsScope?: SettingsScope;
+    /** Called after the settings are saved, so a host can rebuild its service with the new catalog. */
+    onSettingsSaved?: (settings: AppSettings) => void;
     preferences?: KeyValueStorage | null;
     preferenceKey?: string;
     /** Passed to the workspace of the open incident. */
@@ -67,6 +82,24 @@ const DEFAULT_PREFERENCE_KEY = "cyber-incidents-timeline-app";
 const ADDRESS_KEY = "incident";
 const PAGE_THEME_ATTRIBUTE = "data-theme";
 const TOAST_MS = 4000;
+// Marks the root the custom colours are scoped to, so the probes that read the built in colours escape them
+const CUSTOM_ATTRIBUTE = "data-tlg-custom";
+const SCHEMES: readonly ColorScheme[] = [ColorScheme.Light, ColorScheme.Dark];
+
+/**
+ * The settings a viewer saved in this browser through the settings dialog.
+ */
+export function loadAppSettings(storage: KeyValueStorage | null = defaultPreferenceStorage(), key: string = DEFAULT_PREFERENCE_KEY): AppSettings {
+    return new Preferences(storage, key).settings;
+}
+
+/**
+ * The catalog carrying the saved vocabulary, impact scale and milestones, for a host to build its service
+ * with before mounting the app.
+ */
+export function loadAppCatalog(storage: KeyValueStorage | null = defaultPreferenceStorage(), key: string = DEFAULT_PREFERENCE_KEY): Catalog {
+    return settingsCatalog(loadAppSettings(storage, key));
+}
 
 function themeLabels(strings: Strings): Readonly<Record<ThemeMode, { label: string; icon: Icon; next: ThemeMode }>> {
     return {
@@ -98,6 +131,8 @@ interface AppElements {
     details: HTMLButtonElement | null;
     create: HTMLButtonElement | null;
     themeButton: HTMLButtonElement | null;
+    settingsButton: HTMLButtonElement | null;
+    customStyle: HTMLStyleElement;
     main: HTMLElement;
     timeline: HTMLElement;
     empty: HTMLElement;
@@ -124,7 +159,6 @@ class TimelineApp implements TimelineAppHandle {
 
     constructor(root: HTMLElement, options: TimelineAppOptions) {
         this.root = root;
-        this.api = options.api;
         this.options = options;
         const managed = options.manageIncidents ?? true;
         this.permissions = new Access({ canCreate: managed, canEdit: managed, canDelete: managed, ...(managed ? options.incidentPermissions : {}) });
@@ -133,12 +167,16 @@ class TimelineApp implements TimelineAppHandle {
         this.hostFieldDefs = options.incidentFields ?? [];
         checkIncidentFields(this.hostFieldDefs);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);
+        this.api = this.settings() !== null && this.scope() === SettingsScope.Presentation
+            ? new RelabeledTimelineApi(options.api, () => this.preferences.settings)
+            : options.api;
         const themeToggle = options.themeToggle ?? true;
         this.theme = (themeToggle ? this.preferences.theme : null) ?? options.theme ?? ThemeMode.Auto;
         if (this.theme !== ThemeMode.Auto) {
             this.applyPageTheme();
         }
         this.elements = this.build(themeToggle);
+        this.applyCustomColors();
         this.stopWatchingTheme = watchPageTheme(() => this.followPageTheme());
         this.bind();
     }
@@ -161,6 +199,10 @@ class TimelineApp implements TimelineAppHandle {
         const themeButton = themeToggle
             ? h("button", "tlg-button tlg-button-icon", { type: "button", title: themes[this.theme].label, "aria-label": themes[this.theme].label }, [icons.element(themes[this.theme].icon)])
             : null;
+        const settingsButton = this.options.settingsButton === true
+            ? h("button", "tlg-button tlg-button-icon", { type: "button", title: this.strings.settings.open, "aria-label": this.strings.settings.open }, [icons.element(Icon.Settings)])
+            : null;
+        const customStyle = h("style");
         const timeline = h("div", "tlg-app-timeline");
         const empty = h("section", "tlg-app-empty");
         empty.hidden = true;
@@ -171,15 +213,16 @@ class TimelineApp implements TimelineAppHandle {
         this.root.classList.add("tlg-app");
         this.root.setAttribute("data-tlg-theme", this.scheme());
         this.root.replaceChildren(
+            customStyle,
             h("header", "tlg-appbar", {}, [
                 h("span", "tlg-appbar-brand", {}, [icons.element(Icon.Timeline), this.options.title ?? words.title]),
                 h("div", "tlg-appbar-incident", {}, [picker, details]),
-                h("div", "tlg-appbar-actions", {}, [create, themeButton])
+                h("div", "tlg-appbar-actions", {}, [create, settingsButton, themeButton])
             ]),
             main,
             dialog
         );
-        return { picker, details, create, themeButton, main, timeline, empty, dialog };
+        return { picker, details, create, themeButton, settingsButton, customStyle, main, timeline, empty, dialog };
     }
 
     private bind(): void {
@@ -187,6 +230,7 @@ class TimelineApp implements TimelineAppHandle {
         this.elements.details?.addEventListener("click", () => this.showDetails(), { signal });
         this.elements.create?.addEventListener("click", () => this.showCreate(), { signal });
         this.elements.themeButton?.addEventListener("click", () => this.setTheme(themeLabels(this.strings)[this.theme].next), { signal });
+        this.elements.settingsButton?.addEventListener("click", () => this.showSettings(), { signal });
         this.elements.dialog.addEventListener("click", event => {
             if (event.target === this.elements.dialog) this.closeDialog();
         }, { signal });
@@ -224,6 +268,111 @@ class TimelineApp implements TimelineAppHandle {
 
     private followPageTheme(): void {
         this.root.setAttribute("data-tlg-theme", this.scheme());
+    }
+
+    private scope(): SettingsScope {
+        return this.options.settingsScope ?? SettingsScope.Presentation;
+    }
+
+    private settings(): AppSettings | null {
+        return this.options.settingsButton === true ? this.preferences.settings : null;
+    }
+
+    /**
+     * Writes the chosen colours as rules over the app and the workspace inside it. The workspace declares
+     * its own tokens, so an inline style on the root alone would stop at its edge.
+     */
+    private applyCustomColors(): void {
+        const settings = this.settings();
+        if (!settings) return;
+        this.root.setAttribute(CUSTOM_ATTRIBUTE, "");
+        const rules = SCHEMES.map(scheme => {
+            const probe = this.probe(scheme);
+            const tokens = settingsTokens(settings, scheme, elementTokenResolver(probe));
+            probe.remove();
+            const declarations = [...tokens].map(([token, value]) => `${token}: ${value};`).join(" ");
+            const scope = `.tlg-app[${CUSTOM_ATTRIBUTE}][data-tlg-theme="${scheme}"]`;
+            return declarations ? `${scope}, ${scope} .tlg { ${declarations} }` : "";
+        });
+        this.elements.customStyle.textContent = rules.join("\n");
+    }
+
+    /** An element wearing the built in colours of a scheme, to read them from the stylesheet. */
+    private probe(scheme: ColorScheme): HTMLElement {
+        const probe = h("div", "tlg-app", { "data-tlg-theme": scheme, hidden: "" });
+        this.root.append(probe);
+        return probe;
+    }
+
+    private defaultColor(scheme: ColorScheme, token: ThemeToken): string {
+        const probe = this.probe(scheme);
+        const value = elementTokenResolver(probe)(token);
+        probe.remove();
+        return isHexColor(value) ? value : DEFAULT_TOKEN_VALUES[token];
+    }
+
+    private showSettings(): void {
+        const settings = this.settings();
+        if (!settings) return;
+        const form = settingsDialog({
+            settings,
+            theme: this.theme,
+            icons: this.icons,
+            strings: this.strings,
+            scope: this.scope(),
+            defaultColor: (scheme, token) => this.defaultColor(scheme, token),
+            usage: draft => this.settingsUsage(draft),
+            save: (draft, theme) => this.saveSettings(draft, theme),
+            close: () => this.closeDialog()
+        });
+        this.elements.dialog.replaceChildren(form);
+        this.elements.dialog.hidden = false;
+        form.querySelector<HTMLButtonElement>("[role=tab]")?.focus();
+    }
+
+    /**
+     * Counts the ratings and milestone claims naming a level or milestone the draft removes. The records keep
+     * their value, so this only tells the viewer what will read as unknown.
+     */
+    private async settingsUsage(draft: AppSettings): Promise<string[]> {
+        const catalog = this.catalog;
+        if (!catalog || this.scope() === SettingsScope.Presentation) return [];
+        const next = settingsCatalog(draft);
+        const keptLevels = new Set(impactLevelsOf(next.impactScale).map(level => level.level));
+        const keptMilestones = new Set(next.milestones.map(milestone => milestone.key));
+        const removedLevels = new Map(impactLevelsOf(catalog.impactScale).filter(level => !keptLevels.has(level.level)).map(level => [level.level, level.label]));
+        const removedMilestones = new Map(catalog.milestones.filter(milestone => !keptMilestones.has(milestone.key)).map(milestone => [milestone.key, milestone.label]));
+        if (removedLevels.size === 0 && removedMilestones.size === 0) return [];
+
+        const counts = new Map<string, number>();
+        const count = (labels: ReadonlyMap<string, string>, key: string | null): void => {
+            const label = key === null ? undefined : labels.get(key);
+            if (label !== undefined) counts.set(label, (counts.get(label) ?? 0) + 1);
+        };
+        try {
+            for (const incident of await this.api.listIncidents()) {
+                count(removedLevels, incident.impact);
+                const diagram = await this.api.getDiagram(incident.id);
+                diagram.nodes.forEach(node => count(removedLevels, node.criticality));
+                diagram.steps.forEach(step => {
+                    count(removedLevels, step.severity);
+                    count(removedMilestones, step.milestoneKey);
+                });
+            }
+        } catch {
+            return [this.strings.settings.usageFailed];
+        }
+        return [...counts].map(([label, total]) => this.strings.settings.inUse(label, total));
+    }
+
+    private async saveSettings(settings: AppSettings, theme: ThemeMode): Promise<void> {
+        this.preferences.setSettings(settings);
+        this.closeDialog();
+        this.setTheme(theme);
+        this.applyCustomColors();
+        this.options.onSettingsSaved?.(settings);
+        this.catalog = await this.api.getCatalog();
+        await this.show(this.openId);
     }
 
     private applyPageTheme(): void {
@@ -295,12 +444,16 @@ class TimelineApp implements TimelineAppHandle {
             this.renderEmpty();
             return;
         }
+        const settings = this.settings();
         this.handle = await mountTimeline(this.elements.timeline, {
             ...this.options.timeline,
+            ...(settings?.pageSize ? { pageSize: settings.pageSize } : {}),
+            ...(settings?.canvasMode ? { canvasMode: settings.canvasMode } : {}),
+            ...(settings?.durationUnits ? { durationUnits: settings.durationUnits } : {}),
             api: this.api,
             incidentId,
             strings: this.options.strings,
-            locale: this.options.locale,
+            locale: settings?.locale ?? this.options.locale,
             theme: ThemeMode.Auto,
             themeToggle: false,
             preferences: this.options.preferences,
@@ -547,6 +700,7 @@ class TimelineApp implements TimelineAppHandle {
         this.root.replaceChildren();
         this.root.classList.remove("tlg-app");
         this.root.removeAttribute("data-tlg-theme");
+        this.root.removeAttribute(CUSTOM_ATTRIBUTE);
     }
 }
 

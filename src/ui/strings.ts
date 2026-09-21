@@ -283,6 +283,87 @@ export interface NarrativeStrings {
     stoppedAttempts(count: number): string;
 }
 
+export interface SettingsStrings {
+    open: string;
+    title: string;
+    tabAppearance: string;
+    tabVocabulary: string;
+    tabScales: string;
+    tabDisplay: string;
+    tabBackup: string;
+    themeHeading: string;
+    themeHint: string;
+    themeMode: string;
+    auto: string;
+    colorsHeading: string;
+    colorsHint: string;
+    colorsInterface: string;
+    colorsParties: string;
+    light: string;
+    dark: string;
+    accent: string;
+    positive: string;
+    resetColor: string;
+    vocabularyHeading: string;
+    vocabularyHint: string;
+    list: string;
+    groupSides: string;
+    groupNodeKinds: string;
+    groupAttackTactics: string;
+    groupKillChainPhases: string;
+    groupResponsePhases: string;
+    groupOutcomes: string;
+    groupLinkKinds: string;
+    groupConfidences: string;
+    groupInvolvements: string;
+    groupAudiences: string;
+    groupRepresentations: string;
+    iconOf(label: string): string;
+    iconClash(labels: readonly string[]): string;
+    searchIcons: string;
+    impactHeading: string;
+    impactHint: string;
+    unassessed: string;
+    milestonesHeading: string;
+    milestonesHint: string;
+    noMilestones: string;
+    newName: string;
+    addLevel: string;
+    addMilestone: string;
+    moveUp: string;
+    moveDown: string;
+    remove: string;
+    colorOf(label: string): string;
+    pagesHeading: string;
+    pagesHint: string;
+    pageShape: string;
+    layout: string;
+    layoutSlides: string;
+    layoutContinuous: string;
+    datesHeading: string;
+    datesHint: string;
+    dateFormat: string;
+    minutes: string;
+    hours: string;
+    days: string;
+    backupHeading: string;
+    backupHint: string;
+    exportSettings: string;
+    importSettings: string;
+    imported: string;
+    importFailed: string;
+    resetHeading: string;
+    resetHint: string;
+    resetAll: string;
+    resetDone: string;
+    save: string;
+    saveAnyway: string;
+    cancel: string;
+    inUseWarning: string;
+    inUse(label: string, count: number): string;
+    usageFailed: string;
+}
+
 export interface Strings {
     workspace: WorkspaceStrings;
     app: AppStrings;
@@ -294,6 +375,7 @@ export interface Strings {
     options: OptionStrings;
     scene: SceneStrings;
     narrative: NarrativeStrings;
+    settings: SettingsStrings;
 }
 
 /** A host replaces whole groups or single entries; anything left out keeps the English below. */
@@ -571,6 +653,86 @@ export const DEFAULT_STRINGS: Strings = {
         responseActions: (count, phases) => `The response took ${count} recorded action(s)${phases.length > 0 ? `, covering ${phases.join(", ")}` : ""}.`,
         compromisedRecords: (count, named, more) => `${count} record(s) are marked as compromised: ${named.join(", ")}${more ? " and others" : ""}.`,
         stoppedAttempts: count => `${count} attempt(s) were blocked or failed.`
+    },
+    settings: {
+        open: "Settings",
+        title: "Settings",
+        tabAppearance: "Appearance",
+        tabVocabulary: "Vocabulary",
+        tabScales: "Scales",
+        tabDisplay: "Display",
+        tabBackup: "Backup",
+        themeHeading: "Theme",
+        themeHint: "Auto follows the page, then the system. The button beside Settings switches it too.",
+        themeMode: "Mode",
+        auto: "Auto",
+        colorsHeading: "Colours",
+        colorsHint: "Pick each colour for the light and the dark theme. Soft backgrounds follow the colour on their own.",
+        colorsInterface: "Interface",
+        colorsParties: "Parties",
+        light: "Light",
+        dark: "Dark",
+        accent: "Accent",
+        positive: "Positive outcome",
+        resetColor: "Reset",
+        vocabularyHeading: "Names and icons",
+        vocabularyHint: "Rename entries and change their icons. A blank name keeps the built in one.",
+        list: "List",
+        groupSides: "Parties",
+        groupNodeKinds: "Record kinds",
+        groupAttackTactics: "ATT&CK tactics",
+        groupKillChainPhases: "Kill chain phases",
+        groupResponsePhases: "Response phases",
+        groupOutcomes: "Outcomes",
+        groupLinkKinds: "Relationships",
+        groupConfidences: "Confidence",
+        groupInvolvements: "Involvement",
+        groupAudiences: "Audiences",
+        groupRepresentations: "Representations",
+        iconOf: label => `Icon of ${label}`,
+        iconClash: labels => `Same icon as ${labels.join(", ")}`,
+        searchIcons: "Search icons",
+        impactHeading: "Impact scale",
+        impactHint: "The levels incidents, records and steps are rated on, from lowest to highest. The built in levels follow the theme until you pick a colour.",
+        unassessed: "Not assessed",
+        milestonesHeading: "Milestones",
+        milestonesHint: "The moments your reports track, such as the first access or the containment. One step at most holds each.",
+        noMilestones: "No milestones yet.",
+        newName: "Name",
+        addLevel: "Add level",
+        addMilestone: "Add milestone",
+        moveUp: "Move up",
+        moveDown: "Move down",
+        remove: "Remove",
+        colorOf: label => `Colour of ${label}`,
+        pagesHeading: "Pages",
+        pagesHint: "How diagrams are sized and cut, on screen and in every export.",
+        pageShape: "Page shape",
+        layout: "Layout",
+        layoutSlides: "Slides",
+        layoutContinuous: "One long page",
+        datesHeading: "Dates and durations",
+        datesHint: "How dates are written, and the short units durations end with.",
+        dateFormat: "Date format",
+        minutes: "Minutes",
+        hours: "Hours",
+        days: "Days",
+        backupHeading: "Keep a copy",
+        backupHint: "Settings live in this browser only. Export them to a file to keep them safe or to use them in another browser.",
+        exportSettings: "Export settings",
+        importSettings: "Import settings",
+        imported: "Settings loaded from the file. Save to keep them.",
+        importFailed: "That file does not hold settings.",
+        resetHeading: "Start over",
+        resetHint: "Puts every setting back to its built in value. Incidents and their records are not touched.",
+        resetAll: "Reset everything",
+        resetDone: "Every setting is back to its built in value. Save to keep it.",
+        save: "Save",
+        saveAnyway: "Save anyway",
+        cancel: "Cancel",
+        inUseWarning: "Records still use what you removed. They keep their value, drawn as unknown, until someone edits them.",
+        inUse: (label, count) => `${label}: ${count} record(s)`,
+        usageFailed: "The records could not be checked for what you removed."
     }
 };
 
@@ -589,6 +751,7 @@ export function buildStrings(override: StringsOverride = {}): Strings {
         slide: { ...DEFAULT_STRINGS.slide, ...override.slide },
         options: { ...DEFAULT_STRINGS.options, ...override.options },
         scene: { ...DEFAULT_STRINGS.scene, ...override.scene },
-        narrative: { ...DEFAULT_STRINGS.narrative, ...override.narrative }
+        narrative: { ...DEFAULT_STRINGS.narrative, ...override.narrative },
+        settings: { ...DEFAULT_STRINGS.settings, ...override.settings }
     };
 }

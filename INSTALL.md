@@ -653,13 +653,40 @@ It resolves to a handle:
 | `syncAddress` | `boolean` | `true` | Keep `#incident=<id>` in the address |
 | `theme` | `ThemeMode` | `Auto` | Light or dark sets `data-theme` on `<html>`; auto leaves the page alone |
 | `themeToggle` | `boolean` | `true` | Show the theme button, which switches the whole page |
-| `preferences`, `preferenceKey` | | `localStorage`, `cyber-incidents-timeline-app` | Where the theme choice is remembered |
+| `settingsButton` | `boolean` | `false` | Show a settings button beside the theme toggle, see [Viewer settings](#viewer-settings) |
+| `settingsScope` | `SettingsScope` | `Presentation` | `Everything` also offers the impact scale and milestones, see [Viewer settings](#viewer-settings) |
+| `onSettingsSaved` | `(settings) => void` | none | Called after the settings are saved, so the host can rebuild its service |
+| `preferences`, `preferenceKey` | | `localStorage`, `cyber-incidents-timeline-app` | Where the theme choice and the settings are remembered |
 | `timeline` | `TimelineOptions` | none | Passed to the workspace: `renderers`, `permissions`, `slideHeader`, `icons`, `themeDetector` |
 | `onNotify` | `(message) => void` | toast | Receives messages such as load failures |
 
 It resolves to a handle with `timeline` (the workspace handle of the open incident, or `null`), `open(id)`,
 `refresh()`, `setTheme(mode)` and `destroy()`. Like the workspace, the desk only hides what the permissions
 refuse; the server enforces them.
+
+#### Viewer settings
+
+With `settingsButton: true` the app bar gains a settings dialog, kept with the preferences of the browser. Both
+pages of the reference server and the GitHub Pages desk offer it. It covers five tabs:
+
+| Tab | What it changes |
+|---|---|
+| Appearance | The theme, and the accent, positive and party colours for light and dark. Soft backgrounds follow |
+| Vocabulary | The names and icons of parties, record kinds, tactics, phases, outcomes, relationships and views. Two entries of a list sharing an icon are flagged |
+| Scales | The impact levels, in order and with their colours, and the milestones. Removing one that records still use asks for a confirmation, and the records keep their value |
+| Display | The page shape, slides or one long page, the date format and the duration units |
+| Backup | Export or import the settings as a file, or reset them all |
+
+By default the scope is `Presentation`: names and icons are laid over whatever catalog the api serves, and the
+Scales tab is left out, because whoever owns the catalog, such as a server, validates ratings against it. With
+`SettingsScope.Everything` the Scales tab is offered too, and the host builds its service from what was saved:
+
+```js
+const api = new TimelineService(store, { catalog: loadAppCatalog() });
+await mountTimelineApp(element, {
+    api, settingsButton: true, settingsScope: SettingsScope.Everything, onSettingsSaved: () => location.reload()
+});
+```
 
 ### `new TimelineService(store, options)`
 

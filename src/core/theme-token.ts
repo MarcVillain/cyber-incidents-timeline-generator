@@ -25,6 +25,7 @@ export enum ThemeToken {
     Border = "--tlg-border",
     BorderStrong = "--tlg-border-strong",
     Accent = "--tlg-accent",
+    AccentSoft = "--tlg-accent-soft",
     Good = "--tlg-good",
     OnColor = "--tlg-on-color",
     Shadow = "--tlg-shadow"
@@ -57,6 +58,7 @@ export const DEFAULT_TOKEN_VALUES: Readonly<Record<ThemeToken, string>> = {
     [ThemeToken.Border]: "#dcdfe4",
     [ThemeToken.BorderStrong]: "#a3a9b3",
     [ThemeToken.Accent]: "#1565c0",
+    [ThemeToken.AccentSoft]: "#e8f1fb",
     [ThemeToken.Good]: "#2e7d32",
     [ThemeToken.OnColor]: "#ffffff",
     [ThemeToken.Shadow]: "#000000"

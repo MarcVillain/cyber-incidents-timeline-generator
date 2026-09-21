@@ -3,6 +3,7 @@ import { isEnumValue, type RepresentationKey } from "../core/enums.js";
 // A stored key is a plain identifier, the same shape the catalog holds a representation to
 const KEY_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
+import { defaultSettings, parseSettings, serializeSettings, type AppSettings } from "./settings.js";
 import { ThemeMode } from "./theme-mode.js";
 
 type OptionChoices = Map<string, string>;
@@ -34,6 +35,7 @@ export class Preferences {
     private readonly options = new Map<RepresentationKey, OptionChoices>();
     representation: RepresentationKey | null = null;
     theme: ThemeMode | null = null;
+    settings: AppSettings = defaultSettings();
 
     constructor(storage: KeyValueStorage | null, key: string) {
         this.storage = storage;
@@ -62,6 +64,7 @@ export class Preferences {
         this.representation = view !== null && KEY_PATTERN.test(view) ? view : null;
         const theme = this.read("theme");
         this.theme = isEnumValue(ThemeMode, theme) ? theme : null;
+        this.settings = parseSettings(readJson(this.read("settings")));
 
         const stored = readJson(this.read("options"));
         if (typeof stored !== "object" || stored === null) return;
@@ -87,6 +90,11 @@ export class Preferences {
     setTheme(theme: ThemeMode): void {
         this.theme = theme;
         this.write("theme", theme);
+    }
+
+    setSettings(settings: AppSettings): void {
+        this.settings = settings;
+        this.write("settings", serializeSettings(settings));
     }
 
     setChoice(representation: RepresentationKey, option: string, value: string): void {

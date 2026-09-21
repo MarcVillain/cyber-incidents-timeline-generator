@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-09-21
+
+### Added
+
+- A settings button next to the theme toggle, on the GitHub Pages desk and on both pages of the reference
+  server. Settings are kept in the browser and grouped in tabs:
+  - Appearance: the theme and the main colours, for light and dark.
+  - Vocabulary: the names and icons of parties, record kinds, tactics, phases and more. A searchable picker
+    offers over two hundred icons, and entries sharing an icon are flagged.
+  - Scales: the impact levels and milestones. Removing one still in use asks first. Only offered where the
+    browser holds the incidents.
+  - Display: the page shape, slides or one long page, the date format and the duration units.
+  - Backup: export, import or reset the settings.
+- For integrators: `settingsButton` and `settingsScope` on the app, and `loadAppCatalog` to build a service
+  from the saved settings.
+
 ## [0.2.1] - 2026-09-18
 
 ### Added

@@ -1365,6 +1365,221 @@ textarea.tlg-input {
     flex: 1 1 auto;
 }
 
+.tlg-settings {
+    width: min(46rem, 100%);
+    height: min(40rem, calc(100vh - 2rem));
+}
+
+.tlg-settings .tlg-dialog-head h2 {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+}
+
+.tlg-settings .tlg-dialog-body {
+    flex: 1 1 auto;
+    padding-top: .25rem;
+}
+
+.tlg-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: .25rem;
+    padding: 0 1.1rem;
+    border-bottom: 1px solid var(--tlg-border);
+}
+
+.tlg-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .5rem .7rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: transparent;
+    color: var(--tlg-ink-muted);
+    font: inherit;
+    font-size: .85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.tlg-tab:hover {
+    color: var(--tlg-ink);
+}
+
+.tlg-tab[aria-selected="true"] {
+    color: var(--tlg-accent);
+    border-bottom-color: var(--tlg-accent);
+}
+
+.tlg-tab:focus-visible {
+    outline: 2px solid var(--tlg-accent);
+    outline-offset: -2px;
+}
+
+.tlg-settings-section {
+    padding: .75rem 0;
+}
+
+.tlg-settings-section + .tlg-settings-section {
+    border-top: 1px solid var(--tlg-border);
+}
+
+.tlg-settings-section h3 {
+    margin: 0;
+    font-size: .92rem;
+}
+
+.tlg-settings-section h4 {
+    margin: .75rem 0 .35rem;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-settings-hint {
+    margin: .2rem 0 .6rem;
+    font-size: .8rem;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-color-grid {
+    display: grid;
+    grid-template-columns: minmax(8rem, 1fr) 4rem 4rem auto;
+    align-items: center;
+    gap: .35rem .75rem;
+    max-width: 28rem;
+}
+
+.tlg-color-head {
+    font-size: .75rem;
+    color: var(--tlg-ink-muted);
+    text-align: center;
+}
+
+.tlg-color-name {
+    font-size: .85rem;
+}
+
+.tlg-color {
+    width: 100%;
+    height: 1.9rem;
+    padding: .1rem;
+    border: 1px solid var(--tlg-border);
+    border-radius: 6px;
+    background: var(--tlg-surface);
+    cursor: pointer;
+}
+
+.tlg-settings-item .tlg-color {
+    width: 2.5rem;
+    flex: 0 0 auto;
+}
+
+.tlg-vocabulary,
+.tlg-settings-list {
+    display: grid;
+    gap: .35rem;
+    margin-top: .5rem;
+}
+
+.tlg-vocabulary-row,
+.tlg-settings-item,
+.tlg-settings-adder,
+.tlg-settings-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.tlg-settings-adder {
+    margin-top: .5rem;
+    max-width: 24rem;
+}
+
+.tlg-settings-adder > .tlg-button {
+    white-space: nowrap;
+}
+
+.tlg-settings-actions {
+    flex-wrap: wrap;
+}
+
+.tlg-settings-key {
+    flex: 0 0 auto;
+    min-width: 5rem;
+    font-size: .72rem;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-settings-clash {
+    display: inline-flex;
+    color: var(--tlg-impact-medium);
+}
+
+.tlg-icon-panel {
+    display: grid;
+    gap: .4rem;
+    margin: .35rem 0 .5rem;
+    padding: .5rem;
+    background: var(--tlg-surface-alt);
+    border: 1px solid var(--tlg-border);
+    border-radius: var(--tlg-radius);
+}
+
+.tlg-icon-panel .tlg-settings-hint {
+    margin: 0;
+}
+
+.tlg-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(2.1rem, 1fr));
+    gap: .2rem;
+    max-height: 12rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.tlg-icon-choice {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--tlg-ink);
+    cursor: pointer;
+}
+
+.tlg-icon-choice:hover {
+    background: var(--tlg-hover);
+}
+
+.tlg-icon-choice[aria-selected="true"] {
+    border-color: var(--tlg-accent);
+    color: var(--tlg-accent);
+}
+
+.tlg-settings-note {
+    flex: 1 1 18rem;
+    font-size: .8rem;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-settings-note p {
+    margin: 0;
+}
+
+.tlg-settings-warning {
+    color: var(--tlg-impact-high);
+}
+
 @media (max-width: 640px) {
     .tlg-app-quick {
         flex-direction: column;

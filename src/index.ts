@@ -7,18 +7,23 @@ export * from "./storage/browser-storage-store.js";
 export * from "./storage/http-api.js";
 export * from "./storage/sourced-store.js";
 export { mountTimeline, CanvasMode, ThemeMode, type TimelineHandle, type TimelineOptions, type TimelineState } from "./ui/workspace.js";
-export { mountTimelineApp, type TimelineAppHandle, type TimelineAppOptions } from "./ui/app.js";
+export { loadAppCatalog, loadAppSettings, mountTimelineApp, type TimelineAppHandle, type TimelineAppOptions } from "./ui/app.js";
+export {
+    SettingsGroup, SettingsScope, defaultSettings, parseSettings, relabelCatalog, serializeSettings, settingsCatalog,
+    type AppSettings, type ColorOverrides, type EntryOverride
+} from "./ui/settings.js";
 export { IncidentFieldType, checkIncidentFields, fieldValue, withFieldValues, type IncidentFieldChoice, type IncidentFieldDef, type IncidentFieldValue } from "./ui/incident-fields.js";
 export { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./ui/theme-detection.js";
 export {
     DEFAULT_STRINGS, buildStrings,
     type AppStrings, type DeckStrings, type FormStrings, type InspectorStrings, type NarrativeStrings,
     type OptionStrings, type RailStrings, type SceneStrings, type SlideStrings, type Strings,
-    type StringsOverride, type WorkspaceStrings
+    type SettingsStrings, type StringsOverride, type WorkspaceStrings
 } from "./ui/strings.js";
 export { Access, RecordAction, type TimelinePermissions } from "./ui/panels.js";
 export { ExportFormat, exportDocumentFile, standaloneHtml, serialize } from "./ui/export.js";
 export { IconSet } from "./ui/icons/icon-set.js";
+export { RelabeledTimelineApi } from "./ui/relabeled-api.js";
 export { DiagramStore, StoreChange, type TimelineStep, type Selection, type StepFilters } from "./ui/diagram-store.js";
 export { FONT_STACK, Palette, defaultTokenResolver, elementTokenResolver, textWidth, type TokenResolver } from "./ui/theme.js";
 

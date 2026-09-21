@@ -56,7 +56,10 @@ function toRgb(value: string): Rgb | null {
     return null;
 }
 
-function blend(color: string, ratio: number, towards: string): string {
+/**
+ * Moves a colour towards another by a ratio, in RGB. A colour that cannot be read is returned unchanged.
+ */
+export function blend(color: string, ratio: number, towards: string): string {
     const from = toRgb(color);
     const to = toRgb(towards);
     if (!from || !to) return color;

@@ -26,13 +26,14 @@ import { Palette, elementTokenResolver } from "./theme.js";
 import type { SlideHeaderCustomizer } from "./slide-header.js";
 import { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./theme-detection.js";
 import { ThemeMode } from "./theme-mode.js";
+import { CanvasMode } from "./canvas-mode.js";
 import { TimeFormats, type DurationUnits } from "../core/time.js";
 import { buildStrings, type Strings, type StringsOverride } from "./strings.js";
 import { DEFAULT_PAGE_SIZE, Viewport, type PageSize, type Point } from "./viewport.js";
 import type { DiagramSummary } from "../core/summary.js";
 import { withPageSize } from "./chrome.js";
 
-export { ThemeMode };
+export { CanvasMode, ThemeMode };
 
 export interface TimelineOptions {
     /** Where the diagram lives: a TimelineService in the page, or an HttpTimelineApi talking to a server. */
@@ -109,14 +110,6 @@ export interface TimelineHandle {
 
 const DEFAULT_PREFERENCE_KEY = "cyber-incidents-timeline";
 const TOAST_MS = 4000;
-
-/** How the scene meets the page it is drawn on. */
-export enum CanvasMode {
-    /** Cut into pages of a fixed size, which is what a deck and a printer want. */
-    Slides = "slides",
-    /** One page as tall as the content needs, panned and zoomed in the stage. */
-    Continuous = "continuous"
-}
 
 // Growing the canvas is a search, not a measurement: a renderer only ever says how many pages it took
 const CANVAS_GROWTH_TRIES = 6;

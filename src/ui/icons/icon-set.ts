@@ -21,6 +21,11 @@ export class IconSet {
         this.shapes = merged;
     }
 
+    /** Every key the set can draw, built in ones first. */
+    names(): string[] {
+        return [...this.shapes.keys()];
+    }
+
     has(name: string): boolean {
         return this.shapes.has(name);
     }

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it } from "node:test";
 import { Impact } from "../../src/core/enums.js";
-import { mountTimelineApp } from "../../src/ui/app.js";
+import { ThemeToken } from "../../src/core/theme-token.js";
+import type { KeyValueStorage } from "../../src/storage/browser-storage-store.js";
+import { loadAppSettings, mountTimelineApp } from "../../src/ui/app.js";
+import { CanvasMode } from "../../src/ui/canvas-mode.js";
+import { SettingsScope, type AppSettings } from "../../src/ui/settings.js";
 import { ColorScheme } from "../../src/ui/theme-detection.js";
 import { ThemeMode } from "../../src/ui/workspace.js";
 import { chooseOption, fieldNamed, installDom, syntheticEvent } from "../support/dom.js";
@@ -12,6 +16,28 @@ const RENAMED = "Phishing wave on finance and legal";
 const REFERENCE = "CASE-42";
 const SETTLE_ROUNDS = 10;
 const CRITICAL_LABEL = "Critical";
+const SETTINGS_BUTTON = "[aria-label=\"Settings\"]";
+const PREFERENCE_KEY = "app-settings-test";
+const RED = "#ff0000";
+const SEARCHED_ICON = "skull";
+
+function memoryStorage(): KeyValueStorage {
+    const entries = new Map<string, string>();
+    return { getItem: key => entries.get(key) ?? null, setItem: (key, value) => { entries.set(key, value); } };
+}
+
+function openTab(form: HTMLElement, label: string): void {
+    const tab = [...form.querySelectorAll<HTMLButtonElement>("[role=tab]")].find(node => node.textContent?.trim() === label);
+    assert.ok(tab, `No tab reads "${label}"`);
+    tab.click();
+}
+
+function openSettings(root: HTMLElement): HTMLFormElement {
+    const button = root.querySelector<HTMLButtonElement>(`.tlg-appbar-actions ${SETTINGS_BUTTON}`);
+    assert.ok(button);
+    button.click();
+    return dialog(root);
+}
 
 function mountPoint(): HTMLElement {
     const element = document.createElement("div");
@@ -154,6 +180,108 @@ describe("mountTimelineApp", () => {
         await settle();
         assert.equal(document.documentElement.hasAttribute("data-theme"), false);
         assert.equal(workspace.getAttribute("data-tlg-theme"), ColorScheme.Light);
+        app.destroy();
+    });
+
+    it("offers settings only when asked, beside the theme toggle", async () => {
+        const { service } = await seededService();
+        const plain = mountPoint();
+        const app = await mountTimelineApp(plain, { api: service, syncAddress: false, preferences: null });
+        assert.equal(plain.querySelector(SETTINGS_BUTTON), null);
+        app.destroy();
+
+        const element = mountPoint();
+        const custom = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: null, settingsButton: true });
+        const tabs = [...openSettings(element).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
+        assert.deepEqual(tabs, ["Appearance", "Vocabulary", "Display", "Backup"]);
+        custom.destroy();
+
+        const full = mountPoint();
+        const everything = await mountTimelineApp(full, { api: service, syncAddress: false, preferences: null, settingsButton: true, settingsScope: SettingsScope.Everything });
+        const all = [...openSettings(full).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
+        assert.deepEqual(all, ["Appearance", "Vocabulary", "Scales", "Display", "Backup"]);
+        everything.destroy();
+    });
+
+    it("keeps saved settings, applies the colours and tells the host", async () => {
+        const { service } = await seededService();
+        const storage = memoryStorage();
+        const saved: AppSettings[] = [];
+        const element = mountPoint();
+        const app = await mountTimelineApp(element, {
+            api: service, syncAddress: false, preferences: storage, preferenceKey: PREFERENCE_KEY, settingsButton: true,
+            onSettingsSaved: settings => saved.push(settings)
+        });
+
+        const form = openSettings(element);
+        const accent = form.querySelector<HTMLInputElement>("input.tlg-color");
+        assert.ok(accent);
+        type(accent, RED);
+        openTab(form, "Display");
+        chooseOption(fieldNamed(form, "Layout"), "One long page");
+        form.dispatchEvent(syntheticEvent("submit"));
+        await settle();
+
+        const stored = loadAppSettings(storage, PREFERENCE_KEY);
+        assert.equal(stored.canvasMode, CanvasMode.Continuous);
+        assert.equal(stored.colors[ColorScheme.Light][ThemeToken.Accent], RED);
+        assert.equal(saved.length, 1);
+        assert.equal(element.querySelector<HTMLElement>(".tlg-dialog-backdrop")?.hidden, true);
+        assert.ok(element.querySelector("style")?.textContent?.includes(`${ThemeToken.Accent}: ${RED}`));
+        app.destroy();
+    });
+
+    it("finds an icon by searching and flags two parties drawn with it", async () => {
+        const { service } = await seededService();
+        const element = mountPoint();
+        const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: memoryStorage(), preferenceKey: PREFERENCE_KEY, settingsButton: true });
+
+        const form = openSettings(element);
+        openTab(form, "Vocabulary");
+        const [first, second] = form.querySelectorAll<HTMLElement>(".tlg-vocabulary-entry");
+        assert.ok(first && second);
+        first.querySelector<HTMLButtonElement>("[aria-expanded]")?.click();
+        const search = first.querySelector<HTMLInputElement>(".tlg-icon-panel input");
+        assert.ok(search);
+        search.value = SEARCHED_ICON;
+        search.dispatchEvent(syntheticEvent("input"));
+        const shown = [...first.querySelectorAll<HTMLButtonElement>(".tlg-icon-choice")].filter(choice => !choice.hidden);
+        assert.deepEqual(shown.map(choice => choice.getAttribute("aria-label")), [SEARCHED_ICON]);
+        shown[0]?.click();
+
+        const again = form.querySelectorAll<HTMLElement>(".tlg-vocabulary-entry")[1];
+        again?.querySelector<HTMLButtonElement>("[aria-expanded]")?.click();
+        const match = [...(again?.querySelectorAll<HTMLButtonElement>(".tlg-icon-choice") ?? [])].find(choice => choice.getAttribute("aria-label") === SEARCHED_ICON);
+        match?.click();
+        assert.equal(form.querySelectorAll(".tlg-settings-clash").length, 2);
+        app.destroy();
+    });
+
+    it("warns before removing an impact level records still use", async () => {
+        const { service, incident } = await seededService();
+        await service.updateIncident(incident.id, { impact: Impact.Critical });
+        const storage = memoryStorage();
+        const element = mountPoint();
+        const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: storage, preferenceKey: PREFERENCE_KEY, settingsButton: true, settingsScope: SettingsScope.Everything });
+
+        const form = openSettings(element);
+        openTab(form, "Scales");
+        const critical = [...form.querySelectorAll(".tlg-settings-item")].find(item => item.querySelector<HTMLInputElement>("input.tlg-input")?.value === CRITICAL_LABEL);
+        const remove = critical?.querySelector<HTMLButtonElement>("[aria-label=Remove]");
+        assert.ok(remove);
+        remove.click();
+        form.dispatchEvent(syntheticEvent("submit"));
+        await settle();
+
+        assert.ok(form.querySelector(".tlg-settings-note")?.textContent?.includes(`${CRITICAL_LABEL}: `));
+        assert.equal(buttonNamed(form, "Save anyway").type, "submit");
+        assert.equal(loadAppSettings(storage, PREFERENCE_KEY).impactScale, null);
+
+        form.dispatchEvent(syntheticEvent("submit"));
+        await settle();
+        const levels = loadAppSettings(storage, PREFERENCE_KEY).impactScale?.levels.map(level => level.level);
+        assert.ok(levels && !levels.includes(Impact.Critical));
+        assert.equal((await service.getIncident(incident.id)).impact, Impact.Critical);
         app.destroy();
     });
 });

@@ -10,7 +10,7 @@ import { CanvasMode } from "./canvas-mode.js";
 import { ViewPicker } from "./view-picker.js";
 import { h, uniqueId } from "./dom.js";
 import { download } from "./export.js";
-import { button, field, row, select, textInput, type Choice } from "./forms.js";
+import { button, checkbox, field, row, select, textInput, type Choice } from "./forms.js";
 import type { IconSet } from "./icons/icon-set.js";
 import {
     ColorSection, EDITABLE_COLORS, LOCALES, PAGE_PRESETS, SettingsGroup, SettingsScope,
@@ -21,6 +21,20 @@ import type { Strings } from "./strings.js";
 import { ColorScheme } from "./theme-detection.js";
 import { ThemeMode } from "./theme-mode.js";
 import { DEFAULT_PAGE_SIZE } from "./viewport.js";
+import {
+    VocabularyList,
+    audienceEditor,
+    confidenceEditor,
+    involvementEditor,
+    killChainEditor,
+    linkKindEditor,
+    nodeKindEditor,
+    outcomeEditor,
+    responsePhaseEditor,
+    sideEditor,
+    tacticEditor,
+    type ListEditor
+} from "./vocabulary-settings.js";
 
 export enum SettingsTab {
     Appearance = "appearance",
@@ -191,6 +205,10 @@ class SettingsDialog {
     private theme: ThemeMode;
     private tab = SettingsTab.Appearance;
     private group = SettingsGroup.Sides;
+    // The entries whose details are open, kept across the repaints every change makes
+    private readonly opened = new Set<string>();
+    // What an entry means for the views is rarely changed, so it stays out of sight until asked for
+    private advanced = false;
     private acknowledged = false;
 
     constructor(options: SettingsDialogOptions) {
@@ -335,7 +353,8 @@ class SettingsDialog {
             this.paintGroup(list);
         }, { strings: this.strings.forms });
         this.paintGroup(list);
-        return [section(words.vocabularyHeading, words.vocabularyHint, [field(words.list, picker), list])];
+        const hint = this.options.scope === SettingsScope.Everything ? words.vocabularyEditHint : words.vocabularyHint;
+        return [section(words.vocabularyHeading, hint, [field(words.list, picker), list])];
     }
 
     private overridesOf(group: SettingsGroup): Map<string, EntryOverride> {
@@ -346,7 +365,147 @@ class SettingsDialog {
         return created;
     }
 
+    /**
+     * Where the catalog is the browser's own, a list is edited whole. Anywhere else, and for the views,
+     * only the names and icons change.
+     */
     private paintGroup(list: HTMLElement): void {
+        const group = this.group;
+        if (this.options.scope !== SettingsScope.Everything || !isEnumValue(VocabularyList, group)) {
+            this.paintRenames(list);
+            return;
+        }
+        switch (group) {
+            case VocabularyList.Sides:
+                return this.paintEditor(list, sideEditor(this.strings));
+            case VocabularyList.NodeKinds:
+                return this.paintEditor(list, nodeKindEditor(this.strings));
+            case VocabularyList.AttackTactics:
+                return this.paintEditor(list, tacticEditor(this.strings, settingsCatalog(this.draft)));
+            case VocabularyList.KillChainPhases:
+                return this.paintEditor(list, killChainEditor());
+            case VocabularyList.ResponsePhases:
+                return this.paintEditor(list, responsePhaseEditor(this.strings));
+            case VocabularyList.Outcomes:
+                return this.paintEditor(list, outcomeEditor(this.strings));
+            case VocabularyList.LinkKinds:
+                return this.paintEditor(list, linkKindEditor(this.strings));
+            case VocabularyList.Confidences:
+                return this.paintEditor(list, confidenceEditor());
+            case VocabularyList.Involvements:
+                return this.paintEditor(list, involvementEditor());
+            case VocabularyList.Audiences:
+                return this.paintEditor(list, audienceEditor());
+        }
+    }
+
+    /**
+     * One row per entry, with its icon, its name, what it means for the views and the arrows to order it.
+     * The first change writes the whole list into the draft, carrying over any rename made before, and the
+     * list then no longer follows the package until it is reset.
+     */
+    private paintEditor<TEntry>(list: HTMLElement, editor: ListEditor<TEntry>): void {
+        const words = this.strings.settings;
+        const forms = { strings: this.strings.forms };
+        const catalog = settingsCatalog(this.draft);
+        const entries = editor.entries(catalog);
+        const phasesInUse = new Set(catalog.attackTactics.map(entry => entry.killChainPhase));
+        const commit = (next: TEntry[]): void => {
+            const vocabulary = { ...this.draft.vocabulary };
+            editor.store(vocabulary, next);
+            this.draft.vocabulary = vocabulary;
+            this.draft.entries.delete(this.group);
+            this.paintGroup(list);
+        };
+        const replace = (index: number, entry: TEntry): TEntry[] => entries.map((current, position) => (position === index ? entry : current));
+
+        const rows = entries.map((entry, index) => {
+            const key = editor.key(entry);
+            const label = editor.label(entry);
+            const picker = editor.icon
+                ? iconPicker(this.icons, editor.icon.read(entry), words.iconOf(label), this.strings, icon => {
+                    if (editor.icon) commit(replace(index, editor.icon.write(entry, icon)));
+                })
+                : null;
+            const name = labelInput(label, label, label, value => {
+                const trimmed = value?.trim() ?? "";
+                if (trimmed !== "") commit(replace(index, editor.relabel(entry, trimmed)));
+            });
+            const fields = editor.fields.map(entryField => field(entryField.label, select(entryField.value(entry), entryField.choices, value => {
+                if (value) commit(replace(index, entryField.update(entry, value)));
+            }, forms)));
+            const openKey = `${editor.list}:${key}`;
+            const details = fields.length > 0
+                ? h("div", "tlg-vocabulary-details", {}, [...fields, field(words.entryKey, h("code", "tlg-settings-key", {}, [key]))])
+                : null;
+            const open = this.opened.has(openKey);
+            const meaning = details && (this.advanced || open)
+                ? button(this.icons, words.entryDetails, "tlg-button tlg-button-quiet tlg-vocabulary-more", () => {
+                    if (this.opened.has(openKey)) this.opened.delete(openKey);
+                    else this.opened.add(openKey);
+                    this.paintGroup(list);
+                }, open ? Icon.ChevronDown : Icon.ChevronRight)
+                : null;
+            if (details) details.hidden = !open;
+            if (meaning) {
+                meaning.setAttribute("aria-expanded", String(open));
+                meaning.title = words.meaningOf(label);
+            }
+            const move = (offset: number): void => {
+                const next = entries.filter((_, position) => position !== index);
+                next.splice(index + offset, 0, entry);
+                commit(next);
+            };
+            const up = button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", () => move(-1), Icon.ChevronUp);
+            const down = button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", () => move(1), Icon.ChevronDown);
+            const remove = button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", () => {
+                commit(entries.filter((_, position) => position !== index));
+            }, Icon.Trash);
+            up.setAttribute("aria-label", words.moveUp);
+            down.setAttribute("aria-label", words.moveDown);
+            remove.setAttribute("aria-label", words.remove);
+            up.disabled = index === 0;
+            down.disabled = index === entries.length - 1;
+            const kept = key === editor.keeps;
+            const landing = editor.list === VocabularyList.KillChainPhases && phasesInUse.has(key);
+            remove.disabled = kept || landing || (!editor.mayBeEmpty && entries.length === 1);
+            if (kept) remove.title = words.keptEntry;
+            if (landing) remove.title = words.usedByTactic;
+            return h("div", "tlg-vocabulary-entry", {}, [
+                h("div", "tlg-vocabulary-row", {}, [picker?.toggle ?? null, name, meaning, up, down, remove]),
+                picker?.panel ?? null,
+                details
+            ]);
+        });
+
+        const taken = new Set(entries.map(entry => editor.key(entry)));
+        const reset = button(this.icons, words.resetList, "tlg-button tlg-button-quiet", () => {
+            const vocabulary = { ...this.draft.vocabulary };
+            delete vocabulary[editor.list];
+            this.draft.vocabulary = vocabulary;
+            this.draft.entries.delete(this.group);
+            this.paintGroup(list);
+        }, Icon.Undo);
+        const advanced = editor.fields.length > 0
+            ? checkbox(words.showAdvanced, this.advanced, value => {
+                this.advanced = value;
+                this.paintGroup(list);
+            })
+            : null;
+        list.replaceChildren(
+            ...(advanced ? [advanced] : []),
+            ...rows,
+            this.adder(words.addEntry, name => {
+                const created = editor.create(keyFor(name, taken), name);
+                // A new entry means nothing yet, so its details open for the choice to be made
+                if (editor.fields.length > 0) this.opened.add(`${editor.list}:${editor.key(created)}`);
+                commit([...entries, created]);
+            }),
+            h("div", "tlg-vocabulary-foot", {}, [reset])
+        );
+    }
+
+    private paintRenames(list: HTMLElement): void {
         const words = this.strings.settings;
         const group = this.group;
         const defaults = catalogEntries(buildCatalog(), group);
@@ -368,12 +527,12 @@ class SettingsDialog {
             const override = overrides.get(entry.key);
             const name = labelInput(override?.label ?? "", builtIn?.label ?? entry.label, entry.label, value => {
                 change(entry.key, { label: value === null ? null : value.trim() });
-                this.paintGroup(list);
+                this.paintRenames(list);
             });
             const picker = groupHasIcons(group) && entry.icon !== null
                 ? iconPicker(this.icons, entry.icon, words.iconOf(entry.label), this.strings, icon => {
                     change(entry.key, { icon: icon === builtIn?.icon ? null : icon });
-                    this.paintGroup(list);
+                    this.paintRenames(list);
                 })
                 : null;
             const clash = clashes.get(entry.key);
@@ -445,8 +604,9 @@ class SettingsDialog {
                 if (value !== null && value.trim() !== "") level.label = value.trim();
                 commit();
             });
-            const key = h("code", "tlg-settings-key", {}, [index === null ? words.unassessed : level.level]);
-            if (index === null) return h("div", "tlg-settings-item", {}, [color, name, key]);
+            // The key only matters to whoever reads the stored records, so it is left to the tooltip
+            name.title = `${words.entryKey} ${level.level}`;
+            if (index === null) return h("div", "tlg-settings-item", {}, [color, name, h("span", "tlg-settings-key", {}, [words.unassessed])]);
             const move = (offset: number): void => {
                 const [moved] = scale.levels.splice(index, 1);
                 if (moved) scale.levels.splice(index + offset, 0, moved);
@@ -464,7 +624,7 @@ class SettingsDialog {
             up.disabled = index === 0;
             down.disabled = index === scale.levels.length - 1;
             remove.disabled = scale.levels.length === 1;
-            return h("div", "tlg-settings-item", {}, [color, name, key, up, down, remove]);
+            return h("div", "tlg-settings-item", {}, [color, name, up, down, remove]);
         };
         list.replaceChildren(levelRow(scale.unassessed, null), ...scale.levels.map((level, index) => levelRow(level, index)));
     }
@@ -496,7 +656,8 @@ class SettingsDialog {
                 this.paintMilestones(list);
             }, Icon.Trash);
             remove.setAttribute("aria-label", words.remove);
-            return h("div", "tlg-settings-item", {}, [name, h("code", "tlg-settings-key", {}, [milestone.key]), remove]);
+            name.title = `${words.entryKey} ${milestone.key}`;
+            return h("div", "tlg-settings-item", {}, [name, remove]);
         }));
     }
 
@@ -597,8 +758,22 @@ class SettingsDialog {
         this.tell([words.imported]);
     }
 
+    /** Whether the lists of the draft make a catalog, which the editor keeps true but a loaded file may not. */
+    private fits(): boolean {
+        try {
+            settingsCatalog(this.draft);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     private async save(): Promise<void> {
         const words = this.strings.settings;
+        if (!this.fits()) {
+            this.tell([words.invalidVocabulary], true);
+            return;
+        }
         if (!this.acknowledged) {
             const lines = await this.options.usage(this.draft);
             if (lines.length > 0) {

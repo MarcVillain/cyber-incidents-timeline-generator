@@ -1,7 +1,7 @@
 // How far the compromise travelled. Rings are hops away from the first thing that fell, so the picture
 // answers the question everyone asks first: how much of the estate did they reach.
 
-import { Representation, Side } from "../../core/enums.js";
+import { Representation, SideRole } from "../../core/enums.js";
 import type { DiagramNode, RecordId } from "../../core/models.js";
 import { fitText } from "../cards.js";
 import { CONTENT, frame, placeholder } from "../chrome.js";
@@ -34,11 +34,11 @@ interface Spot {
 }
 
 function patientZero(store: DiagramStore, nodes: readonly DiagramNode[]): DiagramNode | null {
-    const firstAttack = store.steps.find(step => step.side === Side.Attacker && step.targetNodeId !== null);
+    const firstAttack = store.steps.find(step => store.sideRole(step.side) === SideRole.Attacker && step.targetNodeId !== null);
     const target = firstAttack ? nodes.find(node => node.id === firstAttack.targetNodeId) : undefined;
     return target
         ?? nodes.find(node => node.compromised)
-        ?? nodes.find(node => node.side === Side.Victim)
+        ?? nodes.find(node => store.sideRole(node.side) === SideRole.Victim)
         ?? nodes[0]
         ?? null;
 }
@@ -125,7 +125,7 @@ function orb(context: RenderContext, spot: Spot): SVGGElement {
     const { member, x, y } = spot;
     const color = spot.unreached
         ? palette.borderStrong
-        : (member.compromised ? palette.sides[Side.Attacker].color : palette.sides[Side.Victim].color);
+        : (member.compromised ? palette.attacker : palette.victim);
     const name = fitText(member.name, 116, { size: 9.5, minSize: 7 });
 
     return group({ class: "tlg-node tlg-orb", "data-node-id": member.id }, [
@@ -152,7 +152,7 @@ export const blastRadius = defineRenderer<BlastPage>({
     draw(context, page, pageIndex, pageCount) {
         const { store, palette, icons } = context;
         const words = context.strings.scene;
-        const attacker = palette.sides[Side.Attacker].color;
+        const attacker = palette.attacker;
 
         const { root, content } = frame(context, {
             page: pageIndex,
@@ -160,7 +160,7 @@ export const blastRadius = defineRenderer<BlastPage>({
             subtitle: page.origin ? `${page.compromised} of ${page.total} records marked compromised` : null,
             legend: [
                 { label: words.compromised, color: attacker },
-                { label: words.reachedNotCompromised, color: palette.sides[Side.Victim].color },
+                { label: words.reachedNotCompromised, color: palette.victim },
                 { label: words.untouched, color: palette.borderStrong },
                 { label: words.recordedRelationship, color: palette.border }
             ]

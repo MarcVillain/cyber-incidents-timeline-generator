@@ -1,5 +1,6 @@
 import type { Catalog } from "../core/catalog.js";
-import { ForbiddenError, NotFoundError, ValidationError, type ValidationIssue } from "../core/errors.js";
+import type { CatalogSettings, CatalogUsageEntry } from "../core/catalog-settings.js";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError, type ValidationIssue } from "../core/errors.js";
 import type {
     Diagram,
     DiagramLink,
@@ -54,6 +55,7 @@ const STATUS_NO_CONTENT = 204;
 const STATUS_BAD_REQUEST = 400;
 const STATUS_UNAUTHORIZED = 401;
 const STATUS_FORBIDDEN = 403;
+const STATUS_CONFLICT = 409;
 const STATUS_NOT_FOUND = 404;
 
 interface ErrorBody {
@@ -87,6 +89,9 @@ async function failure(response: Response, method: HttpMethod, url: string): Pro
     }
     if (response.status === STATUS_FORBIDDEN || response.status === STATUS_UNAUTHORIZED) {
         return new ForbiddenError(message);
+    }
+    if (response.status === STATUS_CONFLICT) {
+        return new ConflictError(message);
     }
     return new HttpError(response.status, message);
 }
@@ -186,6 +191,18 @@ export class HttpTimelineApi implements TimelineApi {
 
     getCatalog(): Promise<Catalog> {
         return this.read(HttpMethod.Get, "/catalog");
+    }
+
+    getCatalogSettings(): Promise<CatalogSettings> {
+        return this.read(HttpMethod.Get, "/catalog/settings");
+    }
+
+    saveCatalogSettings(settings: CatalogSettings): Promise<Catalog> {
+        return this.read(HttpMethod.Put, "/catalog/settings", settings);
+    }
+
+    catalogUsage(settings: CatalogSettings): Promise<CatalogUsageEntry[]> {
+        return this.read(HttpMethod.Post, "/catalog/usage", settings);
     }
 
     createNode(incidentId: RecordId, input: NodeCreateInput): Promise<DiagramNode> {

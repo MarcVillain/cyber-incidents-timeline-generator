@@ -2,7 +2,7 @@
 // matrix this single incident actually walked through.
 
 import type { AttackTacticInfo } from "../../core/catalog.js";
-import { AttackTactic, Representation, Side } from "../../core/enums.js";
+import { AttackTactic, Representation } from "../../core/enums.js";
 import { formatDate } from "../../core/time.js";
 import { fitLines, type FittedLines } from "../cards.js";
 import { CONTENT, frame, placeholder } from "../chrome.js";
@@ -211,7 +211,7 @@ export const attackMatrix = defineRenderer<MatrixPage>({
         page.columns.forEach((column, index) => {
             const x = CONTENT.x + index * (columnWidth + COLUMN_GAP);
             const active = column.total > 0;
-            const headerColor = active ? palette.sides[Side.Attacker].color : palette.borderStrong;
+            const headerColor = active ? palette.attacker : palette.borderStrong;
 
             content.appendChild(rect(x, CONTENT.y, columnWidth, CONTENT.height, {
                 rx: 8, fill: active ? palette.tint(headerColor, 0.985) : palette.surfaceAlt, stroke: palette.border, "stroke-width": 1

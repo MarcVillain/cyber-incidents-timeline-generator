@@ -1,6 +1,6 @@
 // Which source saw what, and when nothing was watching. The gaps are the point of this view.
 
-import { Representation, Side } from "../../core/enums.js";
+import { Representation } from "../../core/enums.js";
 import { Icon } from "../../core/icon.js";
 import { formatDate, formatDuration, hoursBetween } from "../../core/time.js";
 import { timeAxis } from "../axis.js";
@@ -81,7 +81,7 @@ function blindSpots(steps: readonly TimelineStep[]): Gap[] {
  */
 function coverage(palette: Palette, scale: TimeScale, steps: readonly TimelineStep[], x: number, y: number, width: number): SVGGElement {
     const node = group();
-    const attacker = palette.sides[Side.Attacker].color;
+    const attacker = palette.attacker;
     node.appendChild(text("RECORD TRAIL", x - 190, y + 14, { "font-size": 10, "font-weight": 700, "letter-spacing": 0.8, fill: palette.inkMuted }));
     node.appendChild(rect(x, y, width, RIBBON, { rx: RIBBON / 2, fill: palette.tint(palette.inkMuted, 0.88) }));
 
@@ -143,7 +143,7 @@ export const evidenceTimeline = defineRenderer<Source[]>({
             subtitle: first && last ? `${formatDate(first.at)} to ${formatDate(last.at)}` : null,
             legend: [
                 { label: context.strings.scene.somethingRecorded, color: palette.accent },
-                { label: context.strings.scene.nothingRecorded, color: palette.sides[Side.Attacker].color }
+                { label: context.strings.scene.nothingRecorded, color: palette.attacker }
             ]
         });
 
@@ -185,7 +185,7 @@ export const evidenceTimeline = defineRenderer<Source[]>({
 
             source.steps.forEach(step => {
                 const x = scale.at(step.at);
-                const stepColor = palette.sides[step.side].color;
+                const stepColor = palette.side(step.side).color;
                 content.appendChild(group({ class: "tlg-step", "data-step-id": step.id }, [
                     circle(x, center, 11, { fill: palette.tint(stepColor, 0.84), stroke: stepColor, "stroke-width": 1.4 }),
                     icons.draw(store.stepIcon(step), x, center, 12, stepColor)

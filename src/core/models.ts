@@ -1,17 +1,17 @@
 import type {
-    AttackTactic,
-    Audience,
-    Confidence,
+    AttackTacticKey,
+    AudienceKey,
+    ConfidenceKey,
     DiamondVertex,
-    Involvement,
-    KillChainPhase,
-    LinkKind,
+    InvolvementKey,
+    KillChainPhaseKey,
+    LinkKindKey,
     NodeCategory,
-    NodeKind,
+    NodeKindKey,
+    OutcomeKey,
     RepresentationKey,
-    ResponsePhase,
-    Side,
-    StepOutcome
+    ResponsePhaseKey,
+    SideKey
 } from "./enums.js";
 import type { Catalog } from "./catalog.js";
 
@@ -70,8 +70,8 @@ export interface NodeRecord {
     incidentId: RecordId;
     name: string;
     description: string | null;
-    kind: NodeKind;
-    side: Side;
+    kind: NodeKindKey;
+    side: SideKey;
     /** Groups records inside a container, typically a company holding its people and its assets. */
     parentId: RecordId | null;
     /** Hostname, address, hash. Free text because what identifies a record depends on its kind. */
@@ -100,7 +100,7 @@ export type NodeUpdateInput = Partial<NodeFields>;
 
 export interface StepInvolvement {
     nodeId: RecordId;
-    involvement: Involvement;
+    involvement: InvolvementKey;
 }
 
 /**
@@ -121,14 +121,15 @@ export interface StepRecord {
     orderIndex: number;
     title: string;
     description: string | null;
-    side: Side;
-    attackTactic: AttackTactic;
-    responsePhase: ResponsePhase;
+    side: SideKey;
+    attackTactic: AttackTacticKey;
+    responsePhase: ResponsePhaseKey;
     mitreTechniqueId: string | null;
     severity: ImpactLevel;
-    confidence: Confidence;
-    outcome: StepOutcome;
-    audience: Audience;
+    confidence: ConfidenceKey;
+    outcome: OutcomeKey;
+    /** The audiences the step is written for. None means everyone. */
+    audiences: AudienceKey[];
     /** Where the evidence came from, such as EDR, SIEM or a user report. */
     evidenceSource: string | null;
     /** Marks the handful of steps that carry the story, so crowded views can drop the rest. */
@@ -161,10 +162,10 @@ export interface LinkRecord {
     incidentId: RecordId;
     sourceNodeId: RecordId;
     targetNodeId: RecordId;
-    kind: LinkKind;
+    kind: LinkKindKey;
     /** Overrides the default wording of the kind on the edge. */
     label: string | null;
-    confidence: Confidence;
+    confidence: ConfidenceKey;
     /** The step that established the relationship, if any. */
     stepId: RecordId | null;
     /** Host owned data, stored and returned untouched. */
@@ -208,7 +209,7 @@ export type DiagramNode = Omit<NodeRecord, "incidentId" | "canonicalKey"> & {
 };
 
 export type DiagramStep = Omit<StepRecord, "incidentId"> & {
-    killChainPhase: KillChainPhase;
+    killChainPhase: KillChainPhaseKey;
 };
 
 export type DiagramLink = Omit<LinkRecord, "incidentId">;

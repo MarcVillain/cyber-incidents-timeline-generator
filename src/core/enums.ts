@@ -112,11 +112,44 @@ export enum StepOutcome {
 
 /**
  * Lets a single dataset render an executive slide and a technical slide without re-entering anything.
+ * Executive and Technical are the audiences the catalog starts with. Both is no audience of its own: as a
+ * filter it lets every step through, and a step written for everyone lists no audience at all.
  */
 export enum Audience {
     Both = "Both",
     Executive = "Executive",
     Technical = "Technical"
+}
+
+/**
+ * What a side stands for, which is what the views ask rather than the side itself, so a side added to
+ * the catalog, such as an insider, is drawn and measured like the camp it belongs to.
+ */
+export enum SideRole {
+    Attacker = "Attacker",
+    Defender = "Defender",
+    /** Helps the response, such as a retainer, without its steps counting toward the response figures. */
+    Ally = "Ally",
+    Victim = "Victim",
+    Neutral = "Neutral"
+}
+
+/** The response figure a phase counts toward, if any. */
+export enum ResponseStage {
+    None = "None",
+    Detection = "Detection",
+    Containment = "Containment",
+    Eradication = "Eradication",
+    Recovery = "Recovery"
+}
+
+/** What an outcome says about the step, which decides its colour and whether it stopped the attack. */
+export enum OutcomeMeaning {
+    Unknown = "Unknown",
+    Succeeded = "Succeeded",
+    Failed = "Failed",
+    Blocked = "Blocked",
+    Detected = "Detected"
 }
 
 export enum Involvement {
@@ -141,6 +174,21 @@ export enum LinkKind {
     Communication = "Communication",
     Trusts = "Trusts"
 }
+
+/*
+ * The key of an entry of a vocabulary list: one the catalog starts with, or one a deployment added. The
+ * stored value is the key, so the enums above name the built in keys rather than the only ones.
+ */
+export type SideKey = Side | string;
+export type NodeKindKey = NodeKind | string;
+export type AttackTacticKey = AttackTactic | string;
+export type KillChainPhaseKey = KillChainPhase | string;
+export type ResponsePhaseKey = ResponsePhase | string;
+export type OutcomeKey = StepOutcome | string;
+export type LinkKindKey = LinkKind | string;
+export type ConfidenceKey = Confidence | string;
+export type InvolvementKey = Involvement | string;
+export type AudienceKey = Audience | string;
 
 /**
  * The key of a representation: one of the built in flavours below, or a key a host declared in its
@@ -201,7 +249,9 @@ export enum Permission {
     Read = "Read",
     Create = "Create",
     Update = "Update",
-    Delete = "Delete"
+    Delete = "Delete",
+    /** Changing the catalog every incident is recorded against, which a host may keep to administrators. */
+    Configure = "Configure"
 }
 
 export function enumValues<TValue extends string>(enumObject: Readonly<Record<string, TValue>>): readonly TValue[] {

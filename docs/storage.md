@@ -125,6 +125,37 @@ Implement every method of `TimelineStore` from `cyber-incidents-timeline-generat
 
 Run `runStoreContract` against it, as the built in stores do.
 
+## Catalog settings
+
+The vocabulary, impact scale and milestones a deployment edits at run time are kept apart from the records,
+through the `CatalogStore` port, so a host can keep them wherever its configuration already lives.
+
+```ts
+interface CatalogStore {
+    load(): Promise<CatalogSettings | null>;
+    save(settings: CatalogSettings): Promise<void>;
+}
+```
+
+| Store | Where it runs |
+|---|---|
+| `MemoryCatalogStore` | Anywhere |
+| `BrowserStorageCatalogStore` | Browser, beside `BrowserStorageTimelineStore` |
+| `SqlCatalogStore` | Node, one row of the `catalog_settings` table beside the records |
+
+```js
+const { store, catalogStore } = await openSqliteStore("timeline.sqlite");
+const service = new TimelineService(store, { catalog: buildCatalog(), catalogStore });
+```
+
+The settings are laid over the catalog the service is given, so a host can start from its own vocabulary and
+still let users adjust it. Without a catalog store the catalog is fixed and saving settings is refused.
+
+The service reads the settings once and keeps them. A deployment running several processes calls
+`service.reloadCatalog()` when another process may have saved new ones, for instance on a message from its
+configuration service. Like the record stores, a catalog store only stores: run `runCatalogStoreContract`
+from `tests/storage/catalog-store-contract.ts` against your own.
+
 ## More than one tenant
 
 The package holds no opinion about tenancy. Its tables carry no organisation column and its service

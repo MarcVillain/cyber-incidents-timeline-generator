@@ -11,6 +11,7 @@ export class TableNames {
     readonly involvements: string;
     readonly tags: string;
     readonly links: string;
+    readonly catalogSettings: string;
 
     /**
      * A schema qualifies every name, for a host whose application lives in one of its own rather than in
@@ -33,6 +34,7 @@ export class TableNames {
         this.involvements = `${qualified}step_involvements`;
         this.tags = `${qualified}step_tags`;
         this.links = `${qualified}links`;
+        this.catalogSettings = `${qualified}catalog_settings`;
     }
 }
 
@@ -108,6 +110,7 @@ CREATE TABLE IF NOT EXISTS ${tables.steps} (
     severity TEXT NOT NULL,
     confidence TEXT NOT NULL,
     outcome TEXT NOT NULL,
+    -- The audiences as a JSON list of keys, empty for everyone. Databases written before 0.5.0 hold one key, or Both
     audience TEXT NOT NULL,
     evidence_source TEXT NULL,
     is_milestone INTEGER NOT NULL,
@@ -149,5 +152,11 @@ CREATE TABLE IF NOT EXISTS ${tables.links} (
     metadata TEXT NULL
 );
 CREATE INDEX IF NOT EXISTS ${tables.links}_incident ON ${tables.links}(incident_id);
+
+-- The catalog settings of the deployment, as one JSON document in a single row
+CREATE TABLE IF NOT EXISTS ${tables.catalogSettings} (
+    id INTEGER PRIMARY KEY,
+    settings TEXT NOT NULL
+);
 `;
 }

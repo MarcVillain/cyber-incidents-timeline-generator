@@ -4,7 +4,7 @@
 // The look is deliberately instrument panel rather than notecard: a tinted header strip carrying the
 // time and the technique, and labels set as small caps rules instead of pills.
 
-import { AttackTactic, Confidence, ResponsePhase, Side, StepOutcome } from "../core/enums.js";
+import { AttackTactic, Confidence, OutcomeMeaning, ResponsePhase, SideRole, StepOutcome } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { DiagramNode } from "../core/models.js";
 import { TimeFormats, hoursBetween } from "../core/time.js";
@@ -13,7 +13,7 @@ const DEFAULT_TIME = new TimeFormats();
 import type { TimelineStep } from "./diagram-store.js";
 import type { RenderContext } from "./renderers/registry.js";
 import { circle, el, group, line, measure, path, rect, roundedPath, stripTags, text, topRoundedPath, truncate, wrap } from "./svg.js";
-import type { Palette } from "./theme.js";
+import type { Palette, SideColors } from "./theme.js";
 
 export const CORNER = 8;
 export const HEADER_STRIP = 25;
@@ -33,6 +33,8 @@ const TITLE_STEPS: readonly { size: number; lines: number }[] = [
 ];
 const LAST_TITLE_STEP = { size: 9, lines: 7 };
 const CARD_BODY_LINE = 15;
+// How far a role colour is washed towards the page to make the soft fill behind its cards
+const SURFACE_TINT = 0.9;
 const CARD_BODY_SIZE = 11.5;
 const TITLE_LAST_RESORT_LINES = 14;
 const FIT_STEP = 0.5;
@@ -58,11 +60,11 @@ export function cardFooterHeight(width: number): number {
 }
 
 export function stepColor(palette: Palette, step: TimelineStep): string {
-    return palette.sides[step.side].color;
+    return palette.side(step.side).color;
 }
 
 export function nodeColor(palette: Palette, node: DiagramNode): string {
-    return node.colorOverride ?? palette.sides[node.side].color;
+    return node.colorOverride ?? palette.side(node.side).color;
 }
 
 /**
@@ -70,23 +72,46 @@ export function nodeColor(palette: Palette, node: DiagramNode): string {
  * made it and bad news when the response did, so the colour follows the side rather than the word.
  * Blocked is the exception: whoever the step belongs to, something was stopped.
  */
-export function outcomeColor(palette: Palette, step: TimelineStep): string {
-    const attacking = step.side === Side.Attacker;
-    const responding = step.side === Side.Defender || step.side === Side.ThirdParty;
+export function outcomeColor(context: RenderContext, step: TimelineStep): string {
+    const { palette, store } = context;
+    const role = store.sideRole(step.side);
+    const attacking = role === SideRole.Attacker;
+    const responding = role === SideRole.Defender || role === SideRole.Ally;
 
-    switch (step.outcome) {
-        case StepOutcome.Blocked:
+    switch (store.outcomeMeaning(step.outcome)) {
+        case OutcomeMeaning.Blocked:
             return palette.good;
-        case StepOutcome.Failed:
-            return attacking ? palette.good : palette.sides[Side.Attacker].color;
-        case StepOutcome.Succeeded:
-            if (attacking) return palette.sides[Side.Attacker].color;
+        case OutcomeMeaning.Failed:
+            return attacking ? palette.good : palette.attacker;
+        case OutcomeMeaning.Succeeded:
+            if (attacking) return palette.attacker;
             if (responding) return palette.good;
             // A victim step that simply happened is neither good news nor bad
             return palette.inkMuted;
         default:
-            return palette.outcomes[step.outcome];
+            return palette.outcome(step.outcome);
     }
+}
+
+/** Whether an outcome says the step was stopped, whoever took it. */
+export function stoppedOutcome(meaning: OutcomeMeaning): boolean {
+    return meaning === OutcomeMeaning.Blocked || meaning === OutcomeMeaning.Failed;
+}
+
+/**
+ * The colours of a camp, named and drawn like the first side of the catalog that belongs to it, and in
+ * the colour of the role whichever side that is.
+ */
+export function roleColors(context: RenderContext, role: SideRole): SideColors {
+    const { palette, store } = context;
+    const side = store.catalog.sides.find(entry => entry.role === role);
+    const color = palette.roleColor(role);
+    return {
+        label: side?.label ?? role,
+        icon: side?.icon ?? Icon.Unknown,
+        color,
+        surface: palette.tint(color, SURFACE_TINT)
+    };
 }
 
 /**
@@ -94,7 +119,7 @@ export function outcomeColor(palette: Palette, step: TimelineStep): string {
  */
 export function stepBadge(context: RenderContext, step: TimelineStep): string | null {
     if (step.mitreTechniqueId) return step.mitreTechniqueId;
-    if (step.side === Side.Defender && step.responsePhase !== ResponsePhase.None) return context.store.responseInfo(step.responsePhase).label;
+    if (context.store.sideRole(step.side) === SideRole.Defender && step.responsePhase !== ResponsePhase.None) return context.store.responseInfo(step.responsePhase).label;
     if (step.attackTactic !== AttackTactic.None) return context.store.tacticInfo(step.attackTactic).label;
     return null;
 }
@@ -301,7 +326,7 @@ function labelsFor(context: RenderContext, step: TimelineStep): MicroLabel[] {
     const { palette, store } = context;
     const entries: MicroLabel[] = [];
     if (step.outcome !== StepOutcome.Unknown) {
-        entries.push({ label: store.outcomeInfo(step.outcome).label, color: outcomeColor(palette, step) });
+        entries.push({ label: store.outcomeInfo(step.outcome).label, color: outcomeColor(context, step) });
     }
     const lasted = context.time.formatDuration(hoursBetween(step.at, step.until));
     if (step.until && lasted) {
@@ -425,7 +450,7 @@ export function nodeBox(context: RenderContext, item: DiagramNode, width: number
     node.appendChild(iconTile(context, item, 10, tileY, tile));
 
     if (item.compromised) {
-        node.appendChild(rect(10 + tile - 7, tileY - 4, 11, 11, { rx: 3, fill: palette.sides[Side.Attacker].color }));
+        node.appendChild(rect(10 + tile - 7, tileY - 4, 11, 11, { rx: 3, fill: palette.attacker }));
         node.appendChild(icons.draw(Icon.Compromised, 10 + tile - 1.5, tileY + 1.5, 8, palette.onColor));
     }
 

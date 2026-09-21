@@ -286,6 +286,33 @@ describe("view settings panel", () => {
         handle.destroy();
     });
 
+    it("puts one setting back without touching the others", async () => {
+        const { handle, element } = await mounted();
+        const resetOf = (key: string): HTMLButtonElement | null => element.querySelector<HTMLButtonElement>(`[data-control="${key}:reset"]`);
+        assert.equal(resetOf(ROWS_OPTION), null);
+        assert.equal(resetOf("filter-audience"), null);
+
+        handle.setOption(Representation.Narrative, ROWS_OPTION, COMPACT);
+        handle.setOption(Representation.Narrative, SUMMARY_OPTION, HIDDEN);
+        handle.setFilters({ audience: Audience.Executive });
+        resetOf(ROWS_OPTION)?.click();
+        assert.equal(handle.state.options.get(ROWS_OPTION), undefined);
+        assert.equal(handle.state.options.get(SUMMARY_OPTION), HIDDEN);
+        assert.equal(handle.state.filters.audience, Audience.Executive);
+        assert.equal(resetOf(ROWS_OPTION), null);
+
+        resetOf("filter-audience")?.click();
+        assert.equal(handle.state.filters.audience, Audience.Both);
+        handle.destroy();
+    });
+
+    it("offers no reset for a setting chosen back to its default", async () => {
+        const { handle, element } = await mounted();
+        handle.setOption(Representation.Narrative, ROWS_OPTION, COMFORTABLE);
+        assert.equal(element.querySelector(`[data-control="${ROWS_OPTION}:reset"]`), null);
+        handle.destroy();
+    });
+
     it("keeps the last column", async () => {
         const { handle, element } = await mounted();
         handle.setOption(Representation.Narrative, TABLE_COLUMNS_OPTION_ID, TableColumn.What);

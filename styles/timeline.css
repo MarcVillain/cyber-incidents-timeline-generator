@@ -427,6 +427,14 @@ textarea.tlg-input {
     border-top: 1px solid var(--tlg-border);
 }
 
+.tlg-view-setting-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .35rem;
+    min-height: 1.6rem;
+}
+
 .tlg-view-setting-label {
     margin: 0;
     font-size: .8rem;
@@ -1647,6 +1655,30 @@ textarea.tlg-input {
 .tlg-settings-adder {
     margin-top: .5rem;
     max-width: 24rem;
+}
+
+.tlg-vocabulary-row > .tlg-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tlg-vocabulary-more {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.tlg-vocabulary-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: .5rem;
+    margin: .1rem 0 .4rem 2.6rem;
+    padding: .5rem .6rem;
+    border-left: 2px solid var(--tlg-border);
+}
+
+.tlg-vocabulary-foot {
+    display: flex;
+    justify-content: flex-end;
 }
 
 .tlg-settings-adder > .tlg-button {

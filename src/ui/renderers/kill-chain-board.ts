@@ -2,7 +2,7 @@
 // is either a phase that never happened or one nobody could see, and both are worth showing.
 
 import type { KillChainPhaseInfo } from "../../core/catalog.js";
-import { KillChainPhase, Representation, Side, StepOutcome } from "../../core/enums.js";
+import { KillChainPhase, Representation, SideRole, StepOutcome, type KillChainPhaseKey } from "../../core/enums.js";
 import { HEADER_STRIP, cardOutline, fitLines, headerStrip, iconTile, microLabels, outcomeColor } from "../cards.js";
 import { CONTENT, frame, placeholder } from "../chrome.js";
 import type { TimelineStep } from "../diagram-store.js";
@@ -32,7 +32,7 @@ function rowsPerPage(): number {
 
 function boardCard(context: RenderContext, step: TimelineStep, x: number, y: number, width: number): SVGGElement {
     const { palette, store } = context;
-    const color = palette.sides[step.side].color;
+    const color = palette.side(step.side).color;
     const node = group({ class: "tlg-step", "data-step-id": step.id });
 
     node.appendChild(rect(x, y, width, CARD_HEIGHT, { rx: 8, fill: palette.surface }));
@@ -54,7 +54,7 @@ function boardCard(context: RenderContext, step: TimelineStep, x: number, y: num
     }
 
     if (step.outcome !== StepOutcome.Unknown) {
-        node.appendChild(microLabels(palette, [{ label: store.outcomeInfo(step.outcome).label, color: outcomeColor(palette, step) }], x + width - 62, y + CARD_HEIGHT - 14, 56));
+        node.appendChild(microLabels(palette, [{ label: store.outcomeInfo(step.outcome).label, color: outcomeColor(context, step) }], x + width - 62, y + CARD_HEIGHT - 14, 56));
     }
 
     node.appendChild(cardOutline(palette, x, y, width, CARD_HEIGHT, step.isMilestone ? color : null));
@@ -68,9 +68,9 @@ export const killChainBoard = defineRenderer<BoardPage>({
     pages(context) {
         const { store } = context;
         const phases = store.catalog.killChainPhases.filter(phase => phase.phase !== KillChainPhase.None);
-        const attacker = store.visibleSteps().filter(step => step.side === Side.Attacker || step.killChainPhase !== KillChainPhase.None);
+        const attacker = store.visibleSteps().filter(step => store.sideRole(step.side) === SideRole.Attacker || step.killChainPhase !== KillChainPhase.None);
 
-        const byPhase = new Map<KillChainPhase, TimelineStep[]>(phases.map(phase => [phase.phase, []]));
+        const byPhase = new Map<KillChainPhaseKey, TimelineStep[]>(phases.map(phase => [phase.phase, []]));
         const unclassified: TimelineStep[] = [];
         attacker.forEach(step => {
             const bucket = byPhase.get(step.killChainPhase);
@@ -95,7 +95,7 @@ export const killChainBoard = defineRenderer<BoardPage>({
     draw(context, page, pageIndex, pageCount) {
         const { palette, icons } = context;
         const covered = page.columns.filter(column => column.total > 0).length;
-        const attackerColor = palette.sides[Side.Attacker].color;
+        const attackerColor = palette.attacker;
 
         const { root, content } = frame(context, {
             page: pageIndex,

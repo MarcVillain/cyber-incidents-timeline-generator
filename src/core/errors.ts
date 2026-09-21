@@ -25,6 +25,14 @@ export class NotFoundError extends Error {
     }
 }
 
+/** A request that is well formed but that this deployment cannot carry out, such as saving a catalog it keeps in code. */
+export class ConflictError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "ConflictError";
+    }
+}
+
 export class ForbiddenError extends Error {
     constructor(message: string) {
         super(message);

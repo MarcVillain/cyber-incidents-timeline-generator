@@ -1,8 +1,19 @@
 // What a diagram holds, counted rather than drawn. A host reporting on its incidents needs the figures
 // without a browser, and reads them from the same records the representations do.
 
-import type { AttackTactic, Audience, Confidence, Involvement, KillChainPhase, LinkKind, NodeCategory, NodeKind, ResponsePhase, Side, StepOutcome } from "./enums.js";
-import { killChainPhaseOf } from "./catalog.js";
+import type {
+    AttackTacticKey,
+    AudienceKey,
+    ConfidenceKey,
+    InvolvementKey,
+    KillChainPhaseKey,
+    LinkKindKey,
+    NodeCategory,
+    NodeKindKey,
+    OutcomeKey,
+    ResponsePhaseKey,
+    SideKey
+} from "./enums.js";
 import type { Diagram, DiagramNode, DiagramStep, ImpactLevel, RecordId, ResponseMetrics, WallClock } from "./models.js";
 import { hoursBetween, parseWallClock } from "./time.js";
 
@@ -20,9 +31,9 @@ export interface MilestoneMoment {
 export interface NodeSummary {
     total: number;
     compromised: number;
-    byKind: Tally<NodeKind>;
+    byKind: Tally<NodeKindKey>;
     byCategory: Tally<NodeCategory>;
-    bySide: Tally<Side>;
+    bySide: Tally<SideKey>;
     byCriticality: Tally<ImpactLevel>;
 }
 
@@ -30,13 +41,14 @@ export interface StepSummary {
     total: number;
     milestones: number;
     withoutTime: number;
-    bySide: Tally<Side>;
-    byOutcome: Tally<StepOutcome>;
-    byTactic: Tally<AttackTactic>;
-    byKillChainPhase: Tally<KillChainPhase>;
-    byResponsePhase: Tally<ResponsePhase>;
-    byAudience: Tally<Audience>;
-    byConfidence: Tally<Confidence>;
+    bySide: Tally<SideKey>;
+    byOutcome: Tally<OutcomeKey>;
+    byTactic: Tally<AttackTacticKey>;
+    byKillChainPhase: Tally<KillChainPhaseKey>;
+    byResponsePhase: Tally<ResponsePhaseKey>;
+    /** Steps written for everyone count toward no audience. */
+    byAudience: Tally<AudienceKey>;
+    byConfidence: Tally<ConfidenceKey>;
     /** Every technique named at least once, in the order they first appear. */
     techniques: readonly string[];
     /** Every evidence source named at least once. */
@@ -46,9 +58,9 @@ export interface StepSummary {
 
 export interface LinkSummary {
     total: number;
-    byKind: Tally<LinkKind>;
-    byConfidence: Tally<Confidence>;
-    byInvolvement: Tally<Involvement>;
+    byKind: Tally<LinkKindKey>;
+    byConfidence: Tally<ConfidenceKey>;
+    byInvolvement: Tally<InvolvementKey>;
 }
 
 /** When the incident starts and ends according to the records, and how long that is. */
@@ -116,9 +128,9 @@ function summariseSteps(steps: readonly DiagramStep[]): StepSummary {
         bySide: tallyOf(steps.map(step => step.side)),
         byOutcome: tallyOf(steps.map(step => step.outcome)),
         byTactic: tallyOf(steps.map(step => step.attackTactic)),
-        byKillChainPhase: tallyOf(steps.map(step => killChainPhaseOf(step.attackTactic))),
+        byKillChainPhase: tallyOf(steps.map(step => step.killChainPhase)),
         byResponsePhase: tallyOf(steps.map(step => step.responsePhase)),
-        byAudience: tallyOf(steps.map(step => step.audience)),
+        byAudience: tallyOf(steps.flatMap(step => step.audiences)),
         byConfidence: tallyOf(steps.map(step => step.confidence)),
         techniques: distinct(steps.map(step => step.mitreTechniqueId)),
         evidenceSources: distinct(steps.map(step => step.evidenceSource)),

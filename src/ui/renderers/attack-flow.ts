@@ -1,7 +1,7 @@
 // Actions chained by cause, with the assets each one touched hanging underneath, following the shape of
 // the MITRE Attack Flow model. The chain runs back and forth across the slide so long incidents still fit.
 
-import { Representation, Side } from "../../core/enums.js";
+import { Representation, SideRole } from "../../core/enums.js";
 import type { DiagramNode, RecordId } from "../../core/models.js";
 import { fitLines, nodeColor } from "../cards.js";
 import { CONTENT, frame, placeholder } from "../chrome.js";
@@ -64,9 +64,9 @@ function assetsOf(context: RenderContext, step: TimelineStep): DiagramNode[] {
 
 function actionBox(context: RenderContext, step: TimelineStep, x: number, y: number): SVGGElement {
     const { palette, icons, store } = context;
-    const color = palette.sides[step.side].color;
+    const color = palette.side(step.side).color;
     const node = group({ class: "tlg-step", "data-step-id": step.id });
-    const label = step.side === Side.Defender ? store.responseInfo(step.responsePhase).label : store.tacticInfo(step.attackTactic).label;
+    const label = store.sideRole(step.side) === SideRole.Defender ? store.responseInfo(step.responsePhase).label : store.tacticInfo(step.attackTactic).label;
 
     node.appendChild(rect(x, y, ACTION_WIDTH, ACTION_HEIGHT, { rx: 9, fill: palette.surface }));
 

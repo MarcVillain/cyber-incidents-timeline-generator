@@ -1,7 +1,7 @@
 // The Diamond Model of Intrusion Analysis: adversary, capability, infrastructure and victim, with the
 // records of the incident sorted onto the vertex each one belongs to.
 
-import { DiamondVertex, Representation, Side } from "../../core/enums.js";
+import { DiamondVertex, Representation, SideRole } from "../../core/enums.js";
 import { Icon } from "../../core/icon.js";
 import type { DiagramNode } from "../../core/models.js";
 import { fitText, nodeColor } from "../cards.js";
@@ -22,7 +22,7 @@ interface VertexDefinition {
     vertex: DiamondVertex;
     label: string;
     icon: Icon;
-    side: Side;
+    role: SideRole;
     corner: Corner;
 }
 
@@ -33,10 +33,10 @@ interface VertexPage extends VertexDefinition {
 
 function vertices(strings: Strings): readonly VertexDefinition[] {
     return [
-        { vertex: DiamondVertex.Adversary, label: strings.scene.adversary, icon: Icon.ThreatActor, side: Side.Attacker, corner: Corner.Top },
-        { vertex: DiamondVertex.Capability, label: strings.scene.capability, icon: Icon.Tool, side: Side.Attacker, corner: Corner.Left },
-        { vertex: DiamondVertex.Infrastructure, label: strings.scene.infrastructure, icon: Icon.Server, side: Side.ThirdParty, corner: Corner.Right },
-        { vertex: DiamondVertex.Victim, label: strings.scene.victim, icon: Icon.Target, side: Side.Victim, corner: Corner.Bottom }
+        { vertex: DiamondVertex.Adversary, label: strings.scene.adversary, icon: Icon.ThreatActor, role: SideRole.Attacker, corner: Corner.Top },
+        { vertex: DiamondVertex.Capability, label: strings.scene.capability, icon: Icon.Tool, role: SideRole.Attacker, corner: Corner.Left },
+        { vertex: DiamondVertex.Infrastructure, label: strings.scene.infrastructure, icon: Icon.Server, role: SideRole.Ally, corner: Corner.Right },
+        { vertex: DiamondVertex.Victim, label: strings.scene.victim, icon: Icon.Target, role: SideRole.Victim, corner: Corner.Bottom }
     ];
 }
 
@@ -85,7 +85,7 @@ function hub(context: RenderContext, centerX: number, centerY: number): SVGGElem
 
 function panel(context: RenderContext, vertex: VertexPage, x: number, y: number): SVGGElement {
     const { palette, icons, store } = context;
-    const color = palette.sides[vertex.side].color;
+    const color = palette.roleColor(vertex.role);
     const node = group();
 
     node.appendChild(rect(x, y, PANEL_WIDTH, PANEL_HEIGHT, { rx: 12, fill: palette.surface, stroke: palette.tint(color, 0.6), "stroke-width": 1.5 }));
@@ -161,7 +161,7 @@ export const diamondModel = defineRenderer<VertexPage[]>({
             pageCount,
             subtitle: `${total} record(s) placed on the four vertices`,
             legend: vertices.filter(vertex => vertex.total > 0).map(vertex => ({
-                label: vertex.label, color: palette.sides[vertex.side].color, icon: vertex.icon
+                label: vertex.label, color: palette.roleColor(vertex.role), icon: vertex.icon
             }))
         });
 

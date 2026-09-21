@@ -130,7 +130,7 @@ function axis(palette: Palette, steps: readonly TimelineStep[], positions: reado
         if (!previous || !next) continue;
 
         node.appendChild(line(from, axisY, to, axisY, {
-            stroke: palette.sides[next.side].color, "stroke-width": 4, "stroke-linecap": "round", opacity: 0.55
+            stroke: palette.side(next.side).color, "stroke-width": 4, "stroke-linecap": "round", opacity: 0.55
         }));
 
         const elapsed = gapLabel(previous, next);

@@ -1,16 +1,14 @@
 import {
     AttackTactic,
     Audience,
-    Confidence,
-    Involvement,
-    LinkKind,
-    NodeKind,
     ResponsePhase,
     Side,
     StepOutcome,
-    isEnumValue
+    isEnumValue,
+    type AudienceKey
 } from "./enums.js";
 import { buildCatalog, impactLevelsOf, type Catalog } from "./catalog.js";
+import { Vocabulary } from "./vocabulary.js";
 import { ValidationError, type ValidationIssue } from "./errors.js";
 import type {
     IncidentFields,
@@ -48,6 +46,7 @@ export class FieldLimits {
     static readonly EvidenceSource = 200;
     static readonly Tag = 100;
     static readonly Tags = 30;
+    static readonly Audiences = 20;
     static readonly Involvements = 200;
     static readonly OrderIndex = 1000000;
     static readonly LinkLabel = 200;
@@ -68,12 +67,37 @@ export class ValidationRules {
     readonly unassessedImpact: string;
     readonly milestoneKeys: readonly string[];
     readonly representations: readonly string[];
+    readonly sides: readonly string[];
+    readonly nodeKinds: readonly string[];
+    readonly attackTactics: readonly string[];
+    readonly responsePhases: readonly string[];
+    readonly outcomes: readonly string[];
+    readonly linkKinds: readonly string[];
+    readonly confidences: readonly string[];
+    readonly involvements: readonly string[];
+    readonly audiences: readonly string[];
+    readonly defaultConfidence: string;
+    readonly defaultLinkKind: string;
+    readonly defaultInvolvement: string;
 
     constructor(catalog: Catalog) {
         this.impactLevels = impactLevelsOf(catalog.impactScale).map(entry => entry.level);
         this.unassessedImpact = catalog.impactScale.unassessed.level;
         this.milestoneKeys = catalog.milestones.map(entry => entry.key);
         this.representations = catalog.representations.map(entry => entry.representation);
+        this.sides = catalog.sides.map(entry => entry.side);
+        this.nodeKinds = catalog.nodeKinds.map(entry => entry.kind);
+        this.attackTactics = catalog.attackTactics.map(entry => entry.tactic);
+        this.responsePhases = catalog.responsePhases.map(entry => entry.phase);
+        this.outcomes = catalog.outcomes.map(entry => entry.outcome);
+        this.linkKinds = catalog.linkKinds.map(entry => entry.kind);
+        this.confidences = catalog.confidences.map(entry => entry.value);
+        this.involvements = catalog.involvements.map(entry => entry.value);
+        this.audiences = catalog.audiences.map(entry => entry.value);
+        const vocabulary = new Vocabulary(catalog);
+        this.defaultConfidence = vocabulary.defaultConfidence;
+        this.defaultLinkKind = vocabulary.defaultLinkKind;
+        this.defaultInvolvement = vocabulary.defaultInvolvement;
     }
 }
 
@@ -81,6 +105,11 @@ export const DEFAULT_VALIDATION_RULES = new ValidationRules(buildCatalog());
 
 // Colours end up in SVG attributes, so anything beyond a plain CSS colour is refused rather than escaped
 const COLOR_PATTERN = /^(#[0-9a-f]{3,8}|[a-z]{3,30}|(rgb|hsl)a?\([0-9\s.,%deg/]+\))$/i;
+
+/** Whether a colour is plain enough to write into an SVG attribute as it is. */
+export function isSafeColor(value: string): boolean {
+    return COLOR_PATTERN.test(value);
+}
 const ICON_PATTERN = /^[a-z0-9-]+$/;
 const TECHNIQUE_PATTERN = /^T\d{4}(\.\d{3})?$/;
 
@@ -292,6 +321,19 @@ export class FieldReader {
         return value as Metadata;
     }
 
+    /** A list of keys the catalog knows, each kept once, in the order sent. */
+    keyList(field: string, allowed: readonly string[], maxItems: number): string[] | undefined {
+        const value = this.value(field);
+        if (value === undefined) return undefined;
+        if (!Array.isArray(value) || value.length > maxItems) return this.fail(field, `must be a list of at most ${maxItems} values`);
+        const kept: string[] = [];
+        for (const entry of value) {
+            if (typeof entry !== "string" || !allowed.includes(entry)) return this.fail(field, `must only hold ${allowed.join(", ")}`);
+            if (!kept.includes(entry)) kept.push(entry);
+        }
+        return kept;
+    }
+
     textList(field: string, maxLength: number, maxItems: number): string[] | undefined {
         const value = this.value(field);
         if (value === undefined) return undefined;
@@ -341,6 +383,7 @@ function incidentDefaults(rules: ValidationRules): Omit<IncidentFields, "title">
 }
 
 function nodeDefaults(rules: ValidationRules): Omit<NodeFields, "name" | "kind"> {
+    // The catalog check keeps the unknown side in every list, so it is always a valid default
     return {
         description: null,
         side: Side.Unknown,
@@ -367,9 +410,9 @@ function stepDefaults(rules: ValidationRules): Omit<StepFields, "title" | "times
         responsePhase: ResponsePhase.None,
         mitreTechniqueId: null,
         severity: rules.unassessedImpact,
-        confidence: Confidence.Confirmed,
+        confidence: rules.defaultConfidence,
         outcome: StepOutcome.Unknown,
-        audience: Audience.Both,
+        audiences: [],
         evidenceSource: null,
         isMilestone: false,
         milestoneKey: null,
@@ -383,11 +426,11 @@ function stepDefaults(rules: ValidationRules): Omit<StepFields, "title" | "times
     };
 }
 
-function linkDefaults(): Omit<LinkFields, "sourceNodeId" | "targetNodeId"> {
+function linkDefaults(rules: ValidationRules): Omit<LinkFields, "sourceNodeId" | "targetNodeId"> {
     return {
-        kind: LinkKind.ConnectsTo,
+        kind: rules.defaultLinkKind,
         label: null,
-        confidence: Confidence.Confirmed,
+        confidence: rules.defaultConfidence,
         stepId: null,
         metadata: null
     };
@@ -409,8 +452,8 @@ function readNodePatch(reader: FieldReader, rules: ValidationRules): Partial<Nod
     return definedOnly<NodeFields>({
         name: reader.text("name", FieldLimits.NodeName),
         description: reader.nullableText("description", FieldLimits.NodeDescription),
-        kind: reader.enumValue("kind", NodeKind),
-        side: reader.enumValue("side", Side),
+        kind: reader.oneOf("kind", rules.nodeKinds),
+        side: reader.oneOf("side", rules.sides),
         parentId: reader.nullableId("parentId"),
         identifier: reader.nullableText("identifier", FieldLimits.Identifier),
         role: reader.nullableText("role", FieldLimits.Role),
@@ -423,15 +466,24 @@ function readNodePatch(reader: FieldReader, rules: ValidationRules): Partial<Nod
     });
 }
 
-function readInvolvement(reader: FieldReader): StepInvolvement | undefined {
+function readInvolvement(reader: FieldReader, rules: ValidationRules): StepInvolvement | undefined {
     const involvement = definedOnly<StepInvolvement>({
         nodeId: reader.id("nodeId"),
-        involvement: reader.enumValue("involvement", Involvement)
+        involvement: reader.oneOf("involvement", rules.involvements)
     });
     if (involvement.nodeId === undefined) {
         return reader.fail("nodeId", "is required");
     }
-    return { nodeId: involvement.nodeId, involvement: involvement.involvement ?? Involvement.Involved };
+    return { nodeId: involvement.nodeId, involvement: involvement.involvement ?? rules.defaultInvolvement };
+}
+
+/**
+ * Files and clients written before audiences became a list send one audience, or Both for everyone.
+ */
+function legacyAudience(reader: FieldReader, rules: ValidationRules): AudienceKey[] | undefined {
+    const single = reader.oneOf("audience", [Audience.Both, ...rules.audiences]);
+    if (single === undefined) return undefined;
+    return single === Audience.Both ? [] : [single];
 }
 
 /**
@@ -452,34 +504,34 @@ function readStepPatch(reader: FieldReader, rules: ValidationRules): Partial<Ste
         orderIndex: reader.integer("orderIndex", -FieldLimits.OrderIndex, FieldLimits.OrderIndex),
         title: reader.text("title", FieldLimits.StepTitle),
         description: reader.nullableText("description", FieldLimits.StepDescription),
-        side: reader.enumValue("side", Side),
-        attackTactic: reader.enumValue("attackTactic", AttackTactic),
-        responsePhase: reader.enumValue("responsePhase", ResponsePhase),
+        side: reader.oneOf("side", rules.sides),
+        attackTactic: reader.oneOf("attackTactic", rules.attackTactics),
+        responsePhase: reader.oneOf("responsePhase", rules.responsePhases),
         mitreTechniqueId: reader.nullableText("mitreTechniqueId", FieldLimits.TechniqueId, TECHNIQUE_PATTERN),
         severity: reader.oneOf("severity", rules.impactLevels),
-        confidence: reader.enumValue("confidence", Confidence),
-        outcome: reader.enumValue("outcome", StepOutcome),
-        audience: reader.enumValue("audience", Audience),
+        confidence: reader.oneOf("confidence", rules.confidences),
+        outcome: reader.oneOf("outcome", rules.outcomes),
+        audiences: reader.keyList("audiences", rules.audiences, FieldLimits.Audiences) ?? legacyAudience(reader, rules),
         evidenceSource: reader.nullableText("evidenceSource", FieldLimits.EvidenceSource),
         isMilestone: reader.boolean("isMilestone"),
         milestoneKey: reader.nullableOneOf("milestoneKey", rules.milestoneKeys),
         icon: reader.nullableText("icon", FieldLimits.Icon, ICON_PATTERN),
         sourceNodeId: reader.nullableId("sourceNodeId"),
         targetNodeId: reader.nullableId("targetNodeId"),
-        involvements: distinctInvolvements(reader.list("involvements", FieldLimits.Involvements, readInvolvement)),
+        involvements: distinctInvolvements(reader.list("involvements", FieldLimits.Involvements, entry => readInvolvement(entry, rules))),
         tags: reader.textList("tags", FieldLimits.Tag, FieldLimits.Tags),
         externalId: reader.nullableText("externalId", FieldLimits.ExternalId),
         metadata: reader.metadata("metadata")
     });
 }
 
-function readLinkPatch(reader: FieldReader): Partial<LinkFields> {
+function readLinkPatch(reader: FieldReader, rules: ValidationRules): Partial<LinkFields> {
     return definedOnly<LinkFields>({
         sourceNodeId: reader.id("sourceNodeId"),
         targetNodeId: reader.id("targetNodeId"),
-        kind: reader.enumValue("kind", LinkKind),
+        kind: reader.oneOf("kind", rules.linkKinds),
         label: reader.nullableText("label", FieldLimits.LinkLabel),
-        confidence: reader.enumValue("confidence", Confidence),
+        confidence: reader.oneOf("confidence", rules.confidences),
         stepId: reader.nullableId("stepId"),
         metadata: reader.metadata("metadata")
     });
@@ -546,18 +598,18 @@ export function readStepUpdate(value: unknown, rules: ValidationRules = DEFAULT_
     return patch;
 }
 
-export function readLinkCreate(value: unknown): LinkFields {
+export function readLinkCreate(value: unknown, rules: ValidationRules = DEFAULT_VALIDATION_RULES): LinkFields {
     const reader = new FieldReader(value);
-    const patch = readLinkPatch(reader);
+    const patch = readLinkPatch(reader, rules);
     if (!reader.requireAll(patch, ["sourceNodeId", "targetNodeId"])) {
         throw reader.error();
     }
-    return { ...linkDefaults(), ...patch };
+    return { ...linkDefaults(rules), ...patch };
 }
 
-export function readLinkUpdate(value: unknown): LinkUpdateInput {
+export function readLinkUpdate(value: unknown, rules: ValidationRules = DEFAULT_VALIDATION_RULES): LinkUpdateInput {
     const reader = new FieldReader(value);
-    const patch = readLinkPatch(reader);
+    const patch = readLinkPatch(reader, rules);
     reader.throwIfInvalid();
     return patch;
 }

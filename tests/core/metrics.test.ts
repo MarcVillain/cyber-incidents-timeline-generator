@@ -6,10 +6,13 @@ import type { Incident, StepRecord } from "../../src/core/models.js";
 import { detections, longestUnseen, responseEpisodes, responsePoints, type TimedStep } from "../../src/core/response.js";
 import { formatWallClock, parseWallClock } from "../../src/core/time.js";
 import { readIncidentCreate, readStepCreate } from "../../src/core/validation.js";
+import { buildCatalog } from "../../src/core/catalog.js";
+import { Vocabulary } from "../../src/core/vocabulary.js";
 
 const SCOPE = "Scope";
 const OTHER_SCOPE = "Other";
 const MS_PER_HOUR = 3_600_000;
+const VOCABULARY = new Vocabulary(buildCatalog());
 
 function incident(id: number, fields: Partial<Incident>): Incident {
     return { ...readIncidentCreate({ title: `Incident ${id}`, scope: SCOPE }), ...fields, id };
@@ -29,7 +32,7 @@ function measured(id: number, attackedAt: string, detectAfterHours: number | nul
         const detectedAt = new Date((parseWallClock(attackedAt)?.getTime() ?? 0) + detectAfterHours * MS_PER_HOUR);
         steps.push(step(id * 10 + 1, formatWallClock(detectedAt), Side.Defender, { responsePhase: ResponsePhase.Detect }));
     }
-    return { incident: incident(id, { scope }), metrics: buildMetrics(steps) };
+    return { incident: incident(id, { scope }), metrics: buildMetrics(steps, VOCABULARY) };
 }
 
 function timed(timestamp: string, side: Side, outcome = StepOutcome.Unknown, responsePhase = ResponsePhase.None): TimedStep {
@@ -42,7 +45,7 @@ describe("response metrics from the service", () => {
             step(1, "2026-01-01T06:00", Side.Attacker),
             step(2, "2026-01-01T12:00", Side.Defender, { responsePhase: ResponsePhase.Detect }),
             step(3, "2026-01-02T00:00", Side.Defender, { responsePhase: ResponsePhase.Contain })
-        ]);
+        ], VOCABULARY);
 
         assert.equal(metrics.firstAttackerAction, "2026-01-01T06:00:00");
         assert.equal(metrics.detection, "2026-01-01T12:00:00");
@@ -84,24 +87,24 @@ describe("response analysis of the steps", () => {
     ];
 
     it("ignores a detection whose response failed", () => {
-        assert.deepEqual(detections(steps).map(moment => moment.getMonth()), [1]);
+        assert.deepEqual(detections(steps, VOCABULARY).map(moment => moment.getMonth()), [1]);
     });
 
     it("measures the longest run the intruder had before a detection that held", () => {
-        const unseen = longestUnseen(steps);
+        const unseen = longestUnseen(steps, VOCABULARY);
         assert.equal(unseen?.from.getMonth(), 0);
         assert.equal(unseen?.to.getDate(), 10);
     });
 
     it("splits the response into its episodes", () => {
-        const episodes = responseEpisodes(steps);
+        const episodes = responseEpisodes(steps, VOCABULARY);
         assert.equal(episodes.length, 2);
         assert.equal(episodes[0]?.failed, true);
         assert.equal(episodes[1]?.failed, false);
     });
 
     it("tells the first notice apart from the detection that held", () => {
-        const points = responsePoints(steps);
+        const points = responsePoints(steps, VOCABULARY);
         assert.equal(points.firstNoticed?.getMonth(), 0);
         assert.equal(points.detected?.getMonth(), 1);
         assert.equal(points.contained?.getDate(), 2);

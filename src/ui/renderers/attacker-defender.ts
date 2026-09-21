@@ -1,12 +1,12 @@
 // The debrief slide: what the intruder did above the clock, what the response did below it, and the
 // stretch of time in between where nobody was watching.
 
-import { Representation, Side, StepOutcome } from "../../core/enums.js";
+import { Representation, SideRole, StepOutcome } from "../../core/enums.js";
 import { Icon } from "../../core/icon.js";
 import { longestUnseen } from "../../core/response.js";
 import { formatDate, formatDuration } from "../../core/time.js";
 import { span, timeAxis } from "../axis.js";
-import { HEADER_STRIP, cardOutline, fitLines, headerStrip, microLabels, outcomeColor } from "../cards.js";
+import { HEADER_STRIP, cardOutline, fitLines, headerStrip, microLabels, outcomeColor, roleColors } from "../cards.js";
 import { CONTENT, frame, placeholder } from "../chrome.js";
 import type { TimelineStep } from "../diagram-store.js";
 import { paginate, spread, timeScale } from "../geometry.js";
@@ -33,7 +33,7 @@ interface MetricTile {
 
 function compactCard(context: RenderContext, step: TimelineStep, x: number, y: number): SVGGElement {
     const { palette, store } = context;
-    const color = palette.sides[step.side].color;
+    const color = palette.side(step.side).color;
     const node = group({ class: "tlg-step", "data-step-id": step.id });
 
     node.appendChild(rect(x, y, CARD_WIDTH, CARD_HEIGHT, { rx: 8, fill: palette.surface }));
@@ -47,7 +47,7 @@ function compactCard(context: RenderContext, step: TimelineStep, x: number, y: n
     });
 
     if (step.outcome !== StepOutcome.Unknown) {
-        node.appendChild(microLabels(palette, [{ label: store.outcomeInfo(step.outcome).label, color: outcomeColor(palette, step) }], x + 12, y + CARD_HEIGHT - 12, CARD_WIDTH - 24));
+        node.appendChild(microLabels(palette, [{ label: store.outcomeInfo(step.outcome).label, color: outcomeColor(context, step) }], x + 12, y + CARD_HEIGHT - 12, CARD_WIDTH - 24));
     }
 
     node.appendChild(cardOutline(palette, x, y, CARD_WIDTH, CARD_HEIGHT, step.isMilestone ? color : null));
@@ -56,7 +56,7 @@ function compactCard(context: RenderContext, step: TimelineStep, x: number, y: n
 
 function marker(context: RenderContext, step: TimelineStep, x: number, axisY: number): SVGGElement {
     const { palette } = context;
-    const color = palette.sides[step.side].color;
+    const color = palette.side(step.side).color;
     return group({}, [
         circle(x, axisY, 7, { fill: palette.surface, stroke: color, "stroke-width": 2.5 }),
         step.isMilestone ? circle(x, axisY, 3, { fill: color }) : null
@@ -70,9 +70,9 @@ function metricsStrip(context: RenderContext, x: number, y: number): SVGGElement
     const node = group();
 
     const entries: MetricTile[] = [
-        { label: words.dwellTime, value: context.time.formatDuration(metrics.dwellHours), icon: Icon.ThreatActor, color: palette.sides[Side.Attacker].color },
-        { label: words.timeToDetect, value: context.time.formatDuration(metrics.timeToDetectHours), icon: Icon.Search, color: palette.sides[Side.Defender].color },
-        { label: words.timeToContain, value: context.time.formatDuration(metrics.timeToContainHours), icon: Icon.Shield, color: palette.sides[Side.Defender].color },
+        { label: words.dwellTime, value: context.time.formatDuration(metrics.dwellHours), icon: Icon.ThreatActor, color: palette.attacker },
+        { label: words.timeToDetect, value: context.time.formatDuration(metrics.timeToDetectHours), icon: Icon.Search, color: palette.defender },
+        { label: words.timeToContain, value: context.time.formatDuration(metrics.timeToContainHours), icon: Icon.Shield, color: palette.defender },
         { label: words.timeToRecover, value: context.time.formatDuration(metrics.timeToRecoverHours), icon: Icon.Recover, color: palette.good }
     ];
 
@@ -95,12 +95,16 @@ function metricsStrip(context: RenderContext, x: number, y: number): SVGGElement
     return node;
 }
 
+// The two lanes, the attacker above the clock and the response below it
+const DUEL_ROLES: readonly SideRole[] = [SideRole.Attacker, SideRole.Defender];
+
 export const attackerDefender = defineRenderer<TimelineStep[]>({
     representation: Representation.AttackerDefender,
     filters: strings => strings.filters.attackerDefender,
 
     pages(context) {
-        const steps = context.store.visibleSteps().filter(step => step.side === Side.Attacker || step.side === Side.Defender);
+        const { store } = context;
+        const steps = store.visibleSteps().filter(step => DUEL_ROLES.includes(store.sideRole(step.side)));
         return paginate(steps, STEPS_PER_PAGE);
     },
 
@@ -108,8 +112,8 @@ export const attackerDefender = defineRenderer<TimelineStep[]>({
         const { store, palette } = context;
         const first = pageSteps[0];
         const last = pageSteps.at(-1);
-        const attacker = palette.sides[Side.Attacker];
-        const defender = palette.sides[Side.Defender];
+        const attacker = roleColors(context, SideRole.Attacker);
+        const defender = roleColors(context, SideRole.Defender);
 
         const { root, content } = frame(context, {
             page: pageIndex,
@@ -137,7 +141,7 @@ export const attackerDefender = defineRenderer<TimelineStep[]>({
 
         content.appendChild(metricsStrip(context, CONTENT.x, CONTENT.y));
 
-        const unseen = longestUnseen(visible);
+        const unseen = longestUnseen(visible, store.vocabulary);
         if (unseen) {
             content.appendChild(span(scale, unseen.from, unseen.to, {
                 top: trackTop,
@@ -156,15 +160,15 @@ export const attackerDefender = defineRenderer<TimelineStep[]>({
             "font-size": 10.5, "font-weight": 700, "letter-spacing": 1, fill: defender.color
         }));
 
-        [Side.Attacker, Side.Defender].forEach(side => {
-            const sideSteps = pageSteps.filter(step => step.side === side);
+        DUEL_ROLES.forEach(role => {
+            const sideSteps = pageSteps.filter(step => store.sideRole(step.side) === role);
             if (sideSteps.length === 0) return;
 
-            const above = side === Side.Attacker;
+            const above = role === SideRole.Attacker;
             const placed = spread(sideSteps.map(step => scale.at(step.at) - CARD_WIDTH / 2), CARD_WIDTH + CARD_GAP, left, right - CARD_WIDTH);
             const perRow = Math.max(1, Math.floor((right - left) / (CARD_WIDTH + CARD_GAP)));
             const rowCount = Math.min(MAX_ROWS, Math.ceil(sideSteps.length / perRow));
-            const color = palette.sides[side].color;
+            const color = palette.roleColor(role);
 
             sideSteps.forEach((step, index) => {
                 const row = rowCount > 1 ? index % rowCount : 0;

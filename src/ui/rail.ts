@@ -2,7 +2,7 @@
 // typing: pick a kind, type a name, and either press Enter or leave the line.
 
 import type { NodeKindInfo } from "../core/catalog.js";
-import { LinkKind, NodeCategory, NodeKind, RecordType, Side } from "../core/enums.js";
+import { NodeCategory, NodeKind, RecordType, Side, type NodeKindKey, type SideKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { DiagramLink, DiagramNode, RecordId } from "../core/models.js";
 import { formatWallClock, millisecondsFromHours, momentBetween } from "../core/time.js";
@@ -14,7 +14,7 @@ import { DropIntent, canDrop, intentAt, targetFor, type Parented } from "./rail-
 /**
  * The side a new record most likely belongs to, so the common case needs no correction afterwards.
  */
-const DEFAULT_SIDES: ReadonlyMap<NodeKind, Side> = new Map([
+const DEFAULT_SIDES: ReadonlyMap<NodeKindKey, SideKey> = new Map<NodeKindKey, SideKey>([
     [NodeKind.ThreatActor, Side.Attacker],
     [NodeKind.Vendor, Side.ThirdParty],
     [NodeKind.Authority, Side.ThirdParty],
@@ -41,7 +41,7 @@ interface RowDescription {
     type: RecordType;
     id: RecordId;
     icon: string;
-    side: Side;
+    side: SideKey;
     name: string;
     meta: string;
     child: boolean;
@@ -139,7 +139,7 @@ export class Rail {
         records.forEach(record => rowsFor(record).forEach(row => fragment.append(row)));
     }
 
-    private badge(icon: string, side: Side): HTMLSpanElement {
+    private badge(icon: string, side: SideKey): HTMLSpanElement {
         const badge = h("span", "tlg-record-icon", {}, [this.context.icons.element(icon)]);
         badge.style.background = `var(${this.context.store.sideInfo(side).colorToken})`;
         return badge;
@@ -416,11 +416,16 @@ export class Rail {
         this.render();
     }
 
+    /** The side a new record is given, or the unknown one when the catalog no longer has that side. */
+    private knownSide(side: SideKey): SideKey {
+        return this.context.store.vocabulary.hasSide(side) ? side : Side.Unknown;
+    }
+
     private async beginStep(): Promise<void> {
         this.closeMenu();
         const id = await this.context.actions.create({
             type: RecordType.Step,
-            input: { title: this.context.strings.rail.newStep, timestamp: formatWallClock(this.newStepMoment()), side: Side.Attacker }
+            input: { title: this.context.strings.rail.newStep, timestamp: formatWallClock(this.newStepMoment()), side: this.knownSide(Side.Attacker) }
         });
         if (id !== null) this.context.store.setSelection({ type: RecordType.Step, id });
     }
@@ -449,7 +454,7 @@ export class Rail {
         }
         const id = await this.context.actions.create({
             type: RecordType.Link,
-            input: { sourceNodeId: first.id, targetNodeId: second.id, kind: LinkKind.ConnectsTo }
+            input: { sourceNodeId: first.id, targetNodeId: second.id, kind: this.context.store.vocabulary.defaultLinkKind }
         });
         if (id !== null) this.context.store.setSelection({ type: RecordType.Link, id });
     }
@@ -469,7 +474,7 @@ export class Rail {
             input.value = "";
             void this.context.actions.create({
                 type: RecordType.Node,
-                input: { name, kind: pending.kind.kind, side: DEFAULT_SIDES.get(pending.kind.kind) ?? Side.Victim }
+                input: { name, kind: pending.kind.kind, side: this.knownSide(DEFAULT_SIDES.get(pending.kind.kind) ?? Side.Victim) }
             });
             return true;
         };

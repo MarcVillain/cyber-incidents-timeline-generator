@@ -1,6 +1,17 @@
-import { buildCatalog, canonicalKeyOf, checkImpactScale, type Catalog, type ImpactScale } from "./catalog.js";
-import { NotFoundError, ValidationError } from "./errors.js";
+import { buildCatalog, canonicalKeyOf, checkImpactScale, checkVocabulary, type Catalog, type ImpactScale } from "./catalog.js";
+import { ConflictError, NotFoundError, ValidationError } from "./errors.js";
+import {
+    CatalogList,
+    applyCatalogSettings,
+    emptyCatalogSettings,
+    readCatalogSettings,
+    removedEntries,
+    type CatalogSettings,
+    type CatalogUsageEntry
+} from "./catalog-settings.js";
+import type { CatalogStore } from "./catalog-store.js";
 import { toDiagramLink, toDiagramNode, toDiagramStep } from "./mapping.js";
+import { Vocabulary } from "./vocabulary.js";
 import { DEFAULT_BENCHMARK_SAMPLE_SIZE, buildBenchmark, buildMetrics, type MeasuredIncident } from "./metrics.js";
 import type {
     Diagram,
@@ -83,6 +94,16 @@ export interface TimelineApi {
     deleteLink(incidentId: RecordId, linkId: RecordId): Promise<void>;
 
     saveLayout(incidentId: RecordId, layouts: LayoutInput[]): Promise<void>;
+
+    /** What this deployment changed of its catalog. Empty when it keeps the catalog it was built with. */
+    getCatalogSettings(): Promise<CatalogSettings>;
+    /**
+     * Lays the settings over the catalog the deployment was built with, keeps them and answers the catalog
+     * that results. Records holding an entry the settings remove keep it and are drawn as unknown.
+     */
+    saveCatalogSettings(settings: CatalogSettings): Promise<Catalog>;
+    /** The entries the settings would remove that records still hold, counted, so a change can be confirmed first. */
+    catalogUsage(settings: CatalogSettings): Promise<CatalogUsageEntry[]>;
 }
 
 export interface TimelineServiceOptions {
@@ -91,6 +112,22 @@ export interface TimelineServiceOptions {
     /** The levels incidents, records and steps are rated on. Overrides the scale of the catalog when both are given. */
     impactScale?: ImpactScale;
     benchmarkSampleSize?: number;
+    /**
+     * Where the catalog settings of the deployment are kept. Without one the catalog is the one given here
+     * and saving settings is refused, which suits a host that configures its vocabulary in code.
+     */
+    catalogStore?: CatalogStore;
+}
+
+/** The catalog in force and what is derived from it, rebuilt whenever the settings change. */
+interface CatalogState {
+    catalog: Catalog;
+    vocabulary: Vocabulary;
+    rules: ValidationRules;
+}
+
+function stateOf(catalog: Catalog): CatalogState {
+    return { catalog, vocabulary: new Vocabulary(catalog), rules: new ValidationRules(catalog) };
 }
 
 function byId<TRecord extends { id: RecordId }>(a: TRecord, b: TRecord): number {
@@ -119,8 +156,9 @@ function invalid(field: string, message: string, code?: string): ValidationError
  */
 export class TimelineService implements TimelineApi {
     private readonly store: TimelineStore;
-    private readonly catalog: Catalog;
-    private readonly rules: ValidationRules;
+    private readonly base: Catalog;
+    private readonly catalogStore: CatalogStore | null;
+    private state: Promise<CatalogState> | null = null;
     private readonly benchmarkSampleSize: number;
 
     constructor(store: TimelineStore, options: TimelineServiceOptions = {}) {
@@ -130,9 +168,91 @@ export class TimelineService implements TimelineApi {
             catalog.impactScale = structuredClone(options.impactScale);
         }
         checkImpactScale(catalog.impactScale);
-        this.catalog = catalog;
-        this.rules = new ValidationRules(catalog);
+        checkVocabulary(catalog);
+        this.base = catalog;
+        this.catalogStore = options.catalogStore ?? null;
         this.benchmarkSampleSize = options.benchmarkSampleSize ?? DEFAULT_BENCHMARK_SAMPLE_SIZE;
+    }
+
+    /**
+     * The catalog in force, read from the catalog store once and kept. A failed read is not kept, so the
+     * next request tries again.
+     */
+    private catalogState(): Promise<CatalogState> {
+        this.state ??= this.loadCatalogState().catch((error: unknown) => {
+            this.state = null;
+            throw error;
+        });
+        return this.state;
+    }
+
+    private async loadCatalogState(): Promise<CatalogState> {
+        const stored = this.catalogStore ? await this.catalogStore.load() : null;
+        return stateOf(stored ? applyCatalogSettings(this.base, stored) : structuredClone(this.base));
+    }
+
+    /**
+     * Forgets the catalog read from the store, for a deployment running several processes where another
+     * one may have saved settings.
+     */
+    reloadCatalog(): void {
+        this.state = null;
+    }
+
+    async getCatalogSettings(): Promise<CatalogSettings> {
+        return (this.catalogStore ? await this.catalogStore.load() : null) ?? emptyCatalogSettings();
+    }
+
+    async saveCatalogSettings(input: CatalogSettings): Promise<Catalog> {
+        const settings = readCatalogSettings(input);
+        const catalog = applyCatalogSettings(this.base, settings);
+        if (!this.catalogStore) {
+            throw new ConflictError("This deployment keeps its catalog in code, so its settings cannot be saved.");
+        }
+        await this.catalogStore.save(settings);
+        this.state = Promise.resolve(stateOf(catalog));
+        return structuredClone(catalog);
+    }
+
+    async catalogUsage(input: CatalogSettings): Promise<CatalogUsageEntry[]> {
+        const next = applyCatalogSettings(this.base, readCatalogSettings(input));
+        const removed = removedEntries((await this.catalogState()).catalog, next);
+        if (removed.length === 0) return [];
+
+        const counts = new Map<CatalogList, Map<string, number>>();
+        const count = (list: CatalogList, key: string | null): void => {
+            if (key === null || !removed.some(entry => entry.list === list && entry.entries.has(key))) return;
+            const perKey = counts.get(list) ?? new Map<string, number>();
+            perKey.set(key, (perKey.get(key) ?? 0) + 1);
+            counts.set(list, perKey);
+        };
+        for (const incident of await this.store.listIncidents()) {
+            count(CatalogList.ImpactLevels, incident.impact);
+            (await this.store.listNodes(incident.id)).forEach(node => {
+                count(CatalogList.ImpactLevels, node.criticality);
+                count(CatalogList.Sides, node.side);
+                count(CatalogList.NodeKinds, node.kind);
+            });
+            (await this.store.listSteps(incident.id)).forEach(step => {
+                count(CatalogList.ImpactLevels, step.severity);
+                count(CatalogList.Milestones, step.milestoneKey);
+                count(CatalogList.Sides, step.side);
+                count(CatalogList.AttackTactics, step.attackTactic);
+                count(CatalogList.ResponsePhases, step.responsePhase);
+                count(CatalogList.Outcomes, step.outcome);
+                count(CatalogList.Confidences, step.confidence);
+                step.audiences.forEach(audience => count(CatalogList.Audiences, audience));
+                step.involvements.forEach(entry => count(CatalogList.Involvements, entry.involvement));
+            });
+            (await this.store.listLinks(incident.id)).forEach(link => {
+                count(CatalogList.LinkKinds, link.kind);
+                count(CatalogList.Confidences, link.confidence);
+            });
+        }
+        return removed.flatMap(({ list, entries }) => [...entries].flatMap(([key, label]) => {
+            const records = counts.get(list)?.get(key) ?? 0;
+            return records > 0 ? [{ list, key, label, records }] : [];
+        }));
     }
 
     async listIncidents(): Promise<Incident[]> {
@@ -145,12 +265,14 @@ export class TimelineService implements TimelineApi {
     }
 
     async createIncident(input: IncidentCreateInput): Promise<Incident> {
-        const fields = readIncidentCreate(input, this.rules);
+        const { rules } = await this.catalogState();
+        const fields = readIncidentCreate(input, rules);
         return this.store.insertIncident(fields);
     }
 
     async updateIncident(incidentId: RecordId, input: IncidentUpdateInput): Promise<void> {
-        const patch = readIncidentUpdate(input, this.rules);
+        const { rules } = await this.catalogState();
+        const patch = readIncidentUpdate(input, rules);
         await this.store.transaction(async () => {
             const incident = await this.requireIncident(incidentId);
             await this.store.updateIncident({ ...incident, ...patch });
@@ -165,7 +287,8 @@ export class TimelineService implements TimelineApi {
     }
 
     async getCatalog(): Promise<Catalog> {
-        return structuredClone(this.catalog);
+        const { catalog } = await this.catalogState();
+        return structuredClone(catalog);
     }
 
     async getSummary(incidentId: RecordId): Promise<DiagramSummary> {
@@ -182,7 +305,8 @@ export class TimelineService implements TimelineApi {
      * an export derives from what identifies them.
      */
     async importDocument(document: unknown, options: ImportOptions & { into?: RecordId } = {}): Promise<ImportReport> {
-        const parsed = readDocument(document, this.rules);
+        const { rules } = await this.catalogState();
+        const parsed = readDocument(document, rules);
         const mode = options.mode ?? ImportMode.Merge;
         const shift = millisecondsFromHours(options.shiftHours ?? 0);
 
@@ -274,35 +398,37 @@ export class TimelineService implements TimelineApi {
     }
 
     async getDiagram(incidentId: RecordId): Promise<Diagram> {
+        const { catalog, vocabulary } = await this.catalogState();
         return this.store.transaction(async () => {
             const incident = await this.requireIncident(incidentId);
             const nodes = await this.store.listNodes(incidentId);
             const layouts = await this.store.listLayouts(incidentId);
             const steps = (await this.store.listSteps(incidentId)).sort(chronologically);
             const links = await this.store.listLinks(incidentId);
-            const metrics = buildMetrics(steps);
+            const metrics = buildMetrics(steps, vocabulary);
 
             // Only incidents of the same scope can enter the benchmark, so only their steps are read
             const peers: MeasuredIncident[] = [];
             for (const peer of await this.store.listIncidents()) {
                 if (peer.id === incidentId || peer.scope !== incident.scope) continue;
-                peers.push({ incident: peer, metrics: buildMetrics(await this.store.listSteps(peer.id)) });
+                peers.push({ incident: peer, metrics: buildMetrics(await this.store.listSteps(peer.id), vocabulary) });
             }
 
             return {
                 incident,
-                nodes: nodes.sort(byId).map(node => toDiagramNode(node, layouts)),
-                steps: steps.map(toDiagramStep),
+                nodes: nodes.sort(byId).map(node => toDiagramNode(node, layouts, vocabulary)),
+                steps: steps.map(step => toDiagramStep(step, vocabulary)),
                 links: links.sort(byId).map(toDiagramLink),
                 metrics,
                 benchmark: buildBenchmark({ incident, metrics }, peers, this.benchmarkSampleSize),
-                catalog: structuredClone(this.catalog)
+                catalog: structuredClone(catalog)
             };
         });
     }
 
     async createNode(incidentId: RecordId, input: NodeCreateInput): Promise<DiagramNode> {
-        const fields = readNodeCreate(input, this.rules);
+        const { vocabulary, rules } = await this.catalogState();
+        const fields = readNodeCreate(input, rules);
         return this.store.transaction(async () => {
             await this.requireIncident(incidentId);
             await this.checkParent(incidentId, null, fields.parentId);
@@ -311,12 +437,13 @@ export class TimelineService implements TimelineApi {
                 incidentId,
                 canonicalKey: canonicalKeyOf(fields.kind, fields.identifier, fields.name)
             });
-            return toDiagramNode(record, []);
+            return toDiagramNode(record, [], vocabulary);
         });
     }
 
     async updateNode(incidentId: RecordId, nodeId: RecordId, input: NodeUpdateInput): Promise<void> {
-        const patch = readNodeUpdate(input, this.rules);
+        const { rules } = await this.catalogState();
+        const patch = readNodeUpdate(input, rules);
         await this.store.transaction(async () => {
             const node = await this.requireNode(incidentId, nodeId);
             const merged: NodeRecord = { ...node, ...patch };
@@ -353,18 +480,20 @@ export class TimelineService implements TimelineApi {
     }
 
     async createStep(incidentId: RecordId, input: StepCreateInput): Promise<DiagramStep> {
-        const fields = readStepCreate(input, this.rules);
+        const { vocabulary, rules } = await this.catalogState();
+        const fields = readStepCreate(input, rules);
         return this.store.transaction(async () => {
             await this.requireIncident(incidentId);
             await this.checkStepReferences(incidentId, fields);
             await this.checkMilestoneKey(incidentId, fields.milestoneKey, null);
             const record = await this.store.insertStep({ ...fields, incidentId });
-            return toDiagramStep(record);
+            return toDiagramStep(record, vocabulary);
         });
     }
 
     async updateStep(incidentId: RecordId, stepId: RecordId, input: StepUpdateInput): Promise<void> {
-        const patch = readStepUpdate(input, this.rules);
+        const { rules } = await this.catalogState();
+        const patch = readStepUpdate(input, rules);
         await this.store.transaction(async () => {
             const step = await this.requireStep(incidentId, stepId);
             const merged: StepRecord = { ...step, ...patch };
@@ -388,7 +517,8 @@ export class TimelineService implements TimelineApi {
     }
 
     async createLink(incidentId: RecordId, input: LinkCreateInput): Promise<DiagramLink> {
-        const fields = readLinkCreate(input);
+        const { rules } = await this.catalogState();
+        const fields = readLinkCreate(input, rules);
         return this.store.transaction(async () => {
             await this.requireIncident(incidentId);
             await this.checkLinkReferences(incidentId, fields);
@@ -398,7 +528,8 @@ export class TimelineService implements TimelineApi {
     }
 
     async updateLink(incidentId: RecordId, linkId: RecordId, input: LinkUpdateInput): Promise<void> {
-        const patch = readLinkUpdate(input);
+        const { rules } = await this.catalogState();
+        const patch = readLinkUpdate(input, rules);
         await this.store.transaction(async () => {
             const link = await this.requireLink(incidentId, linkId);
             const merged = { ...link, ...patch };
@@ -415,7 +546,8 @@ export class TimelineService implements TimelineApi {
     }
 
     async saveLayout(incidentId: RecordId, layouts: LayoutInput[]): Promise<void> {
-        const entries = readLayouts(layouts, this.rules);
+        const { rules } = await this.catalogState();
+        const entries = readLayouts(layouts, rules);
         await this.store.transaction(async () => {
             await this.requireIncident(incidentId);
             const owned = new Set((await this.store.listNodes(incidentId)).map(node => node.id));

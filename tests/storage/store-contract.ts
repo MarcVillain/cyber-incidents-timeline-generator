@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { Involvement, NodeKind, Representation, Side } from "../../src/core/enums.js";
+import { Audience, Involvement, NodeKind, Representation, Side } from "../../src/core/enums.js";
 import type { StepRecord } from "../../src/core/models.js";
 import type { TimelineStore } from "../../src/core/store.js";
 import { readIncidentCreate, readLinkCreate, readNodeCreate, readStepCreate } from "../../src/core/validation.js";
@@ -64,7 +64,7 @@ export function runStoreContract(name: string, createStore: () => Promise<Timeli
             assert.deepEqual(await store.listSteps(incident.id), [step]);
             assert.deepEqual(await store.listLinks(incident.id), [link]);
 
-            const changed: StepRecord = { ...step, side: Side.Attacker, tags: ["three"], involvements: [] };
+            const changed: StepRecord = { ...step, side: Side.Attacker, tags: ["three"], audiences: [Audience.Executive, Audience.Technical], involvements: [] };
             await store.updateStep(changed);
             assert.deepEqual(await store.findStep(step.id), changed);
 

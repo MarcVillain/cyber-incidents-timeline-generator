@@ -38,7 +38,7 @@ describe("DiagramStore", () => {
         });
 
         store.setFilters({ milestonesOnly: false, audience: Audience.Technical });
-        assert.ok(store.visibleSteps().every(step => step.audience !== Audience.Executive));
+        assert.ok(store.visibleSteps().every(step => !step.audiences.includes(Audience.Executive)));
     });
 
     it("gathers the tags of the timeline once each, in order", () => {

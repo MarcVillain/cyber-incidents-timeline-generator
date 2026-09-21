@@ -9,23 +9,30 @@ import type {
     KillChainPhaseInfo,
     LinkKindInfo,
     NodeKindInfo,
+    OptionInfo,
     OutcomeInfo,
     RepresentationInfo,
     ResponsePhaseInfo,
     SideInfo
 } from "../core/catalog.js";
-import { categoryOf, diamondVertexOf, killChainPhaseOf } from "../core/catalog.js";
 import {
     AttackTactic,
     Audience,
-    KillChainPhase,
-    LinkKind,
-    NodeKind,
+    OutcomeMeaning,
     RecordType,
     Representation,
-    ResponsePhase,
-    Side,
-    StepOutcome
+    ResponseStage,
+    SideRole,
+    type AttackTacticKey,
+    type AudienceKey,
+    type ConfidenceKey,
+    type InvolvementKey,
+    type KillChainPhaseKey,
+    type LinkKindKey,
+    type NodeKindKey,
+    type OutcomeKey,
+    type ResponsePhaseKey,
+    type SideKey
 } from "../core/enums.js";
 import type {
     Diagram,
@@ -40,6 +47,7 @@ import type {
     ResponseMetrics,
     StepUpdateInput
 } from "../core/models.js";
+import { Vocabulary } from "../core/vocabulary.js";
 import { parseWallClock } from "../core/time.js";
 import type { Point } from "./viewport.js";
 import { summarise, type DiagramSummary } from "../core/summary.js";
@@ -59,9 +67,10 @@ export interface Selection {
 }
 
 export interface StepFilters {
-    audience: Audience;
+    /** One audience of the catalog, or Both for every step. */
+    audience: AudienceKey;
     milestonesOnly: boolean;
-    sides: ReadonlySet<Side> | null;
+    sides: ReadonlySet<SideKey> | null;
 }
 
 export enum StoreChange {
@@ -83,14 +92,6 @@ interface LoadedDiagram {
 
 function indexBy<TKey, TValue>(entries: readonly TValue[], key: (entry: TValue) => TKey): Map<TKey, TValue> {
     return new Map(entries.map(entry => [key(entry), entry]));
-}
-
-function lookup<TKey, TValue>(map: ReadonlyMap<TKey, TValue>, key: TKey, fallback: TKey): TValue {
-    const found = map.get(key) ?? map.get(fallback);
-    if (found === undefined) {
-        throw new Error(`The catalog has no entry for ${String(key)}.`);
-    }
-    return found;
 }
 
 function timed(step: DiagramStep): TimelineStep {
@@ -121,13 +122,7 @@ export class DiagramStore {
 
     private loaded: LoadedDiagram | null = null;
     private readonly listeners = new Set<(change: StoreChange) => void>();
-    private nodeKinds = new Map<NodeKind, NodeKindInfo>();
-    private sides = new Map<Side, SideInfo>();
-    private tactics = new Map<AttackTactic, AttackTacticInfo>();
-    private killChainPhases = new Map<KillChainPhase, KillChainPhaseInfo>();
-    private responsePhases = new Map<ResponsePhase, ResponsePhaseInfo>();
-    private linkKinds = new Map<LinkKind, LinkKindInfo>();
-    private outcomes = new Map<StepOutcome, OutcomeInfo>();
+    private words: Vocabulary | null = null;
     private representations = new Map<RepresentationKey, RepresentationInfo>();
     private nodesById = new Map<RecordId, DiagramNode>();
 
@@ -142,13 +137,7 @@ export class DiagramStore {
 
     load(diagram: Diagram): void {
         const catalog = diagram.catalog;
-        this.nodeKinds = indexBy(catalog.nodeKinds, entry => entry.kind);
-        this.sides = indexBy(catalog.sides, entry => entry.side);
-        this.tactics = indexBy(catalog.attackTactics, entry => entry.tactic);
-        this.killChainPhases = indexBy(catalog.killChainPhases, entry => entry.phase);
-        this.responsePhases = indexBy(catalog.responsePhases, entry => entry.phase);
-        this.linkKinds = indexBy(catalog.linkKinds, entry => entry.kind);
-        this.outcomes = indexBy(catalog.outcomes, entry => entry.outcome);
+        this.words = new Vocabulary(catalog);
         this.representations = indexBy(catalog.representations, entry => entry.representation);
         this.nodesById = indexBy(diagram.nodes, entry => entry.id);
 
@@ -173,6 +162,14 @@ export class DiagramStore {
 
     get catalog(): Catalog {
         return this.diagram.catalog;
+    }
+
+    /** The catalog read by key, answering a key it no longer has as unknown. */
+    get vocabulary(): Vocabulary {
+        if (!this.words) {
+            throw new Error("The diagram has not been loaded yet.");
+        }
+        return this.words;
     }
 
     get nodes(): readonly DiagramNode[] {
@@ -221,32 +218,56 @@ export class DiagramStore {
         return this.links.find(link => link.id === id) ?? null;
     }
 
-    kindInfo(kind: NodeKind): NodeKindInfo {
-        return lookup(this.nodeKinds, kind, NodeKind.Person);
+    kindInfo(kind: NodeKindKey): NodeKindInfo {
+        return this.vocabulary.nodeKind(kind);
     }
 
-    sideInfo(side: Side): SideInfo {
-        return lookup(this.sides, side, Side.Unknown);
+    sideInfo(side: SideKey): SideInfo {
+        return this.vocabulary.side(side);
     }
 
-    tacticInfo(tactic: AttackTactic): AttackTacticInfo {
-        return lookup(this.tactics, tactic, AttackTactic.None);
+    sideRole(side: SideKey): SideRole {
+        return this.vocabulary.sideRole(side);
     }
 
-    killChainInfo(phase: KillChainPhase): KillChainPhaseInfo {
-        return lookup(this.killChainPhases, phase, KillChainPhase.None);
+    tacticInfo(tactic: AttackTacticKey): AttackTacticInfo {
+        return this.vocabulary.tactic(tactic);
     }
 
-    responseInfo(phase: ResponsePhase): ResponsePhaseInfo {
-        return lookup(this.responsePhases, phase, ResponsePhase.None);
+    killChainInfo(phase: KillChainPhaseKey): KillChainPhaseInfo {
+        return this.vocabulary.killChainPhase(phase);
     }
 
-    linkKindInfo(kind: LinkKind): LinkKindInfo {
-        return lookup(this.linkKinds, kind, LinkKind.ConnectsTo);
+    responseInfo(phase: ResponsePhaseKey): ResponsePhaseInfo {
+        return this.vocabulary.responsePhase(phase);
     }
 
-    outcomeInfo(outcome: StepOutcome): OutcomeInfo {
-        return lookup(this.outcomes, outcome, StepOutcome.Unknown);
+    responseStage(phase: ResponsePhaseKey): ResponseStage {
+        return this.vocabulary.responseStage(phase);
+    }
+
+    linkKindInfo(kind: LinkKindKey): LinkKindInfo {
+        return this.vocabulary.linkKind(kind);
+    }
+
+    outcomeInfo(outcome: OutcomeKey): OutcomeInfo {
+        return this.vocabulary.outcome(outcome);
+    }
+
+    outcomeMeaning(outcome: OutcomeKey): OutcomeMeaning {
+        return this.vocabulary.outcomeMeaning(outcome);
+    }
+
+    confidenceInfo(confidence: ConfidenceKey): OptionInfo<ConfidenceKey> {
+        return this.vocabulary.confidence(confidence);
+    }
+
+    involvementInfo(involvement: InvolvementKey): OptionInfo<InvolvementKey> {
+        return this.vocabulary.involvement(involvement);
+    }
+
+    audienceInfo(audience: AudienceKey): OptionInfo<AudienceKey> {
+        return this.vocabulary.audience(audience);
     }
 
     impactLevel(level: string): ImpactLevelInfo | null {
@@ -278,7 +299,7 @@ export class DiagramStore {
 
     stepIcon(step: DiagramStep): string {
         if (step.icon) return step.icon;
-        if (step.side === Side.Defender) return this.responseInfo(step.responsePhase).icon;
+        if (this.sideRole(step.side) === SideRole.Defender) return this.responseInfo(step.responsePhase).icon;
         if (step.attackTactic !== AttackTactic.None) return this.tacticInfo(step.attackTactic).icon;
         return this.sideInfo(step.side).icon;
     }
@@ -289,7 +310,8 @@ export class DiagramStore {
     visibleSteps(): TimelineStep[] {
         return this.steps.filter(step => {
             if (this.filters.milestonesOnly && !step.isMilestone) return false;
-            if (this.filters.audience !== Audience.Both && step.audience !== Audience.Both && step.audience !== this.filters.audience) return false;
+            // A step listing no audience is written for everyone, so every audience sees it
+            if (this.filters.audience !== Audience.Both && step.audiences.length > 0 && !step.audiences.includes(this.filters.audience)) return false;
             if (this.filters.sides && !this.filters.sides.has(step.side)) return false;
             return true;
         });
@@ -350,8 +372,8 @@ export class DiagramStore {
         const node = this.node(id);
         if (!node) return null;
         const previous = swap(node, patch);
-        node.category = categoryOf(node.kind);
-        node.diamondVertex = diamondVertexOf(node.kind, node.side);
+        node.category = this.vocabulary.categoryOf(node.kind);
+        node.diamondVertex = this.vocabulary.diamondVertexOf(node.kind, node.side);
         this.emit(StoreChange.Records);
         return previous;
     }
@@ -362,7 +384,7 @@ export class DiagramStore {
         const previous = swap(step, patch);
         step.at = parseWallClock(step.timestamp);
         step.until = parseWallClock(step.endTimestamp);
-        step.killChainPhase = killChainPhaseOf(step.attackTactic);
+        step.killChainPhase = this.vocabulary.killChainPhaseOf(step.attackTactic);
         this.diagram.steps.sort(chronological);
         this.emit(StoreChange.Records);
         return previous;

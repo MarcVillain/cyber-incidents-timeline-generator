@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it } from "node:test";
-import { Impact } from "../../src/core/enums.js";
+import { Impact, Side } from "../../src/core/enums.js";
 import { ThemeToken } from "../../src/core/theme-token.js";
 import type { KeyValueStorage } from "../../src/storage/browser-storage-store.js";
 import { loadAppSettings, mountTimelineApp } from "../../src/ui/app.js";
@@ -20,6 +20,9 @@ const SETTINGS_BUTTON = "[aria-label=\"Settings\"]";
 const PREFERENCE_KEY = "app-settings-test";
 const RED = "#ff0000";
 const SEARCHED_ICON = "skull";
+const LEGAL = "Legal";
+const LEGAL_KEY = "legal";
+const THIRD_PARTY_LABEL = "Third party";
 
 function memoryStorage(): KeyValueStorage {
     const entries = new Map<string, string>();
@@ -32,10 +35,12 @@ function openTab(form: HTMLElement, label: string): void {
     tab.click();
 }
 
-function openSettings(root: HTMLElement): HTMLFormElement {
+async function openSettings(root: HTMLElement): Promise<HTMLFormElement> {
     const button = root.querySelector<HTMLButtonElement>(`.tlg-appbar-actions ${SETTINGS_BUTTON}`);
     assert.ok(button);
     button.click();
+    // The full settings read the catalog settings from the api before the dialog opens
+    await settle();
     return dialog(root);
 }
 
@@ -192,13 +197,13 @@ describe("mountTimelineApp", () => {
 
         const element = mountPoint();
         const custom = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: null, settingsButton: true });
-        const tabs = [...openSettings(element).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
+        const tabs = [...(await openSettings(element)).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
         assert.deepEqual(tabs, ["Appearance", "Vocabulary", "Display", "Backup"]);
         custom.destroy();
 
         const full = mountPoint();
         const everything = await mountTimelineApp(full, { api: service, syncAddress: false, preferences: null, settingsButton: true, settingsScope: SettingsScope.Everything });
-        const all = [...openSettings(full).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
+        const all = [...(await openSettings(full)).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
         assert.deepEqual(all, ["Appearance", "Vocabulary", "Scales", "Display", "Backup"]);
         everything.destroy();
     });
@@ -213,7 +218,7 @@ describe("mountTimelineApp", () => {
             onSettingsSaved: settings => saved.push(settings)
         });
 
-        const form = openSettings(element);
+        const form = await openSettings(element);
         const accent = form.querySelector<HTMLInputElement>("input.tlg-color");
         assert.ok(accent);
         type(accent, RED);
@@ -236,7 +241,7 @@ describe("mountTimelineApp", () => {
         const element = mountPoint();
         const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: memoryStorage(), preferenceKey: PREFERENCE_KEY, settingsButton: true });
 
-        const form = openSettings(element);
+        const form = await openSettings(element);
         openTab(form, "Vocabulary");
         const [first, second] = form.querySelectorAll<HTMLElement>(".tlg-vocabulary-entry");
         assert.ok(first && second);
@@ -257,6 +262,96 @@ describe("mountTimelineApp", () => {
         app.destroy();
     });
 
+    it("keeps what an entry means out of sight until asked for, and opens it for a new entry", async () => {
+        const { service } = await seededService();
+        const element = mountPoint();
+        const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: memoryStorage(), preferenceKey: PREFERENCE_KEY, settingsButton: true, settingsScope: SettingsScope.Everything });
+        const form = await openSettings(element);
+        openTab(form, "Vocabulary");
+        const shownDetails = (): number => [...form.querySelectorAll<HTMLElement>(".tlg-vocabulary-details")].filter(panel => !panel.hidden).length;
+        const detailButtons = (): number => form.querySelectorAll(".tlg-vocabulary-more").length;
+        assert.equal(detailButtons(), 0);
+        assert.equal(shownDetails(), 0);
+
+        const advanced = [...form.querySelectorAll<HTMLInputElement>(".tlg-vocabulary input[type=checkbox]")][0];
+        assert.ok(advanced);
+        advanced.checked = true;
+        advanced.dispatchEvent(syntheticEvent("change"));
+        assert.ok(detailButtons() > 0);
+        assert.equal(shownDetails(), 0);
+
+        advanced.checked = false;
+        advanced.dispatchEvent(syntheticEvent("change"));
+        const adder = form.querySelector<HTMLInputElement>(".tlg-settings-adder input");
+        assert.ok(adder);
+        adder.value = "Insider";
+        adder.dispatchEvent(syntheticEvent("keydown", { key: "Enter" }));
+        assert.equal(shownDetails(), 1);
+        app.destroy();
+    });
+
+    it("adds an audience to its list and keeps the whole list", async () => {
+        const { service } = await seededService();
+        const storage = memoryStorage();
+        const element = mountPoint();
+        const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: storage, preferenceKey: PREFERENCE_KEY, settingsButton: true, settingsScope: SettingsScope.Everything });
+
+        const form = await openSettings(element);
+        openTab(form, "Vocabulary");
+        chooseOption(fieldNamed(form, "List"), "Audiences");
+        const adder = form.querySelector<HTMLInputElement>(".tlg-settings-adder input");
+        assert.ok(adder);
+        adder.value = LEGAL;
+        adder.dispatchEvent(syntheticEvent("keydown", { key: "Enter" }));
+        form.dispatchEvent(syntheticEvent("submit"));
+        await settle();
+
+        const audiences = (await service.getCatalogSettings()).vocabulary.audiences;
+        assert.deepEqual(audiences?.map(entry => entry.value), ["Executive", "Technical", LEGAL_KEY]);
+        app.destroy();
+    });
+
+    it("warns before removing a party records still use, and puts a list back as it came", async () => {
+        const { service } = await seededService();
+        const storage = memoryStorage();
+        const element = mountPoint();
+        const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: storage, preferenceKey: PREFERENCE_KEY, settingsButton: true, settingsScope: SettingsScope.Everything });
+
+        const form = await openSettings(element);
+        openTab(form, "Vocabulary");
+        const entryNamed = (label: string): HTMLElement | undefined => [...form.querySelectorAll<HTMLElement>(".tlg-vocabulary-entry")]
+            .find(entry => entry.querySelector<HTMLInputElement>("input.tlg-input")?.value === label);
+        const unknown = entryNamed("Unknown")?.querySelector<HTMLButtonElement>("[aria-label=Remove]");
+        assert.equal(unknown?.disabled, true);
+        entryNamed(THIRD_PARTY_LABEL)?.querySelector<HTMLButtonElement>("[aria-label=Remove]")?.click();
+        assert.equal(entryNamed(THIRD_PARTY_LABEL), undefined);
+
+        form.dispatchEvent(syntheticEvent("submit"));
+        await settle();
+        assert.ok(form.querySelector(".tlg-settings-note")?.textContent?.includes(`${THIRD_PARTY_LABEL}: `));
+
+        buttonNamed(form, "Reset this list").click();
+        assert.ok(entryNamed(THIRD_PARTY_LABEL));
+        form.dispatchEvent(syntheticEvent("submit"));
+        await settle();
+        const sides = (await service.getCatalogSettings()).vocabulary.sides;
+        assert.equal(sides, undefined);
+        assert.ok((await service.getCatalog()).sides.some(entry => entry.side === Side.ThirdParty));
+        app.destroy();
+    });
+
+    it("hands the vocabulary an earlier release kept in the browser over to the service", async () => {
+        const { service } = await seededService();
+        const storage = memoryStorage();
+        const audiences = [...(await service.getCatalog()).audiences, { value: LEGAL_KEY, label: LEGAL }];
+        storage.setItem(`${PREFERENCE_KEY}-settings`, JSON.stringify({ vocabulary: { audiences } }));
+        const app = await mountTimelineApp(mountPoint(), { api: service, syncAddress: false, preferences: storage, preferenceKey: PREFERENCE_KEY, settingsButton: true, settingsScope: SettingsScope.Everything });
+
+        assert.deepEqual((await service.getCatalogSettings()).vocabulary.audiences?.map(entry => entry.value), audiences.map(entry => entry.value));
+        assert.deepEqual(loadAppSettings(storage, PREFERENCE_KEY).vocabulary, {});
+        app.destroy();
+    });
+
     it("warns before removing an impact level records still use", async () => {
         const { service, incident } = await seededService();
         await service.updateIncident(incident.id, { impact: Impact.Critical });
@@ -264,7 +359,7 @@ describe("mountTimelineApp", () => {
         const element = mountPoint();
         const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: storage, preferenceKey: PREFERENCE_KEY, settingsButton: true, settingsScope: SettingsScope.Everything });
 
-        const form = openSettings(element);
+        const form = await openSettings(element);
         openTab(form, "Scales");
         const critical = [...form.querySelectorAll(".tlg-settings-item")].find(item => item.querySelector<HTMLInputElement>("input.tlg-input")?.value === CRITICAL_LABEL);
         const remove = critical?.querySelector<HTMLButtonElement>("[aria-label=Remove]");
@@ -279,7 +374,7 @@ describe("mountTimelineApp", () => {
 
         form.dispatchEvent(syntheticEvent("submit"));
         await settle();
-        const levels = loadAppSettings(storage, PREFERENCE_KEY).impactScale?.levels.map(level => level.level);
+        const levels = (await service.getCatalogSettings()).impactScale?.levels.map(level => level.level);
         assert.ok(levels && !levels.includes(Impact.Critical));
         assert.equal((await service.getIncident(incident.id)).impact, Impact.Critical);
         app.destroy();

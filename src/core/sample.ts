@@ -100,7 +100,7 @@ export async function seedSampleData(api: TimelineApi, start: Date = defaultSamp
     await step({ timestamp: at(start, 20), title: "Forensic imaging of the workstation", side: Side.ThirdParty, responsePhase: ResponsePhase.Analyze, evidenceSource: "Forensics", sourceNodeId: retainer, targetNodeId: workstation });
     await step({ timestamp: at(start, 30), title: "Implant removed and credentials rotated", side: Side.Defender, responsePhase: ResponsePhase.Eradicate, outcome: StepOutcome.Succeeded, sourceNodeId: soc, targetNodeId: workstation });
     await step({ timestamp: at(start, 48), title: "Services restored from clean backups", side: Side.Defender, responsePhase: ResponsePhase.Recover, outcome: StepOutcome.Succeeded, isMilestone: true, sourceNodeId: soc, targetNodeId: fileServer });
-    await step({ timestamp: at(start, 72), timeKnown: false, title: "Lessons learned review", side: Side.Defender, responsePhase: ResponsePhase.Review, audience: Audience.Executive, sourceNodeId: soc });
+    await step({ timestamp: at(start, 72), timeKnown: false, title: "Lessons learned review", side: Side.Defender, responsePhase: ResponsePhase.Review, audiences: [Audience.Executive], sourceNodeId: soc });
 
     await api.createLink(incident.id, { sourceNodeId: clerk, targetNodeId: workstation, kind: LinkKind.Owns });
     await api.createLink(incident.id, { sourceNodeId: clerk, targetNodeId: credentials, kind: LinkKind.Owns });

@@ -1,4 +1,4 @@
-import type { RepresentationKey } from "../core/enums.js";
+import { Audience, type RepresentationKey } from "../core/enums.js";
 import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, RecordId, StepRecord } from "../core/models.js";
 import type { LinkData, NodeData, StepData, TimelineStore } from "../core/store.js";
 import { MemoryTimelineStore, SNAPSHOT_VERSION, emptySnapshot, type StoreSnapshot } from "./memory-store.js";
@@ -22,12 +22,34 @@ function isSnapshot(value: unknown): value is StoreSnapshot {
         && [candidate.incidents, candidate.nodes, candidate.steps, candidate.links, candidate.layouts].every(Array.isArray);
 }
 
+// Snapshots of this version held one audience per step, or Both for everyone, before the list
+const SINGLE_AUDIENCE_VERSION = 1;
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function upgradeStep(step: unknown): unknown {
+    if (!isRecord(step)) return step;
+    const { audience, ...rest } = step;
+    return { ...rest, audiences: typeof audience === "string" && audience !== Audience.Both ? [audience] : [] };
+}
+
+/**
+ * Brings a snapshot an earlier release wrote up to the current shape, so a browser keeps its incidents
+ * across the upgrade.
+ */
+function upgrade(value: unknown): unknown {
+    if (!isRecord(value) || value["version"] !== SINGLE_AUDIENCE_VERSION || !Array.isArray(value["steps"])) return value;
+    return { ...value, version: SNAPSHOT_VERSION, steps: value["steps"].map(upgradeStep) };
+}
+
 function readSnapshot(storage: KeyValueStorage, key: string): StoreSnapshot {
     const raw = storage.getItem(key);
     if (raw === null) {
         return emptySnapshot();
     }
-    const parsed: unknown = JSON.parse(raw);
+    const parsed = upgrade(JSON.parse(raw));
     if (!isSnapshot(parsed)) {
         throw new Error(`The data stored under "${key}" is not a timeline generator snapshot of version ${SNAPSHOT_VERSION}.`);
     }

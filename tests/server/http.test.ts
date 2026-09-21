@@ -6,7 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { NodeKind, Permission } from "../../src/core/enums.js";
-import { ForbiddenError, NotFoundError, ValidationError } from "../../src/core/errors.js";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../src/core/errors.js";
+import { buildCatalog } from "../../src/core/catalog.js";
+import { emptyCatalogSettings, type CatalogSettings } from "../../src/core/catalog-settings.js";
+import { MemoryCatalogStore } from "../../src/storage/catalog-stores.js";
 import { seedSampleData } from "../../src/core/sample.js";
 import { TimelineService } from "../../src/core/service.js";
 import { HttpStatus, createTimelineServer, type TimelineServerOptions } from "../../src/server/index.js";
@@ -17,6 +20,12 @@ import { CUSTOM_SCALE, SAMPLE_START } from "../support/fixtures.js";
 const LOCALHOST = "127.0.0.1";
 const SMALL_BODY_LIMIT = 64;
 const READ_ONLY_HEADER = "x-read-only";
+const NO_CONFIGURE_HEADER = "x-no-configure";
+const LEGAL = { value: "legal", label: "Legal" };
+
+function withLegal(): CatalogSettings {
+    return { ...emptyCatalogSettings(), vocabulary: { audiences: [...buildCatalog().audiences, LEGAL] } };
+}
 
 async function listen(options: TimelineServerOptions): Promise<{ server: Server; origin: string }> {
     const server = createTimelineServer(options);
@@ -31,6 +40,41 @@ async function listen(options: TimelineServerOptions): Promise<{ server: Server;
 async function close(server: Server): Promise<void> {
     await new Promise<void>((resolve, reject) => server.close(error => (error ? reject(error) : resolve())));
 }
+
+describe("catalog settings over HTTP", () => {
+    it("reads, checks and saves the catalog settings, behind the configure permission", async () => {
+        const service = new TimelineService(new MemoryTimelineStore(), { catalogStore: new MemoryCatalogStore() });
+        await seedSampleData(service, SAMPLE_START);
+        const { server, origin } = await listen({
+            api: service,
+            authorize: (request, permission) => !(request.headers[NO_CONFIGURE_HEADER] && permission === Permission.Configure),
+            onError: () => undefined
+        });
+        const api = new HttpTimelineApi({ baseUrl: `${origin}/api` });
+        const limited = new HttpTimelineApi({ baseUrl: `${origin}/api`, headers: () => ({ [NO_CONFIGURE_HEADER]: "1" }) });
+        try {
+            assert.deepEqual(await api.getCatalogSettings(), emptyCatalogSettings());
+            const catalog = await api.saveCatalogSettings(withLegal());
+            assert.ok(catalog.audiences.some(entry => entry.value === LEGAL.value));
+            assert.deepEqual(await limited.getCatalogSettings(), withLegal());
+            await assert.rejects(limited.saveCatalogSettings(emptyCatalogSettings()), ForbiddenError);
+            await assert.rejects(limited.catalogUsage(emptyCatalogSettings()), ForbiddenError);
+            const withoutSides = { ...emptyCatalogSettings(), vocabulary: { sides: buildCatalog().sides.slice(0, 1) } };
+            assert.ok((await api.catalogUsage(withoutSides)).length > 0);
+        } finally {
+            await close(server);
+        }
+    });
+
+    it("answers conflict where the catalog is kept in code", async () => {
+        const { server, origin } = await listen({ api: new TimelineService(new MemoryTimelineStore()), onError: () => undefined });
+        try {
+            await assert.rejects(new HttpTimelineApi({ baseUrl: `${origin}/api` }).saveCatalogSettings(withLegal()), ConflictError);
+        } finally {
+            await close(server);
+        }
+    });
+});
 
 describe("REST contract end to end", () => {
     const service = new TimelineService(new MemoryTimelineStore());

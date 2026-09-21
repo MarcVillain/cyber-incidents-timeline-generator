@@ -3,7 +3,6 @@
 // deployment, which is what lets one instance hand a timeline to another.
 
 import { canonicalKeyOf } from "./catalog.js";
-import { Confidence, Involvement, LinkKind } from "./enums.js";
 import { ValidationError, type ValidationIssue } from "./errors.js";
 import {
     DEFAULT_VALIDATION_RULES,
@@ -189,7 +188,7 @@ export function readDocument(value: unknown, rules: ValidationRules = DEFAULT_VA
     const incident = readIncidentCreate(reader.raw("incident"), rules);
     const nodes = reader.list("nodes", FieldLimits.DocumentRecords, entry => readDocumentNode(entry, rules)) ?? [];
     const steps = reader.list("steps", FieldLimits.DocumentRecords, entry => readDocumentStep(entry, rules)) ?? [];
-    const links = reader.list("links", FieldLimits.DocumentRecords, entry => readDocumentLink(entry)) ?? [];
+    const links = reader.list("links", FieldLimits.DocumentRecords, entry => readDocumentLink(entry, rules)) ?? [];
     const layouts = reader.list("layouts", FieldLimits.LayoutEntries, entry => readDocumentLayout(entry, rules)) ?? [];
     reader.throwIfInvalid();
 
@@ -225,17 +224,17 @@ function readDocumentStep(reader: FieldReader, rules: ValidationRules): Document
         key,
         source: reader.nullableText("source", FieldLimits.DocumentKey) ?? null,
         target: reader.nullableText("target", FieldLimits.DocumentKey) ?? null,
-        involvements: reader.list("involvements", FieldLimits.Involvements, entry => readDocumentInvolvement(entry)) ?? []
+        involvements: reader.list("involvements", FieldLimits.Involvements, entry => readDocumentInvolvement(entry, rules)) ?? []
     };
 }
 
-function readDocumentInvolvement(reader: FieldReader): DocumentInvolvement | undefined {
+function readDocumentInvolvement(reader: FieldReader, rules: ValidationRules): DocumentInvolvement | undefined {
     const node = reader.text("node", FieldLimits.DocumentKey);
     if (node === undefined) return reader.fail("node", "is required");
-    return { node, involvement: reader.enumValue("involvement", Involvement) ?? Involvement.Involved };
+    return { node, involvement: reader.oneOf("involvement", rules.involvements) ?? rules.defaultInvolvement };
 }
 
-function readDocumentLink(reader: FieldReader): DocumentLink | undefined {
+function readDocumentLink(reader: FieldReader, rules: ValidationRules): DocumentLink | undefined {
     const key = reader.text("key", FieldLimits.DocumentKey);
     const source = reader.text("source", FieldLimits.DocumentKey);
     const target = reader.text("target", FieldLimits.DocumentKey);
@@ -246,9 +245,9 @@ function readDocumentLink(reader: FieldReader): DocumentLink | undefined {
         key,
         source,
         target,
-        kind: reader.enumValue("kind", LinkKind) ?? LinkKind.ConnectsTo,
+        kind: reader.oneOf("kind", rules.linkKinds) ?? rules.defaultLinkKind,
         label: reader.nullableText("label", FieldLimits.LinkLabel) ?? null,
-        confidence: reader.enumValue("confidence", Confidence) ?? Confidence.Confirmed,
+        confidence: reader.oneOf("confidence", rules.confidences) ?? rules.defaultConfidence,
         step: reader.nullableText("step", FieldLimits.DocumentKey) ?? null,
         metadata: reader.metadata("metadata") ?? null
     };

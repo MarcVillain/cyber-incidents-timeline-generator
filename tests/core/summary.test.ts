@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildCatalog, killChainPhaseOf } from "../../src/core/catalog.js";
+import { buildCatalog } from "../../src/core/catalog.js";
 import { AttackTactic, KillChainPhase, NodeKind, Side, StepOutcome } from "../../src/core/enums.js";
 import { TimelineService } from "../../src/core/service.js";
 import { summarise } from "../../src/core/summary.js";
@@ -31,7 +31,7 @@ describe("summary", () => {
         const summary = await service.getSummary(incident.id);
 
         assert.ok((summary.steps.bySide[Side.Attacker] ?? 0) > 0);
-        assert.equal(Object.values(summary.steps.byOutcome).every(count => count > 0), true);
+        assert.equal(Object.values(summary.steps.byOutcome).every(count => (count ?? 0) > 0), true);
         assert.ok(summary.steps.techniques.length > 0);
         assert.ok(summary.steps.evidenceSources.length > 0);
     });
@@ -41,7 +41,7 @@ describe("summary", () => {
         const summary = await service.getSummary(incident.id);
         const diagram = await service.getDiagram(incident.id);
 
-        const expected = diagram.steps.filter(step => killChainPhaseOf(step.attackTactic) === KillChainPhase.Delivery).length;
+        const expected = diagram.steps.filter(step => step.killChainPhase === KillChainPhase.Delivery).length;
         assert.equal(summary.steps.byKillChainPhase[KillChainPhase.Delivery] ?? 0, expected);
         assert.ok((summary.steps.byTactic[AttackTactic.InitialAccess] ?? 0) > 0);
     });

@@ -1,6 +1,7 @@
 // A TimelineApi that hands out the catalog with a viewer's own words and icons, for a catalog the viewer does
 // not own. Everything else passes straight through, so the owner still validates every write.
 
+import type { CatalogSettings, CatalogUsageEntry } from "../core/catalog-settings.js";
 import type { Catalog } from "../core/catalog.js";
 import type { ImportOptions, ImportReport, TimelineDocument } from "../core/document.js";
 import type {
@@ -28,6 +29,19 @@ export class RelabeledTimelineApi implements TimelineApi {
     async getDiagram(incidentId: RecordId): Promise<Diagram> {
         const diagram = await this.api.getDiagram(incidentId);
         return { ...diagram, catalog: relabelCatalog(diagram.catalog, this.settings()) };
+    }
+
+    getCatalogSettings(): Promise<CatalogSettings> {
+        return this.api.getCatalogSettings();
+    }
+
+    // Settings saved elsewhere come back relabeled like every catalog this wrapper hands out
+    async saveCatalogSettings(settings: CatalogSettings): Promise<Catalog> {
+        return relabelCatalog(await this.api.saveCatalogSettings(settings), this.settings());
+    }
+
+    catalogUsage(settings: CatalogSettings): Promise<CatalogUsageEntry[]> {
+        return this.api.catalogUsage(settings);
     }
 
     listIncidents(): Promise<Incident[]> {

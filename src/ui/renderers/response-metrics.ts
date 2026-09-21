@@ -11,7 +11,7 @@
 // Each gets the representation that suits it. A breakdown wants a proportional bar, a comparison wants
 // paired bars on a shared scale, and a list of failures is better off staying a list.
 
-import { Representation, Side, StepOutcome } from "../../core/enums.js";
+import { OutcomeMeaning, Representation } from "../../core/enums.js";
 import { Icon } from "../../core/icon.js";
 import type { ResponseBenchmark, ResponseMetrics } from "../../core/models.js";
 import { longestUnseen, responseEpisodes, responsePoints, type ResponseEpisode, type ResponsePoints, type Stretch } from "../../core/response.js";
@@ -115,9 +115,9 @@ type Episode = ResponseEpisode<TimelineStep>;
  * The figures worth quoting whichever comparison is on screen.
  */
 function figures(context: RenderContext, steps: readonly TimelineStep[], points: ResponsePoints, episodes: readonly Episode[]): Figure[] {
-    const { palette, time } = context;
+    const { palette, time, store } = context;
     const words = context.strings.scene;
-    const unseen = longestUnseen(steps);
+    const unseen = longestUnseen(steps, store.vocabulary);
     const responseEnd = episodes.at(-1)?.to ?? null;
     const failed = episodes.filter(episode => episode.failed).length;
 
@@ -126,14 +126,14 @@ function figures(context: RenderContext, steps: readonly TimelineStep[], points:
             label: words.timeUndetected,
             value: time.formatDuration(unseen ? unseen.hours : null),
             icon: Icon.ThreatActor,
-            color: palette.sides[Side.Attacker].color,
+            color: palette.attacker,
             hint: unseen ? words.unseenRange(time.formatDate(unseen.from), time.formatDate(unseen.to)) : words.nothingNoticed
         },
         {
             label: words.incidentSpan,
             value: time.formatDuration(hoursBetween(points.firstAttack, responseEnd)),
             icon: Icon.Timeline,
-            color: palette.sides[Side.Victim].color,
+            color: palette.victim,
             hint: words.incidentSpanHint
         },
         {
@@ -147,7 +147,7 @@ function figures(context: RenderContext, steps: readonly TimelineStep[], points:
             label: words.investigations,
             value: episodes.length > 0 ? String(episodes.length) : null,
             icon: Icon.Microscope,
-            color: palette.sides[Side.Defender].color,
+            color: palette.defender,
             hint: failed > 0 ? words.investigationsFailed(failed) : words.investigationsClosed
         }
     ];
@@ -194,8 +194,8 @@ function breakdown(context: RenderContext, points: ResponsePoints, episodes: rea
     // the first alarm: a notice whose remediation failed left the intruder exactly as hidden as before
     const known = points.detected ?? points.firstNoticed;
     const candidates: { label: string; from: Date | null; to: Date | null; color: string }[] = [
-        { label: words.beforeAnyoneKnew, from: points.firstAttack, to: known, color: palette.sides[Side.Attacker].color },
-        { label: words.knownAndWorked, from: known, to: responseEnd, color: palette.sides[Side.Defender].color }
+        { label: words.beforeAnyoneKnew, from: points.firstAttack, to: known, color: palette.attacker },
+        { label: words.knownAndWorked, from: known, to: responseEnd, color: palette.defender }
     ];
     const phases = candidates.filter((phase): phase is Phase => phase.from !== null && phase.to !== null && phase.to.getTime() > phase.from.getTime());
 
@@ -216,7 +216,7 @@ function breakdown(context: RenderContext, points: ResponsePoints, episodes: rea
     }));
     if (unseen) {
         node.appendChild(text(`Longest single stretch unseen: ${formatDuration(unseen.hours)}`, CONTENT.right, barY - 14, {
-            "font-size": 10, "font-weight": 700, "text-anchor": "end", fill: palette.sides[Side.Attacker].color
+            "font-size": 10, "font-weight": 700, "text-anchor": "end", fill: palette.attacker
         }));
     }
 
@@ -253,7 +253,7 @@ function againstObjectives(strings: Strings, palette: Palette, points: ResponseP
             label: objective.label,
             actual: objective.actual(points),
             reference: objective.hours,
-            color: palette.sides[Side.Defender].color
+            color: palette.defender
         }))
     };
 }
@@ -266,8 +266,8 @@ function againstHistory(strings: Strings, palette: Palette, benchmark: ResponseB
         caption: strings.scene.benchmarkCaption(benchmark.sampleSize, benchmark.scope),
         referenceLabel: strings.scene.usually,
         rows: [
-            { label: strings.scene.detect, actual: hoursBetween(points.firstAttack, points.firstNoticed), reference: benchmark.medianTimeToDetectHours, color: palette.sides[Side.Defender].color },
-            { label: strings.scene.contain, actual: hoursBetween(points.firstNoticed, points.contained), reference: benchmark.medianTimeToContainHours, color: palette.sides[Side.Victim].color },
+            { label: strings.scene.detect, actual: hoursBetween(points.firstAttack, points.firstNoticed), reference: benchmark.medianTimeToDetectHours, color: palette.defender },
+            { label: strings.scene.contain, actual: hoursBetween(points.firstNoticed, points.contained), reference: benchmark.medianTimeToContainHours, color: palette.victim },
             { label: strings.scene.recover, actual: hoursBetween(points.firstNoticed, points.recovered), reference: benchmark.medianTimeToRecoverHours, color: palette.good }
         ]
     };
@@ -299,7 +299,7 @@ function comparison(palette: Palette, model: Comparison, top: number, height: nu
     rows.forEach((row, index) => {
         const y = rowTop + index * rowHeight;
         const missed = row.actual !== null && row.reference !== null && row.actual > row.reference;
-        const color = missed ? palette.sides[Side.Attacker].color : row.color;
+        const color = missed ? palette.attacker : row.color;
 
         node.appendChild(text(row.label.toUpperCase(), CONTENT.x, y + 24, { "font-size": 11, "font-weight": 700, "letter-spacing": 0.8, fill: palette.ink }));
 
@@ -327,13 +327,13 @@ function comparison(palette: Palette, model: Comparison, top: number, height: nu
  * had to go differently for the figures above to be smaller.
  */
 function causes(context: RenderContext, steps: readonly TimelineStep[], episodes: readonly Episode[], top: number, height: number): SVGGElement {
-    const { palette, icons } = context;
+    const { palette, icons, store } = context;
     const node = group();
     const entries: Cause[] = [];
 
     episodes.forEach((episode, index) => {
         if (!episode.failed) return;
-        const failure = episode.steps.find(step => step.outcome === StepOutcome.Failed);
+        const failure = episode.steps.find(step => store.outcomeMeaning(step.outcome) === OutcomeMeaning.Failed);
         const next = episodes[index + 1];
         entries.push({
             title: failure ? failure.title : `Investigation ${index + 1} closed without fixing it`,
@@ -344,7 +344,7 @@ function causes(context: RenderContext, steps: readonly TimelineStep[], episodes
     });
 
     steps
-        .filter(step => step.outcome === StepOutcome.Failed && !entries.some(entry => entry.title === step.title))
+        .filter(step => store.outcomeMeaning(step.outcome) === OutcomeMeaning.Failed && !entries.some(entry => entry.title === step.title))
         .forEach(step => entries.push({ title: step.title, at: step.at, cost: null, note: "recorded as failed" }));
 
     if (entries.length === 0) {
@@ -353,7 +353,7 @@ function causes(context: RenderContext, steps: readonly TimelineStep[], episodes
     }
 
     const rowHeight = Math.min(CAUSE_MAX, height / entries.length);
-    const color = palette.sides[Side.Attacker].color;
+    const color = palette.attacker;
 
     entries.forEach((entry, index) => {
         const y = top + index * rowHeight;
@@ -388,8 +388,8 @@ export const responseMetrics = defineRenderer<ResponseMetrics>({
     draw(context, _, pageIndex, pageCount) {
         const { store, palette } = context;
         const steps = store.visibleSteps();
-        const points = responsePoints(steps);
-        const episodes = responseEpisodes(steps);
+        const points = responsePoints(steps, store.vocabulary);
+        const episodes = responseEpisodes(steps, store.vocabulary);
         const view = optionValue(context, viewOption(context.strings));
 
         const { root, content } = frame(context, {
@@ -411,7 +411,7 @@ export const responseMetrics = defineRenderer<ResponseMetrics>({
 
         switch (view) {
             case View.Breakdown:
-                content.appendChild(breakdown(context, points, episodes, longestUnseen(steps), top, height));
+                content.appendChild(breakdown(context, points, episodes, longestUnseen(steps, store.vocabulary), top, height));
                 break;
             case View.Target:
                 content.appendChild(comparison(palette, againstObjectives(context.strings, palette, points), top, height, context.strings.scene.noObjective));

@@ -78,6 +78,33 @@ describe("settings", () => {
         assert.equal(parsed.durationUnits, null);
     });
 
+    it("keeps a stored list the catalog accepts and drops one it does not", () => {
+        const defaults = buildCatalog();
+        const parsed = parseSettings({
+            vocabulary: {
+                audiences: [...defaults.audiences, { value: "legal", label: "Legal" }],
+                sides: defaults.sides.filter(entry => entry.side !== Side.Unknown),
+                confidences: [{ value: "not a key", label: "Broken" }]
+            }
+        });
+        assert.deepEqual(parsed.vocabulary.audiences?.map(entry => entry.value), ["Executive", "Technical", "legal"]);
+        assert.equal(parsed.vocabulary.sides, undefined);
+        assert.equal(parsed.vocabulary.confidences, undefined);
+        assert.ok(settingsCatalog(parsed).audiences.some(entry => entry.value === "legal"));
+    });
+
+    it("keeps a tactic landing in a phase added in the same settings", () => {
+        const defaults = buildCatalog();
+        const phase = { phase: "staging", label: "Staging", icon: Icon.Archive };
+        const parsed = parseSettings({
+            vocabulary: {
+                attackTactics: [...defaults.attackTactics, { tactic: "stage", label: "Stage", icon: Icon.Archive, attackId: null, killChainPhase: phase.phase }],
+                killChainPhases: [...defaults.killChainPhases, phase]
+            }
+        });
+        assert.equal(settingsCatalog(parsed).attackTactics.at(-1)?.killChainPhase, phase.phase);
+    });
+
     it("reads defaults from anything that is not settings", () => {
         assert.deepEqual(parseSettings(null), defaultSettings());
         assert.deepEqual(parseSettings([1, 2]), defaultSettings());

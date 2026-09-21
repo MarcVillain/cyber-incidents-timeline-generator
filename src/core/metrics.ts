@@ -1,6 +1,7 @@
-import { ResponsePhase, Side } from "./enums.js";
+import { ResponseStage, SideRole } from "./enums.js";
 import type { Incident, ResponseBenchmark, ResponseMetrics, StepRecord, WallClock } from "./models.js";
 import { hoursBetween, parseWallClock } from "./time.js";
+import type { Vocabulary } from "./vocabulary.js";
 
 export const DEFAULT_BENCHMARK_SAMPLE_SIZE = 25;
 
@@ -24,24 +25,24 @@ function earliest(values: readonly (WallClock | null)[]): WallClock | null {
     return found;
 }
 
-function firstResponse(defenderSteps: readonly StepRecord[], phase: ResponsePhase): WallClock | null {
-    return earliest(defenderSteps.filter(step => step.responsePhase === phase).map(step => step.timestamp));
+function firstResponse(defenderSteps: readonly StepRecord[], vocabulary: Vocabulary, stage: ResponseStage): WallClock | null {
+    return earliest(defenderSteps.filter(step => vocabulary.responseStage(step.responsePhase) === stage).map(step => step.timestamp));
 }
 
 /**
  * The response figures of an incident, read from its steps alone. The steps are the record of what
  * happened, so every figure can be traced back to a step on the slides.
  */
-export function buildMetrics(steps: readonly StepRecord[]): ResponseMetrics {
-    const attackerSteps = steps.filter(step => step.side === Side.Attacker);
-    const defenderSteps = steps.filter(step => step.side === Side.Defender);
+export function buildMetrics(steps: readonly StepRecord[], vocabulary: Vocabulary): ResponseMetrics {
+    const attackerSteps = steps.filter(step => vocabulary.sideRole(step.side) === SideRole.Attacker);
+    const defenderSteps = steps.filter(step => vocabulary.sideRole(step.side) === SideRole.Defender);
 
     const firstAttackerAction = earliest(attackerSteps.map(step => step.timestamp));
     const firstDefenderAction = earliest(defenderSteps.map(step => step.timestamp));
-    const detection = firstResponse(defenderSteps, ResponsePhase.Detect);
-    const containment = firstResponse(defenderSteps, ResponsePhase.Contain);
-    const eradication = firstResponse(defenderSteps, ResponsePhase.Eradicate);
-    const recovery = firstResponse(defenderSteps, ResponsePhase.Recover);
+    const detection = firstResponse(defenderSteps, vocabulary, ResponseStage.Detection);
+    const containment = firstResponse(defenderSteps, vocabulary, ResponseStage.Containment);
+    const eradication = firstResponse(defenderSteps, vocabulary, ResponseStage.Eradication);
+    const recovery = firstResponse(defenderSteps, vocabulary, ResponseStage.Recovery);
 
     return {
         firstAttackerAction,

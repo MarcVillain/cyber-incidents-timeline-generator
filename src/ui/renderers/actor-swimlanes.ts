@@ -4,12 +4,12 @@
 // the later one drops onto a row underneath and the lane grows to hold the rows it needs. Only when the
 // page itself runs out of height do the labels start shortening.
 
-import { Representation, Side, StepOutcome } from "../../core/enums.js";
+import { Representation, Side, type SideKey } from "../../core/enums.js";
 import { Icon } from "../../core/icon.js";
 import type { DiagramNode, RecordId } from "../../core/models.js";
 import { formatDate } from "../../core/time.js";
 import { timeAxis } from "../axis.js";
-import { fitText, iconTile, outcomeColor } from "../cards.js";
+import { fitText, iconTile, outcomeColor, stoppedOutcome } from "../cards.js";
 import { CONTENT, LegendStroke, frame, placeholder, sideLegend } from "../chrome.js";
 import type { TimelineStep } from "../diagram-store.js";
 import { clamp, packIntoRows, paginateGroups, timeScale, type Span, type TimeScale, type Weighted } from "../geometry.js";
@@ -43,7 +43,7 @@ interface Lane extends Weighted {
     node: DiagramNode | null;
     label: string;
     subtitle: string;
-    side: Side;
+    side: SideKey;
     steps: TimelineStep[];
 }
 
@@ -168,7 +168,7 @@ function trackScale(steps: readonly TimelineStep[], trackX: number, trackWidth: 
 function laneHeader(context: RenderContext, lane: Lane, x: number, center: number): SVGGElement {
     const { palette, icons } = context;
     const node = group();
-    const color = palette.sides[lane.side].color;
+    const color = palette.side(lane.side).color;
 
     if (lane.node) {
         node.appendChild(iconTile(context, lane.node, x, center - 13, 26));
@@ -187,7 +187,7 @@ function laneHeader(context: RenderContext, lane: Lane, x: number, center: numbe
 function stepChip(context: RenderContext, chip: Chip, scale: TimeScale): SVGGElement {
     const { palette, icons, store } = context;
     const { step, label, labelSize, width, left, anchor, y } = chip;
-    const color = palette.sides[step.side].color;
+    const color = palette.side(step.side).color;
     const node = group({ class: "tlg-step", "data-step-id": step.id });
 
     const runsTo = step.until && !scale.collapsed ? Math.min(scale.at(step.until), CONTENT.right - 6) : null;
@@ -208,8 +208,8 @@ function stepChip(context: RenderContext, chip: Chip, scale: TimeScale): SVGGEle
         node.appendChild(text(label, left + 31, y, { "font-size": labelSize, "font-weight": 500, fill: palette.ink, "dominant-baseline": "central" }));
     }
 
-    if (step.outcome === StepOutcome.Blocked || step.outcome === StepOutcome.Failed) {
-        node.appendChild(circle(left + width - 9, y - 10, 6.5, { fill: outcomeColor(palette, step) }));
+    if (stoppedOutcome(store.outcomeMeaning(step.outcome))) {
+        node.appendChild(circle(left + width - 9, y - 10, 6.5, { fill: outcomeColor(context, step) }));
         node.appendChild(icons.draw(store.outcomeInfo(step.outcome).icon, left + width - 9, y - 10, 8, palette.onColor));
     }
     return node;
@@ -260,7 +260,7 @@ function handoffs(palette: Palette, steps: readonly TimelineStep[], chips: Reado
         pairs.set(consequence.id, { step, consequence });
     });
 
-    node.appendChild(arrowMarkers(HANDOFF_ARROW, [...pairs.values()].map(pair => palette.sides[pair.step.side].color)));
+    node.appendChild(arrowMarkers(HANDOFF_ARROW, [...pairs.values()].map(pair => palette.side(pair.step.side).color)));
 
     const trackLeft = CONTENT.x + GUTTER + 8;
     pairs.forEach(({ step, consequence }) => {
@@ -274,7 +274,7 @@ function handoffs(palette: Palette, steps: readonly TimelineStep[], chips: Reado
         const startY = from.y + (downwards ? CHIP_HEIGHT / 2 : -CHIP_HEIGHT / 2);
         const endY = to.y + (downwards ? -CHIP_HEIGHT / 2 - 3 : CHIP_HEIGHT / 2 + 3);
         const midY = (startY + endY) / 2;
-        const color = palette.sides[step.side].color;
+        const color = palette.side(step.side).color;
 
         node.appendChild(path(`M${startX},${startY} C${startX},${midY} ${endX},${midY} ${endX},${endY}`, {
             fill: "none", stroke: color, "stroke-width": 1.4, "stroke-dasharray": "4 3", opacity: 0.75,

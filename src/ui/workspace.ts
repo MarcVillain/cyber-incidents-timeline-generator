@@ -4,7 +4,8 @@
 // Edits are applied here first and saved behind them. That is what lets an open form keep its scroll
 // position and its half typed fields while the drawing updates.
 
-import { Audience, RecordType, Representation, type RepresentationKey } from "../core/enums.js";
+import type { Catalog } from "../core/catalog.js";
+import { Audience, RecordType, Representation, type AudienceKey, type RepresentationKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { linkFieldsOf, nodeFieldsOf, stepFieldsOf } from "../core/mapping.js";
 import type { LinkCreateInput, RecordId, StepInvolvement } from "../core/models.js";
@@ -22,7 +23,7 @@ import type { RecordDraft, RecordEdit, TimelinePermissions, WorkspaceActions } f
 import { Preferences, defaultPreferenceStorage } from "./preferences.js";
 import { Rail } from "./rail.js";
 import { BUILT_IN_RENDERERS } from "./renderers/index.js";
-import { LIST_LABEL_LENGTH, OptionKind, cleanListLabel, parseOptionList, serializeOptionList, type ListEntry, type Pagination, type RenderContext, type Renderer, type RendererChoice, type RendererListOption, type RendererOption } from "./renderers/registry.js";
+import { LIST_LABEL_LENGTH, OptionKind, cleanListLabel, parseOptionList, serializeOptionList, type ListEntry, type Pagination, type RenderContext, type Renderer, type RendererChoice, type RendererListOption, type RendererOption, type RendererSetting } from "./renderers/registry.js";
 import { tableColumnsOption, timelineTable } from "./timeline-table.js";
 import { Palette, elementTokenResolver } from "./theme.js";
 import type { SlideHeaderCustomizer } from "./slide-header.js";
@@ -146,12 +147,9 @@ const CANVAS_GROWTH_TRIES = 6;
 const CANVAS_GROWTH_STEP = 4;
 const CANVAS_MAX_HEIGHT = 20000;
 
-function audienceChoices(strings: Strings): readonly RendererChoice<Audience>[] {
-    return [
-        { value: Audience.Both, label: strings.workspace.audienceEverything },
-        { value: Audience.Executive, label: strings.workspace.audienceExecutive },
-        { value: Audience.Technical, label: strings.workspace.audienceTechnical }
-    ];
+/** Every step, then each audience of the catalog. */
+function audienceChoices(strings: Strings, catalog: Catalog): readonly RendererChoice<AudienceKey>[] {
+    return [{ value: Audience.Both, label: strings.workspace.audienceEverything }, ...catalog.audiences];
 }
 
 function exportChoices(strings: Strings): readonly { format: ExportFormat; label: string; icon: Icon }[] {
@@ -646,7 +644,7 @@ class Workspace implements TimelineHandle {
 
     private renderFilters(): void {
         const filters = this.store.filters;
-        const audience = this.cycleButton(audienceChoices(this.strings), filters.audience, filters.audience !== Audience.Both, value => this.applyFilters({ audience: value }));
+        const audience = this.cycleButton(audienceChoices(this.strings, this.store.catalog), filters.audience, filters.audience !== Audience.Both, value => this.applyFilters({ audience: value }));
         const milestones = h("button", "tlg-chip-toggle", { type: "button", "aria-pressed": String(filters.milestonesOnly) }, [this.strings.workspace.milestonesOnly]);
         milestones.addEventListener("click", () => this.applyFilters({ milestonesOnly: !this.store.filters.milestonesOnly }));
         this.elements.filters.replaceChildren(audience, milestones);
@@ -677,16 +675,21 @@ class Workspace implements TimelineHandle {
             ? document.activeElement.getAttribute(CONTROL_KEY)
             : null;
 
+        const audienceChanged = filters.audience !== Audience.Both;
+        const settings = this.renderer.options(this.strings);
+        const changed = settings.filter(setting => this.differsFromDefault(setting, chosen));
         const shared = [
-            this.settingSection(words.audience, described.audience, this.choiceGroup(AUDIENCE_CONTROL, words.audience, audienceChoices(this.strings), filters.audience,
-                value => this.applyFilters({ audience: value }))),
-            this.settingSection(words.milestones, described.milestones, this.choiceGroup(MILESTONES_CONTROL, words.milestones, milestoneChoices(this.strings),
-                filters.milestonesOnly ? MilestoneChoice.Only : MilestoneChoice.Every, value => this.applyFilters({ milestonesOnly: value === MilestoneChoice.Only })))
+            this.settingSection(AUDIENCE_CONTROL, words.audience, described.audience, this.choiceGroup(AUDIENCE_CONTROL, words.audience, audienceChoices(this.strings, this.store.catalog), filters.audience,
+                value => this.applyFilters({ audience: value })), audienceChanged ? () => this.applyFilters({ audience: Audience.Both }) : null),
+            this.settingSection(MILESTONES_CONTROL, words.milestones, described.milestones, this.choiceGroup(MILESTONES_CONTROL, words.milestones, milestoneChoices(this.strings),
+                filters.milestonesOnly ? MilestoneChoice.Only : MilestoneChoice.Every, value => this.applyFilters({ milestonesOnly: value === MilestoneChoice.Only })),
+            filters.milestonesOnly ? () => this.applyFilters({ milestonesOnly: false }) : null)
         ];
-        const own = this.renderer.options(this.strings).map(setting => this.settingSection(setting.label, setting.description ?? null, setting.kind === OptionKind.List
+        const own = settings.map(setting => this.settingSection(setting.id, setting.label, setting.description ?? null, setting.kind === OptionKind.List
             ? this.listSetting(setting, chosen.get(setting.id))
-            : this.choiceGroup(setting.id, setting.label, setting.choices, this.chosenValue(setting, chosen), value => this.setOption(this.representation, setting.id, value))));
-        const untouched = chosen.size === 0 && filters.audience === Audience.Both && !filters.milestonesOnly;
+            : this.choiceGroup(setting.id, setting.label, setting.choices, this.chosenValue(setting, chosen), value => this.setOption(this.representation, setting.id, value)),
+        changed.includes(setting) ? () => this.resetOption(setting.id) : null));
+        const untouched = changed.length === 0 && !audienceChanged && !filters.milestonesOnly;
         const reset = button(this.icons, words.resetView, "tlg-button tlg-button-quiet", () => this.resetView(), Icon.Undo);
         reset.setAttribute(CONTROL_KEY, RESET_CONTROL);
         reset.disabled = untouched;
@@ -709,9 +712,36 @@ class Workspace implements TimelineHandle {
         this.redraw();
     }
 
-    private settingSection(label: string, description: string | null, body: HTMLElement): HTMLElement {
+    /** Whether a setting holds something else than it would with nothing chosen. */
+    private differsFromDefault(setting: RendererSetting, chosen: ReadonlyMap<string, string>): boolean {
+        if (setting.kind === OptionKind.List) {
+            const stored = chosen.get(setting.id);
+            return stored !== undefined && serializeOptionList(parseOptionList(stored, setting)) !== serializeOptionList(parseOptionList(undefined, setting));
+        }
+        return this.chosenValue(setting, chosen) !== setting.fallback;
+    }
+
+    private resetOption(optionId: string): void {
+        this.preferences.clearChoice(this.representation, optionId);
+        this.pageIndex = 0;
+        this.renderFilters();
+        this.redraw();
+    }
+
+    /**
+     * A setting under its heading. The heading carries a reset for as long as the setting is off its
+     * default, so putting one back never means resetting the others with it.
+     */
+    private settingSection(key: string, label: string, description: string | null, body: HTMLElement, reset: (() => void) | null): HTMLElement {
+        const undo = reset ? button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", reset, Icon.Undo) : null;
+        if (undo) {
+            const name = this.strings.workspace.resetSetting(label);
+            undo.setAttribute("aria-label", name);
+            undo.title = name;
+            undo.setAttribute(CONTROL_KEY, `${key}:${RESET_CONTROL}`);
+        }
         return h("section", "tlg-view-setting", {}, [
-            h("h3", "tlg-view-setting-label", {}, [label]),
+            h("div", "tlg-view-setting-head", {}, [h("h3", "tlg-view-setting-label", {}, [label]), undo]),
             description ? h("p", "tlg-view-setting-hint", {}, [description]) : null,
             body
         ]);

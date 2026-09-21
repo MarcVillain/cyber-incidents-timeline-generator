@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS tlg_steps (
     severity TEXT NOT NULL,
     confidence TEXT NOT NULL,
     outcome TEXT NOT NULL,
+    -- The audiences as a JSON list of keys, empty for everyone. Databases written before 0.5.0 hold one key, or Both
     audience TEXT NOT NULL,
     evidence_source TEXT NULL,
     is_milestone SMALLINT NOT NULL,
@@ -106,3 +107,9 @@ CREATE TABLE IF NOT EXISTS tlg_links (
     metadata JSONB NULL
 );
 CREATE INDEX IF NOT EXISTS tlg_links_incident ON tlg_links(incident_id);
+
+-- The catalog settings of the deployment, as one JSON document in a single row
+CREATE TABLE IF NOT EXISTS tlg_catalog_settings (
+    id INTEGER PRIMARY KEY,
+    settings JSONB NOT NULL
+);

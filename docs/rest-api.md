@@ -11,7 +11,16 @@ the base path, `/api` by default.
 
 - **Times** are wall clock readings without a zone, such as `2026-01-12T08:30:00`. A zone suffix sent by a
   client is dropped, not applied. Dates alone are accepted and read as midnight.
-- **Enumerations** travel as their names, for example `"Attacker"` or `"InitialAccess"`.
+- **Vocabulary** fields (`side`, `kind`, `attackTactic`, `responsePhase`, `outcome`, `confidence`, `involvement`
+  and the entries of `audiences`) are keys of the lists in the catalog the server is configured with, for
+  example `"Attacker"` or `"InitialAccess"`. A deployment may add or remove entries, so read `GET /catalog`
+  rather than assume the built in keys. Anything else is refused.
+- **Meanings.** Each side carries a `role`, each response phase the `stage` of the response figures it counts
+  toward, each outcome a `meaning` and each tactic its `killChainPhase`. The views and the metrics read those,
+  so an entry added to a list is drawn and measured like the built in entry it resembles.
+- **Audiences.** A step lists the audiences it is written for in `audiences`. An empty list means everyone.
+  A client written before 0.5.0 may still send a single `audience`, which is read as a list of one, or as
+  everyone when it is `"Both"`.
 - **Ratings** (`impact`, `criticality`, `severity`) are level keys of the impact scale the server is configured
   with, listed in `catalog.impactScale`. Anything else is refused.
 - **Incidents owned by another tool** carry its key in `externalId`, `null` otherwise. See
@@ -26,6 +35,9 @@ the base path, `/api` by default.
 | Method | Path | Body | Success | Permission |
 |---|---|---|---|---|
 | GET | `/catalog` | | `200 Catalog` | Read |
+| GET | `/catalog/settings` | | `200 CatalogSettings` | Read |
+| PUT | `/catalog/settings` | `CatalogSettings` | `200 Catalog` | Configure |
+| POST | `/catalog/usage` | `CatalogSettings` | `200 CatalogUsageEntry[]` | Configure |
 | GET | `/incidents` | | `200 Incident[]` | Read |
 | POST | `/incidents` | `IncidentCreateInput` | `201 Incident` | Create |
 | GET | `/incidents/{incidentId}` | | `200 Incident` | Read |
@@ -82,6 +94,21 @@ where it was, rather than displacing it.
 - Deleting a step deletes the relationships it established.
 - Deleting an incident deletes everything in it.
 
+### Changing the catalog
+
+A deployment may let its users fit the vocabulary, the impact scale and the milestones to their own needs.
+`CatalogSettings` holds `impactScale`, `milestones` and `vocabulary`, each list of which replaces the list of
+the same name whole; `null` or a list left out keeps what the server was built with.
+
+- `PUT /catalog/settings` checks that the settings hold together, keeps them and answers the catalog that
+  results. Settings that do not fit, such as a tactic landing in a kill chain phase the lists no longer have,
+  answer `400`. A server keeping its catalog in code, with no catalog store, answers `409`.
+- `POST /catalog/usage` answers, for settings not yet saved, each entry they remove that records still hold,
+  with the number of those records. Records are never rewritten: they keep the key and are drawn as unknown
+  until edited, so a client asks first and confirms.
+- A list must keep the entry records fall back to (`Unknown` for sides, outcomes and confidences, `None` for
+  tactics and phases). `Both` is not an audience: an empty `audiences` means everyone.
+
 ## Example
 
 ```http
@@ -96,6 +123,7 @@ Content-Type: application/json
   "mitreTechniqueId": "T1021.002",
   "sourceNodeId": 31,
   "targetNodeId": 36,
+  "audiences": ["Technical"],
   "isMilestone": true
 }
 ```
@@ -127,6 +155,7 @@ Errors carry `{ "message": string }`, and validation errors add the issues found
 | 403 | The `authorize` callback refused the request |
 | 404 | No such route, incident or record in that incident |
 | 405 | The route exists but not for that method; `Allow` lists the methods it takes |
+| 409 | The catalog settings cannot be saved, because the server keeps its catalog in code |
 | 413 | The body is larger than `maxBodyBytes` |
 | 415 | A body was sent without `Content-Type: application/json` |
 | 500 | Anything else; details are passed to `onError` and never returned |
@@ -134,5 +163,7 @@ Errors carry `{ "message": string }`, and validation errors add the issues found
 ## Authorization
 
 `createTimelineHandler` calls `authorize(request, permission, incidentId)` before every route. `permission`
-is `Read`, `Create`, `Update` or `Delete`, and `incidentId` is `null` for `/catalog` and `/incidents`. Return
+is `Read`, `Create`, `Update`, `Delete` or `Configure`, and `incidentId` is `null` for `/catalog` and `/incidents`.
+`Configure` guards changing the catalog every incident is recorded against, so a host can let analysts edit
+incidents and keep the vocabulary to administrators. Return
 `false` to answer `403`. Omitting the callback allows everything, which is only suitable for a local tool.

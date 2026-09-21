@@ -1,14 +1,4 @@
-import {
-    AttackTactic,
-    Audience,
-    Confidence,
-    Involvement,
-    LinkKind,
-    NodeKind,
-    ResponsePhase,
-    Side,
-    StepOutcome
-} from "../../core/enums.js";
+import { Audience, type AudienceKey } from "../../core/enums.js";
 import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, RecordId, StepInvolvement, StepRecord } from "../../core/models.js";
 import type { LinkData, NodeData, StepData, TimelineStore } from "../../core/store.js";
 import { RowReader, flag, json, type SqlDriver, type SqlRow, type SqlValue } from "./driver.js";
@@ -43,7 +33,7 @@ function stepValues(data: StepData): SqlValue[] {
     return [
         data.incidentId, data.timestamp, data.endTimestamp, flag(data.timeKnown), data.orderIndex, data.title,
         data.description, data.side, data.attackTactic, data.responsePhase, data.mitreTechniqueId, data.severity,
-        data.confidence, data.outcome, data.audience, data.evidenceSource, flag(data.isMilestone), data.milestoneKey, data.icon,
+        data.confidence, data.outcome, JSON.stringify(data.audiences), data.evidenceSource, flag(data.isMilestone), data.milestoneKey, data.icon,
         data.sourceNodeId, data.targetNodeId, data.externalId, json(data.metadata)
     ];
 }
@@ -73,8 +63,8 @@ function readNode(row: SqlRow): NodeRecord {
         incidentId: read.number("incident_id"),
         name: read.text("name"),
         description: read.nullableText("description"),
-        kind: read.enumValue("kind", NodeKind),
-        side: read.enumValue("side", Side),
+        kind: read.text("kind"),
+        side: read.text("side"),
         parentId: read.nullableNumber("parent_id"),
         identifier: read.nullableText("identifier"),
         role: read.nullableText("role"),
@@ -88,6 +78,21 @@ function readNode(row: SqlRow): NodeRecord {
     };
 }
 
+/**
+ * The audience column holds the list as JSON. A database written before audiences became a list holds a
+ * single key there, or Both for everyone, which reads back as the same thing.
+ */
+function readAudiences(stored: string): AudienceKey[] {
+    if (!stored.startsWith("[")) {
+        return stored === Audience.Both ? [] : [stored];
+    }
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed) || !parsed.every(entry => typeof entry === "string")) {
+        throw new Error(`Column audience holds ${stored}, which is not a list of audiences.`);
+    }
+    return parsed;
+}
+
 function readStep(row: SqlRow, involvements: StepInvolvement[], tags: string[]): StepRecord {
     const read = new RowReader(row);
     return {
@@ -99,14 +104,14 @@ function readStep(row: SqlRow, involvements: StepInvolvement[], tags: string[]):
         orderIndex: read.number("order_index"),
         title: read.text("title"),
         description: read.nullableText("description"),
-        side: read.enumValue("side", Side),
-        attackTactic: read.enumValue("attack_tactic", AttackTactic),
-        responsePhase: read.enumValue("response_phase", ResponsePhase),
+        side: read.text("side"),
+        attackTactic: read.text("attack_tactic"),
+        responsePhase: read.text("response_phase"),
         mitreTechniqueId: read.nullableText("mitre_technique_id"),
         severity: read.text("severity"),
-        confidence: read.enumValue("confidence", Confidence),
-        outcome: read.enumValue("outcome", StepOutcome),
-        audience: read.enumValue("audience", Audience),
+        confidence: read.text("confidence"),
+        outcome: read.text("outcome"),
+        audiences: readAudiences(read.text("audience")),
         evidenceSource: read.nullableText("evidence_source"),
         isMilestone: read.boolean("is_milestone"),
         milestoneKey: read.nullableText("milestone_key"),
@@ -127,9 +132,9 @@ function readLink(row: SqlRow): LinkRecord {
         incidentId: read.number("incident_id"),
         sourceNodeId: read.number("source_node_id"),
         targetNodeId: read.number("target_node_id"),
-        kind: read.enumValue("kind", LinkKind),
+        kind: read.text("kind"),
         label: read.nullableText("label"),
-        confidence: read.enumValue("confidence", Confidence),
+        confidence: read.text("confidence"),
         stepId: read.nullableNumber("step_id"),
         metadata: read.json("metadata")
     };
@@ -292,7 +297,7 @@ export class SqlTimelineStore implements TimelineStore {
 
         const involvements = groupBy(involvementRows, "step_id", reader => ({
             nodeId: reader.number("node_id"),
-            involvement: reader.enumValue("involvement", Involvement)
+            involvement: reader.text("involvement")
         }));
         const tags = groupBy(tagRows, "step_id", reader => reader.text("value"));
 

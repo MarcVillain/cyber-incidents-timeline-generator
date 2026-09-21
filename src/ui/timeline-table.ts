@@ -2,7 +2,7 @@
 // picked and named. The narrative slide draws it and the tabular exports write it, so both hold the
 // same cells.
 
-import { AttackTactic, KillChainPhase, ResponsePhase, Side } from "../core/enums.js";
+import { AttackTactic, KillChainPhase, ResponsePhase, SideRole } from "../core/enums.js";
 import type { DiagramNode } from "../core/models.js";
 import { hoursBetween, type TimeFormats } from "../core/time.js";
 import type { DiagramStore, TimelineStep } from "./diagram-store.js";
@@ -118,7 +118,7 @@ export function tableColumnsOption(strings: Strings): RendererListOption<TableCo
 
 /** Where the step sits in the attack or in the response, whichever side took it. */
 export function stageLabel(store: DiagramStore, step: TimelineStep): string {
-    return step.side === Side.Defender ? store.responseInfo(step.responsePhase).label : store.tacticInfo(step.attackTactic).label;
+    return store.sideRole(step.side) === SideRole.Defender ? store.responseInfo(step.responsePhase).label : store.tacticInfo(step.attackTactic).label;
 }
 
 /**
@@ -156,7 +156,7 @@ function involvedCell(source: TableSource, step: TimelineStep): string {
     return step.involvements.flatMap(entry => {
         const node = store.node(entry.nodeId);
         if (!node) return [];
-        const role = store.catalog.involvements.find(option => option.value === entry.involvement)?.label ?? entry.involvement;
+        const role = store.involvementInfo(entry.involvement).label;
         return [strings.table.involvement(node.name, role)];
     }).join(LIST_JOIN);
 }
@@ -222,11 +222,11 @@ export function cellText(source: TableSource, step: TimelineStep, column: TableC
         case TableColumn.Severity:
             return store.impactLevel(step.severity)?.label ?? step.severity;
         case TableColumn.Confidence:
-            return store.catalog.confidences.find(entry => entry.value === step.confidence)?.label ?? step.confidence;
+            return store.confidenceInfo(step.confidence).label;
         case TableColumn.Outcome:
             return store.outcomeInfo(step.outcome).label;
         case TableColumn.Audience:
-            return store.catalog.audiences.find(entry => entry.value === step.audience)?.label ?? step.audience;
+            return step.audiences.length > 0 ? step.audiences.map(audience => store.audienceInfo(audience).label).join(LIST_JOIN) : words.everyone;
         case TableColumn.Milestone:
             return milestoneCell(source, step);
         case TableColumn.Evidence:

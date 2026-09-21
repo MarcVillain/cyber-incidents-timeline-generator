@@ -4,7 +4,7 @@
 // The margins are deliberately thin. A slide is not a window, so the diagram runs close to the edge and
 // the drawing area gets the space instead.
 
-import type { Side } from "../core/enums.js";
+import type { SideKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { RenderContext } from "./renderers/registry.js";
 import { defaultSlideHeader, type SlideDetail, type SlideHeader, type SlideImpact } from "./slide-header.js";
@@ -312,11 +312,11 @@ function legendEntry(context: RenderContext, parent: SVGGElement, entry: LegendE
 /**
  * Legend describing the sides actually present in a set of records.
  */
-export function sideLegend(context: RenderContext, records: readonly { side: Side }[]): LegendEntry[] {
+export function sideLegend(context: RenderContext, records: readonly { side: SideKey }[]): LegendEntry[] {
     const present = new Set(records.map(record => record.side));
     return context.store.catalog.sides
         .filter(side => present.has(side.side))
-        .map(side => ({ label: side.label, color: context.palette.sides[side.side].color, icon: side.icon }));
+        .map(side => ({ label: side.label, color: context.palette.side(side.side).color, icon: side.icon }));
 }
 
 /**

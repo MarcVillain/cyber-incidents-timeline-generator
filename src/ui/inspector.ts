@@ -4,13 +4,13 @@
 // place, so the other fields keep what was typed in them and the scroll position stays where it was.
 
 import { impactLevelsOf } from "../core/catalog.js";
-import { Involvement, RecordType, Side } from "../core/enums.js";
+import { RecordType, Side, type SideKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import type { DiagramLink, DiagramNode, LinkUpdateInput, NodeUpdateInput, RecordId, StepUpdateInput } from "../core/models.js";
 import { joinWallClock, splitWallClock } from "../core/time.js";
 import type { Selection, TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
-import { button, checkbox, dateAndTime, field, recordSelect, row, select, tagChips, textArea, textInput, type Choice, type SelectOptions } from "./forms.js";
+import { button, checkbox, dateAndTime, field, recordSelect, row, select, tagChips, textArea, textInput, toggleChips, type Choice, type SelectOptions } from "./forms.js";
 import type { PanelContext } from "./panels.js";
 
 type InspectedRecord =
@@ -117,7 +117,7 @@ export class Inspector {
         }
     }
 
-    private sideOf(inspected: InspectedRecord): Side {
+    private sideOf(inspected: InspectedRecord): SideKey {
         if (inspected.type === RecordType.Link) {
             return this.context.store.node(inspected.record.sourceNodeId)?.side ?? Side.Unknown;
         }
@@ -188,7 +188,7 @@ export class Inspector {
         const save = (patch: NodeUpdateInput): void => actions.edit(node.id, { type: RecordType.Node, patch });
         const catalog = store.catalog;
         const kinds: Choice<typeof node.kind>[] = catalog.nodeKinds.map(entry => ({ value: entry.kind, label: entry.label }));
-        const sides: Choice<Side>[] = catalog.sides.map(entry => ({ value: entry.side, label: entry.label }));
+        const sides: Choice<SideKey>[] = catalog.sides.map(entry => ({ value: entry.side, label: entry.label }));
         const impacts: Choice<string>[] = impactLevelsOf(catalog.impactScale).map(entry => ({ value: entry.level, label: entry.label }));
         const others = store.nodes.filter(candidate => candidate.id !== node.id);
 
@@ -243,7 +243,7 @@ export class Inspector {
             ),
             row(
                 field(w.confidence, this.pick(step.confidence, catalog.confidences, value => { if (value) save({ confidence: value }); })),
-                field(w.audience, this.pick(step.audience, catalog.audiences, value => { if (value) save({ audience: value }); }))
+                field(w.audience, toggleChips(step.audiences, catalog.audiences, value => save({ audiences: value }), w.everyone))
             ),
             field(w.evidenceSource, textInput(step.evidenceSource, value => save({ evidenceSource: value }), w.evidenceSourceHint)),
             checkbox(w.milestone, step.isMilestone, value => save({ isMilestone: value })),
@@ -280,7 +280,7 @@ export class Inspector {
             const taken = new Set(current.involvements.map(entry => entry.nodeId));
             const available = store.nodes.filter(node => !taken.has(node.id) && node.id !== current.sourceNodeId && node.id !== current.targetNodeId);
             picker.replaceChildren(this.pickRecord(null, available, value => {
-                if (value !== null) save([...current.involvements, { nodeId: value, involvement: Involvement.Involved }]);
+                if (value !== null) save([...current.involvements, { nodeId: value, involvement: store.vocabulary.defaultInvolvement }]);
             }, { allowEmpty: true, emptyLabel: this.context.strings.inspector.addRecord }));
         };
 

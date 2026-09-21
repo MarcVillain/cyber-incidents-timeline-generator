@@ -1,14 +1,15 @@
 // What the recorded steps say about how the response went, read from the moments the diagram draws so a
 // slide never shows a number the steps underneath it disagree with.
 
-import { ResponsePhase, Side, StepOutcome } from "./enums.js";
+import { OutcomeMeaning, ResponseStage, SideRole, type OutcomeKey, type ResponsePhaseKey, type SideKey } from "./enums.js";
 import { hoursFromMilliseconds, millisecondsFromHours } from "./time.js";
+import type { Vocabulary } from "./vocabulary.js";
 
 export interface TimedStep {
     at: Date | null;
-    side: Side;
-    outcome: StepOutcome;
-    responsePhase: ResponsePhase;
+    side: SideKey;
+    outcome: OutcomeKey;
+    responsePhase: ResponsePhaseKey;
 }
 
 type Dated<TStep extends TimedStep> = TStep & { at: Date };
@@ -56,9 +57,9 @@ function latest(moments: readonly Date[]): Date | null {
     return [...moments].sort(chronological).at(-1) ?? null;
 }
 
-function noticedMoments(steps: readonly TimedStep[]): Date[] {
+function noticedMoments(steps: readonly TimedStep[], vocabulary: Vocabulary): Date[] {
     return dated(steps)
-        .filter(step => step.outcome === StepOutcome.Detected || step.responsePhase === ResponsePhase.Detect)
+        .filter(step => vocabulary.outcomeMeaning(step.outcome) === OutcomeMeaning.Detected || vocabulary.responseStage(step.responsePhase) === ResponseStage.Detection)
         .map(step => step.at)
         .sort(chronological);
 }
@@ -68,10 +69,10 @@ function noticedMoments(steps: readonly TimedStep[]): Date[] {
  * failed did not end anything: the intruder carried on exactly as before, and treating that moment as
  * the end of a run reports hours where the truth is months.
  */
-export function detections(steps: readonly TimedStep[]): Date[] {
-    const noticed = noticedMoments(steps);
+export function detections(steps: readonly TimedStep[], vocabulary: Vocabulary): Date[] {
+    const noticed = noticedMoments(steps, vocabulary);
     const failed = dated(steps)
-        .filter(step => step.side === Side.Defender && step.outcome === StepOutcome.Failed)
+        .filter(step => vocabulary.sideRole(step.side) === SideRole.Defender && vocabulary.outcomeMeaning(step.outcome) === OutcomeMeaning.Failed)
         .map(step => step.at);
 
     return noticed.filter((moment, index) => {
@@ -84,9 +85,9 @@ export function detections(steps: readonly TimedStep[]): Date[] {
  * The longest the intruder ran before anybody noticed. Taking the first action and the first detection
  * only measures the first intrusion, and an incident can be hit twice.
  */
-export function longestUnseen(steps: readonly TimedStep[]): Stretch | null {
-    const attacks = dated(steps).filter(step => step.side === Side.Attacker).map(step => step.at).sort(chronological);
-    const noticed = detections(steps);
+export function longestUnseen(steps: readonly TimedStep[], vocabulary: Vocabulary): Stretch | null {
+    const attacks = dated(steps).filter(step => vocabulary.sideRole(step.side) === SideRole.Attacker).map(step => step.at).sort(chronological);
+    const noticed = detections(steps, vocabulary);
 
     let longest: Stretch | null = null;
     for (const attack of attacks) {
@@ -101,27 +102,27 @@ export function longestUnseen(steps: readonly TimedStep[]): Stretch | null {
     return longest !== null && longest.hours > 0 ? longest : null;
 }
 
-function phaseMoment(steps: readonly TimedStep[], phase: ResponsePhase): Date | null {
-    return earliest(dated(steps).filter(step => step.responsePhase === phase).map(step => step.at));
+function stageMoment(steps: readonly TimedStep[], vocabulary: Vocabulary, stage: ResponseStage): Date | null {
+    return earliest(dated(steps).filter(step => vocabulary.responseStage(step.responsePhase) === stage).map(step => step.at));
 }
 
 /**
  * The points the response passed through, read off the steps.
  */
-export function responsePoints(steps: readonly TimedStep[]): ResponsePoints {
-    const attacks = dated(steps).filter(step => step.side === Side.Attacker).map(step => step.at);
-    const held = detections(steps);
+export function responsePoints(steps: readonly TimedStep[], vocabulary: Vocabulary): ResponsePoints {
+    const attacks = dated(steps).filter(step => vocabulary.sideRole(step.side) === SideRole.Attacker).map(step => step.at);
+    const held = detections(steps, vocabulary);
 
     // Two different detections matter. The first time anyone noticed at all is what time to detect
     // measures, even if the fix that followed came to nothing. The first one that held is what ended
     // the intruder's run. On an incident handled twice these are months apart.
     return {
         firstAttack: earliest(attacks),
-        firstNoticed: earliest(noticedMoments(steps)),
+        firstNoticed: earliest(noticedMoments(steps, vocabulary)),
         detected: held[0] ?? null,
-        contained: phaseMoment(steps, ResponsePhase.Contain),
-        eradicated: phaseMoment(steps, ResponsePhase.Eradicate),
-        recovered: phaseMoment(steps, ResponsePhase.Recover),
+        contained: stageMoment(steps, vocabulary, ResponseStage.Containment),
+        eradicated: stageMoment(steps, vocabulary, ResponseStage.Eradication),
+        recovered: stageMoment(steps, vocabulary, ResponseStage.Recovery),
         lastAction: latest(dated(steps).map(step => step.at))
     };
 }
@@ -134,8 +135,8 @@ export function responsePoints(steps: readonly TimedStep[]): ResponsePoints {
  * An episode opens when somebody notices and closes on the last thing the response did before anybody
  * noticed again. It ends badly when the work inside it failed, which is what left the intruder in place.
  */
-export function responseEpisodes<TStep extends TimedStep>(steps: readonly TStep[]): ResponseEpisode<TStep>[] {
-    const noticed = noticedMoments(steps);
+export function responseEpisodes<TStep extends TimedStep>(steps: readonly TStep[], vocabulary: Vocabulary): ResponseEpisode<TStep>[] {
+    const noticed = noticedMoments(steps, vocabulary);
     if (noticed.length === 0) return [];
 
     const gap = millisecondsFromHours(EPISODE_BREAK_HOURS);
@@ -143,7 +144,7 @@ export function responseEpisodes<TStep extends TimedStep>(steps: readonly TStep[
         const previous = noticed[index - 1];
         return !previous || moment.getTime() - previous.getTime() > gap;
     });
-    const responding = dated(steps).filter(step => step.side !== Side.Attacker).sort((a, b) => chronological(a.at, b.at));
+    const responding = dated(steps).filter(step => vocabulary.sideRole(step.side) !== SideRole.Attacker).sort((a, b) => chronological(a.at, b.at));
 
     return opens.map((from, index) => {
         const until = opens[index + 1] ?? null;
@@ -155,7 +156,7 @@ export function responseEpisodes<TStep extends TimedStep>(steps: readonly TStep[
             to,
             steps: inside,
             hours: hoursFromMilliseconds(to.getTime() - from.getTime()),
-            failed: inside.some(step => step.outcome === StepOutcome.Failed)
+            failed: inside.some(step => vocabulary.outcomeMeaning(step.outcome) === OutcomeMeaning.Failed)
         };
     });
 }

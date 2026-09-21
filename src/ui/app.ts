@@ -3,6 +3,7 @@
 // alone instead.
 
 import { impactLevelsOf, type Catalog } from "../core/catalog.js";
+import type { CatalogSettings } from "../core/catalog-settings.js";
 import { ValidationError } from "../core/errors.js";
 import { Icon } from "../core/icon.js";
 import { DEFAULT_TOKEN_VALUES, ThemeToken } from "../core/theme-token.js";
@@ -45,11 +46,11 @@ export interface TimelineAppOptions {
     settingsButton?: boolean;
     /**
      * What the settings may change. Presentation, the default, lays names and icons over whatever catalog the
-     * api serves and leaves the impact scale and milestones to it. Everything also offers those, for a host that
-     * builds its service from loadAppCatalog and rebuilds it when onSettingsSaved is called.
+     * api serves and leaves its lists alone. Everything also edits the vocabulary lists, the impact scale and
+     * the milestones, and saves them through the api, which needs a service given a catalog store.
      */
     settingsScope?: SettingsScope;
-    /** Called after the settings are saved, so a host can rebuild its service with the new catalog. */
+    /** Called after the settings are saved. */
     onSettingsSaved?: (settings: AppSettings) => void;
     preferences?: KeyValueStorage | null;
     preferenceKey?: string;
@@ -94,8 +95,9 @@ export function loadAppSettings(storage: KeyValueStorage | null = defaultPrefere
 }
 
 /**
- * The catalog carrying the saved vocabulary, impact scale and milestones, for a host to build its service
- * with before mounting the app.
+ * The catalog carrying the vocabulary, impact scale and milestones a release before 0.5.0 saved with the
+ * preferences. Kept for hosts still building their service this way; the app now saves those through the
+ * api, into the catalog store of the service.
  */
 export function loadAppCatalog(storage: KeyValueStorage | null = defaultPreferenceStorage(), key: string = DEFAULT_PREFERENCE_KEY): Catalog {
     return settingsCatalog(loadAppSettings(storage, key));
@@ -139,6 +141,19 @@ interface AppElements {
     dialog: HTMLElement;
 }
 
+/** The part of the settings that belongs to the catalog, which whoever keeps the records keeps too. */
+function catalogSettingsOf(settings: AppSettings): CatalogSettings {
+    return { impactScale: settings.impactScale, milestones: settings.milestones, vocabulary: settings.vocabulary };
+}
+
+function withoutCatalog(settings: AppSettings): AppSettings {
+    return { ...settings, impactScale: null, milestones: null, vocabulary: {} };
+}
+
+function holdsCatalog(settings: AppSettings): boolean {
+    return settings.impactScale !== null || settings.milestones !== null || Object.keys(settings.vocabulary).length > 0;
+}
+
 class TimelineApp implements TimelineAppHandle {
     private readonly root: HTMLElement;
     private readonly api: TimelineApi;
@@ -167,7 +182,8 @@ class TimelineApp implements TimelineAppHandle {
         this.hostFieldDefs = options.incidentFields ?? [];
         checkIncidentFields(this.hostFieldDefs);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);
-        this.api = this.settings() !== null && this.scope() === SettingsScope.Presentation
+        // Names and icons chosen for lists the catalog owner keeps, and for the views, are applied here in every scope
+        this.api = this.settings() !== null
             ? new RelabeledTimelineApi(options.api, () => this.preferences.settings)
             : options.api;
         const themeToggle = options.themeToggle ?? true;
@@ -230,7 +246,7 @@ class TimelineApp implements TimelineAppHandle {
         this.elements.details?.addEventListener("click", () => this.showDetails(), { signal });
         this.elements.create?.addEventListener("click", () => this.showCreate(), { signal });
         this.elements.themeButton?.addEventListener("click", () => this.setTheme(themeLabels(this.strings)[this.theme].next), { signal });
-        this.elements.settingsButton?.addEventListener("click", () => this.showSettings(), { signal });
+        this.elements.settingsButton?.addEventListener("click", () => void this.showSettings(), { signal });
         this.elements.dialog.addEventListener("click", event => {
             if (event.target === this.elements.dialog) this.closeDialog();
         }, { signal });
@@ -251,6 +267,7 @@ class TimelineApp implements TimelineAppHandle {
 
     async start(): Promise<void> {
         try {
+            await this.moveStoredCatalog();
             this.catalog = await this.api.getCatalog();
             this.incidents = await this.api.listIncidents();
         } catch (error) {
@@ -311,9 +328,29 @@ class TimelineApp implements TimelineAppHandle {
         return isHexColor(value) ? value : DEFAULT_TOKEN_VALUES[token];
     }
 
-    private showSettings(): void {
+    /**
+     * Releases before 0.5.0 kept the vocabulary, the scale and the milestones with the preferences of the
+     * browser. They belong to the catalog now, so the first start hands them over and forgets them here.
+     */
+    private async moveStoredCatalog(): Promise<void> {
         const settings = this.settings();
-        if (!settings) return;
+        if (!settings || this.scope() !== SettingsScope.Everything || !holdsCatalog(settings)) return;
+        await this.api.saveCatalogSettings(catalogSettingsOf(settings));
+        this.preferences.setSettings(withoutCatalog(settings));
+    }
+
+    private async showSettings(): Promise<void> {
+        const stored = this.settings();
+        if (!stored) return;
+        let settings = stored;
+        if (this.scope() === SettingsScope.Everything) {
+            try {
+                settings = { ...stored, ...(await this.api.getCatalogSettings()) };
+            } catch (error) {
+                this.notify(messageOf(error, this.strings));
+                return;
+            }
+        }
         const form = settingsDialog({
             settings,
             theme: this.theme,
@@ -334,39 +371,25 @@ class TimelineApp implements TimelineAppHandle {
      * Counts the ratings and milestone claims naming a level or milestone the draft removes. The records keep
      * their value, so this only tells the viewer what will read as unknown.
      */
+    /**
+     * The entries the draft removes that records still hold, counted by whoever keeps the records. The
+     * records keep what they hold, so this only asks for a confirmation.
+     */
     private async settingsUsage(draft: AppSettings): Promise<string[]> {
-        const catalog = this.catalog;
-        if (!catalog || this.scope() === SettingsScope.Presentation) return [];
-        const next = settingsCatalog(draft);
-        const keptLevels = new Set(impactLevelsOf(next.impactScale).map(level => level.level));
-        const keptMilestones = new Set(next.milestones.map(milestone => milestone.key));
-        const removedLevels = new Map(impactLevelsOf(catalog.impactScale).filter(level => !keptLevels.has(level.level)).map(level => [level.level, level.label]));
-        const removedMilestones = new Map(catalog.milestones.filter(milestone => !keptMilestones.has(milestone.key)).map(milestone => [milestone.key, milestone.label]));
-        if (removedLevels.size === 0 && removedMilestones.size === 0) return [];
-
-        const counts = new Map<string, number>();
-        const count = (labels: ReadonlyMap<string, string>, key: string | null): void => {
-            const label = key === null ? undefined : labels.get(key);
-            if (label !== undefined) counts.set(label, (counts.get(label) ?? 0) + 1);
-        };
+        if (this.scope() === SettingsScope.Presentation) return [];
         try {
-            for (const incident of await this.api.listIncidents()) {
-                count(removedLevels, incident.impact);
-                const diagram = await this.api.getDiagram(incident.id);
-                diagram.nodes.forEach(node => count(removedLevels, node.criticality));
-                diagram.steps.forEach(step => {
-                    count(removedLevels, step.severity);
-                    count(removedMilestones, step.milestoneKey);
-                });
-            }
+            const usage = await this.api.catalogUsage(catalogSettingsOf(draft));
+            return usage.map(entry => this.strings.settings.inUse(entry.label, entry.records));
         } catch {
             return [this.strings.settings.usageFailed];
         }
-        return [...counts].map(([label, total]) => this.strings.settings.inUse(label, total));
     }
 
     private async saveSettings(settings: AppSettings, theme: ThemeMode): Promise<void> {
-        this.preferences.setSettings(settings);
+        if (this.scope() === SettingsScope.Everything) {
+            await this.api.saveCatalogSettings(catalogSettingsOf(settings));
+        }
+        this.preferences.setSettings(withoutCatalog(settings));
         this.closeDialog();
         this.setTheme(theme);
         this.applyCustomColors();

@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Permission } from "../core/enums.js";
-import { ForbiddenError, NotFoundError, ValidationError } from "../core/errors.js";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../core/errors.js";
+import { readCatalogSettings } from "../core/catalog-settings.js";
 import type { RecordId } from "../core/models.js";
 import type { TimelineApi } from "../core/service.js";
 import { ImportMode, type ImportOptions } from "../core/document.js";
@@ -31,6 +32,7 @@ export enum HttpStatus {
     Forbidden = 403,
     NotFound = 404,
     MethodNotAllowed = 405,
+    Conflict = 409,
     PayloadTooLarge = 413,
     UnsupportedMediaType = 415,
     InternalServerError = 500
@@ -126,6 +128,9 @@ function buildRoutes(api: TimelineApi): Route[] {
 
     return [
         { method: HttpMethod.Get, pattern: ["catalog"], permission: Permission.Read, handle: async () => ok(await api.getCatalog()) },
+        { method: HttpMethod.Get, pattern: ["catalog", "settings"], permission: Permission.Read, handle: async () => ok(await api.getCatalogSettings()) },
+        { method: HttpMethod.Put, pattern: ["catalog", "settings"], permission: Permission.Configure, handle: async context => ok(await api.saveCatalogSettings(readCatalogSettings(await context.body()))) },
+        { method: HttpMethod.Post, pattern: ["catalog", "usage"], permission: Permission.Configure, handle: async context => ok(await api.catalogUsage(readCatalogSettings(await context.body()))) },
         { method: HttpMethod.Get, pattern: ["incidents"], permission: Permission.Read, handle: async () => ok(await api.listIncidents()) },
         { method: HttpMethod.Post, pattern: ["incidents"], permission: Permission.Create, handle: async context => created(await api.createIncident(readIncidentCreate(await context.body(), await context.rules()))) },
         { method: HttpMethod.Get, pattern: incidentPath, permission: Permission.Read, handle: async context => ok(await api.getIncident(incident(context))) },
@@ -142,8 +147,8 @@ function buildRoutes(api: TimelineApi): Route[] {
         { method: HttpMethod.Put, pattern: [...incidentPath, "steps", Segment.Record], permission: Permission.Update, handle: async context => { await api.updateStep(incident(context), record(context), readStepUpdate(await context.body(), await context.rules())); return NO_CONTENT; } },
         { method: HttpMethod.Delete, pattern: [...incidentPath, "steps", Segment.Record], permission: Permission.Delete, handle: async context => { await api.deleteStep(incident(context), record(context)); return NO_CONTENT; } },
 
-        { method: HttpMethod.Post, pattern: [...incidentPath, "links"], permission: Permission.Create, handle: async context => created(await api.createLink(incident(context), readLinkCreate(await context.body()))) },
-        { method: HttpMethod.Put, pattern: [...incidentPath, "links", Segment.Record], permission: Permission.Update, handle: async context => { await api.updateLink(incident(context), record(context), readLinkUpdate(await context.body())); return NO_CONTENT; } },
+        { method: HttpMethod.Post, pattern: [...incidentPath, "links"], permission: Permission.Create, handle: async context => created(await api.createLink(incident(context), readLinkCreate(await context.body(), await context.rules()))) },
+        { method: HttpMethod.Put, pattern: [...incidentPath, "links", Segment.Record], permission: Permission.Update, handle: async context => { await api.updateLink(incident(context), record(context), readLinkUpdate(await context.body(), await context.rules())); return NO_CONTENT; } },
         { method: HttpMethod.Delete, pattern: [...incidentPath, "links", Segment.Record], permission: Permission.Delete, handle: async context => { await api.deleteLink(incident(context), record(context)); return NO_CONTENT; } },
 
         { method: HttpMethod.Put, pattern: [...incidentPath, "layout"], permission: Permission.Update, handle: async context => { await api.saveLayout(incident(context), readLayouts(await context.body(), await context.rules())); return NO_CONTENT; } },
@@ -220,6 +225,7 @@ function statusOf(error: unknown): HttpStatus {
     if (error instanceof ValidationError || error instanceof MalformedBodyError) return HttpStatus.BadRequest;
     if (error instanceof NotFoundError) return HttpStatus.NotFound;
     if (error instanceof ForbiddenError) return HttpStatus.Forbidden;
+    if (error instanceof ConflictError) return HttpStatus.Conflict;
     if (error instanceof PayloadTooLargeError) return HttpStatus.PayloadTooLarge;
     if (error instanceof UnsupportedMediaTypeError) return HttpStatus.UnsupportedMediaType;
     return HttpStatus.InternalServerError;

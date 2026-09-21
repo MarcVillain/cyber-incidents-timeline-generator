@@ -9,8 +9,6 @@ export interface WorkspaceStrings {
     milestonesOnly: string;
     audience: string;
     audienceEverything: string;
-    audienceExecutive: string;
-    audienceTechnical: string;
     add: string;
     addFirstRecord: string;
     emptyTitle: string;
@@ -67,6 +65,7 @@ export interface WorkspaceStrings {
     viewsBefore: string;
     viewsAfter: string;
     resetView: string;
+    resetSetting(label: string): string;
 }
 
 export interface AppStrings {
@@ -146,6 +145,7 @@ export interface InspectorStrings {
     severity: string;
     confidence: string;
     audience: string;
+    everyone: string;
     evidenceSource: string;
     evidenceSourceHint: string;
     milestone: string;
@@ -278,6 +278,7 @@ export interface TableStrings {
     reference: string;
     yes: string;
     no: string;
+    everyone: string;
     sinceStart(duration: string): string;
     involvement(name: string, role: string): string;
     /** The name of the worksheet in the spreadsheet export. */
@@ -451,6 +452,43 @@ export interface SettingsStrings {
     inUseWarning: string;
     inUse(label: string, count: number): string;
     usageFailed: string;
+    vocabularyEditHint: string;
+    addEntry: string;
+    resetList: string;
+    keptEntry: string;
+    usedByTactic: string;
+    role: string;
+    roleAttacker: string;
+    roleDefender: string;
+    roleAlly: string;
+    roleVictim: string;
+    roleNeutral: string;
+    entryColor: string;
+    category: string;
+    categoryActor: string;
+    categoryResource: string;
+    diamondVertex: string;
+    killChainPhase: string;
+    stage: string;
+    stageNone: string;
+    stageDetection: string;
+    stageContainment: string;
+    stageEradication: string;
+    stageRecovery: string;
+    meaning: string;
+    meaningUnknown: string;
+    meaningSucceeded: string;
+    meaningFailed: string;
+    meaningBlocked: string;
+    meaningDetected: string;
+    direction: string;
+    oneWay: string;
+    bothWays: string;
+    invalidVocabulary: string;
+    entryKey: string;
+    entryDetails: string;
+    showAdvanced: string;
+    meaningOf(label: string): string;
 }
 
 export interface Strings {
@@ -481,8 +519,6 @@ export const DEFAULT_STRINGS: Strings = {
         milestonesOnly: "Milestones only",
         audience: "Audience",
         audienceEverything: "Everything",
-        audienceExecutive: "Executive",
-        audienceTechnical: "Technical",
         add: "Add",
         addFirstRecord: "Add the first record",
         emptyTitle: "No incident diagram yet",
@@ -538,7 +574,8 @@ export const DEFAULT_STRINGS: Strings = {
         everyStep: "Every step",
         viewsBefore: "Show the views before",
         viewsAfter: "Show the views after",
-        resetView: "Reset to defaults"
+        resetView: "Reset to defaults",
+        resetSetting: label => `Put ${label} back to its default`
     },
     app: {
         title: "Incident timelines",
@@ -615,6 +652,7 @@ export const DEFAULT_STRINGS: Strings = {
         severity: "Severity",
         confidence: "Confidence",
         audience: "Audience",
+        everyone: "Everyone, when none is picked",
         evidenceSource: "Evidence source",
         evidenceSourceHint: "EDR, SIEM, user report",
         milestone: "Milestone",
@@ -771,6 +809,7 @@ export const DEFAULT_STRINGS: Strings = {
         reference: "Reference",
         yes: "Yes",
         no: "No",
+        everyone: "Everyone",
         sinceStart: duration => `T+${duration}`,
         involvement: (name, role) => `${name} (${role})`,
         sheet: "Timeline"
@@ -940,7 +979,44 @@ export const DEFAULT_STRINGS: Strings = {
         cancel: "Cancel",
         inUseWarning: "Records still use what you removed. They keep their value, drawn as unknown, until someone edits them.",
         inUse: (label, count) => `${label}: ${count} record(s)`,
-        usageFailed: "The records could not be checked for what you removed."
+        usageFailed: "The records could not be checked for what you removed.",
+        vocabularyEditHint: "Add, rename, reorder and remove entries, and say what each one means for the views. A list you never touch follows the package.",
+        addEntry: "Add entry",
+        resetList: "Reset this list",
+        keptEntry: "Kept: records fall back to it",
+        usedByTactic: "A tactic lands in this phase",
+        role: "Camp",
+        roleAttacker: "Attacker",
+        roleDefender: "Defender",
+        roleAlly: "Helps the response",
+        roleVictim: "Victim",
+        roleNeutral: "Neutral",
+        entryColor: "Colour",
+        category: "Kind of record",
+        categoryActor: "Party",
+        categoryResource: "Resource",
+        diamondVertex: "Diamond vertex",
+        killChainPhase: "Kill chain phase",
+        stage: "Counts toward",
+        stageNone: "No figure",
+        stageDetection: "Time to detect",
+        stageContainment: "Time to contain",
+        stageEradication: "Eradication",
+        stageRecovery: "Time to recover",
+        meaning: "Means",
+        meaningUnknown: "Nothing in particular",
+        meaningSucceeded: "It worked",
+        meaningFailed: "It failed",
+        meaningBlocked: "It was stopped",
+        meaningDetected: "It was noticed",
+        direction: "Direction",
+        oneWay: "One way",
+        bothWays: "Both ways",
+        invalidVocabulary: "These lists do not fit together. Check that every tactic lands in a kill chain phase that still exists.",
+        entryKey: "Stored as",
+        entryDetails: "Details",
+        showAdvanced: "Show what each entry means for the views",
+        meaningOf: label => `What ${label} means for the views`
     }
 };
 

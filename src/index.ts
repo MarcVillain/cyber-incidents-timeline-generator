@@ -4,6 +4,7 @@
 export * from "./core/index.js";
 export * from "./storage/memory-store.js";
 export * from "./storage/browser-storage-store.js";
+export * from "./storage/catalog-stores.js";
 export * from "./storage/http-api.js";
 export * from "./storage/sourced-store.js";
 export { mountTimeline, CanvasMode, ThemeMode, ViewPicker, type TimelineHandle, type TimelineOptions, type TimelineState } from "./ui/workspace.js";

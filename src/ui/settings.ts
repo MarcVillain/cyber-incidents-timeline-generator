@@ -2,7 +2,7 @@
 // the impact scale, the milestones and the layout. Everything maps onto options the package already takes,
 // so a setting never adds a rule of its own.
 
-import { buildCatalog, checkImpactScale, checkMilestones, type Catalog, type ImpactLevelInfo, type ImpactScale, type MilestoneInfo } from "../core/catalog.js";
+import { buildCatalog, checkImpactScale, checkMilestones, type Catalog, type ImpactLevelInfo, type ImpactScale, type MilestoneInfo, type VocabularyOptions } from "../core/catalog.js";
 import { isEnumValue } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { ThemeToken } from "../core/theme-token.js";
@@ -11,6 +11,7 @@ import { ColorScheme } from "./theme-detection.js";
 import { blend, type TokenResolver } from "./theme.js";
 import { CanvasMode } from "./canvas-mode.js";
 import { ViewPicker } from "./view-picker.js";
+import { parseVocabulary } from "./vocabulary-settings.js";
 import type { PageSize } from "./viewport.js";
 
 /** What the settings may change. */
@@ -59,6 +60,8 @@ export interface AppSettings {
     entries: Map<SettingsGroup, Map<string, EntryOverride>>;
     impactScale: ImpactScale | null;
     milestones: MilestoneInfo[] | null;
+    /** The lists rewritten whole. A list left out follows the package, with the renames of entries applied. */
+    vocabulary: VocabularyOptions;
     pageSize: PageSize | null;
     canvasMode: CanvasMode | null;
     viewPicker: ViewPicker | null;
@@ -130,6 +133,7 @@ export function defaultSettings(): AppSettings {
         entries: new Map(),
         impactScale: null,
         milestones: null,
+        vocabulary: {},
         pageSize: null,
         canvasMode: null,
         viewPicker: null,
@@ -254,6 +258,7 @@ export function parseSettings(value: unknown): AppSettings {
     settings.entries = parseEntries(value["entries"]);
     settings.impactScale = parseImpactScale(value["impactScale"]);
     settings.milestones = parseMilestones(value["milestones"]);
+    settings.vocabulary = parseVocabulary(value["vocabulary"]);
     settings.pageSize = parsePageSize(value["pageSize"]);
     settings.canvasMode = isEnumValue(CanvasMode, value["canvasMode"]) ? value["canvasMode"] : null;
     settings.viewPicker = isEnumValue(ViewPicker, value["viewPicker"]) ? value["viewPicker"] : null;
@@ -292,7 +297,8 @@ function relabeled<TEntry extends { label: string }>(
 export function settingsCatalog(settings: AppSettings): Catalog {
     return relabelCatalog(buildCatalog({
         ...(settings.impactScale ? { impactScale: settings.impactScale } : {}),
-        ...(settings.milestones ? { milestones: settings.milestones } : {})
+        ...(settings.milestones ? { milestones: settings.milestones } : {}),
+        vocabulary: settings.vocabulary
     }), settings);
 }
 

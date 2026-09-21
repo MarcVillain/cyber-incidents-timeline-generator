@@ -183,6 +183,28 @@ export function tagChips(
     return container;
 }
 
+/**
+ * A chip per choice that turns on and off, for a field holding several of them. Nothing on is a value
+ * of its own, which the hint beside the chips names.
+ */
+export function toggleChips<TValue extends string>(values: readonly TValue[], choices: readonly Choice<TValue>[], onChange: (values: TValue[]) => void, hint: string): HTMLDivElement {
+    const chosen = new Set<TValue>(values);
+    const note = h("span", "tlg-toggle-hint", {}, [hint]);
+    const chips = choices.map(choice => {
+        const chip = h("button", "tlg-chip-toggle", { type: "button", "aria-pressed": String(chosen.has(choice.value)) }, [choice.label]);
+        chip.addEventListener("click", () => {
+            if (chosen.has(choice.value)) chosen.delete(choice.value);
+            else chosen.add(choice.value);
+            chip.setAttribute("aria-pressed", String(chosen.has(choice.value)));
+            note.hidden = chosen.size > 0;
+            onChange(choices.map(entry => entry.value).filter(value => chosen.has(value)));
+        });
+        return chip;
+    });
+    note.hidden = chosen.size > 0;
+    return h("div", "tlg-chips", {}, [...chips, note]);
+}
+
 export function button(icons: IconSet, label: string, className: string, onClick: () => void, icon: string | null = null): HTMLButtonElement {
     const node = h("button", className, { type: "button" });
     if (icon) {

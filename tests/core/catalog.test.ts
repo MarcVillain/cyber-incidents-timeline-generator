@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildCatalog, canonicalKeyOf, checkImpactScale, diamondVertexOf, killChainPhaseOf } from "../../src/core/catalog.js";
+import { buildCatalog, canonicalKeyOf, checkImpactScale } from "../../src/core/catalog.js";
+import { Vocabulary } from "../../src/core/vocabulary.js";
 import { AttackTactic, DiamondVertex, KillChainPhase, NodeKind, Representation, Side, enumValues } from "../../src/core/enums.js";
 import { Icon } from "../../src/core/icon.js";
 import { ICON_SHAPES } from "../../src/ui/icons/shapes.js";
@@ -51,15 +52,17 @@ describe("catalog", () => {
     });
 
     it("derives the kill chain phase from the tactic", () => {
-        assert.equal(killChainPhaseOf(AttackTactic.InitialAccess), KillChainPhase.Delivery);
-        assert.equal(killChainPhaseOf(AttackTactic.None), KillChainPhase.None);
+        const vocabulary = new Vocabulary(buildCatalog());
+        assert.equal(vocabulary.killChainPhaseOf(AttackTactic.InitialAccess), KillChainPhase.Delivery);
+        assert.equal(vocabulary.killChainPhaseOf(AttackTactic.None), KillChainPhase.None);
     });
 
     it("lets the side win over the kind on the diamond model", () => {
-        assert.equal(diamondVertexOf(NodeKind.Person, Side.Attacker), DiamondVertex.Adversary);
-        assert.equal(diamondVertexOf(NodeKind.Person, Side.Victim), DiamondVertex.Victim);
-        assert.equal(diamondVertexOf(NodeKind.Workstation, Side.Attacker), DiamondVertex.Infrastructure);
-        assert.equal(diamondVertexOf(NodeKind.ThreatActor, Side.Victim), DiamondVertex.Victim);
+        const vocabulary = new Vocabulary(buildCatalog());
+        assert.equal(vocabulary.diamondVertexOf(NodeKind.Person, Side.Attacker), DiamondVertex.Adversary);
+        assert.equal(vocabulary.diamondVertexOf(NodeKind.Person, Side.Victim), DiamondVertex.Victim);
+        assert.equal(vocabulary.diamondVertexOf(NodeKind.Workstation, Side.Attacker), DiamondVertex.Infrastructure);
+        assert.equal(vocabulary.diamondVertexOf(NodeKind.ThreatActor, Side.Victim), DiamondVertex.Victim);
     });
 
     it("builds a canonical key from the identifier before the name", () => {

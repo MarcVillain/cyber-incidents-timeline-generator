@@ -104,6 +104,12 @@ export class Preferences {
         this.writeChoices();
     }
 
+    /** Forgets one setting chosen for the representation, so it falls back to its default. */
+    clearChoice(representation: RepresentationKey, option: string): void {
+        this.options.get(representation)?.delete(option);
+        this.writeChoices();
+    }
+
     /** Forgets every setting chosen for the representation, so each falls back to its default. */
     clearChoices(representation: RepresentationKey): void {
         this.options.delete(representation);

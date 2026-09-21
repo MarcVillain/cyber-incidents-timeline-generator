@@ -1,7 +1,7 @@
 // Everyone and everything involved, and how they connect. Positions come from a fixed rule rather than a
 // simulation, so the same incident always draws the same picture and nothing drifts.
 
-import { Confidence, Representation, Side } from "../../core/enums.js";
+import { Confidence, Representation, Side, SideRole, type SideKey } from "../../core/enums.js";
 import type { DiagramLink, DiagramNode, RecordId } from "../../core/models.js";
 import { fitText, nodeBox, nodeColor } from "../cards.js";
 import { CONTENT, frame, placeholder } from "../chrome.js";
@@ -48,7 +48,8 @@ function labelsOption(strings: Strings): RendererOption<GraphLabels> {
     };
 }
 
-const BAND_ORDER: readonly Side[] = [Side.Attacker, Side.ThirdParty, Side.Unknown, Side.Victim, Side.Defender];
+// The bands run from the attacker to the defenders, each role holding its sides in catalog order
+const BAND_ROLES: readonly SideRole[] = [SideRole.Attacker, SideRole.Ally, SideRole.Neutral, SideRole.Victim, SideRole.Defender];
 const BAND_GAP = 46;
 const SIDE_REACH = 34;
 const LABEL_REACH = 0.34;
@@ -81,12 +82,12 @@ interface Cluster extends Weighted {
     id: string;
     container: DiagramNode | null;
     label: string;
-    side: Side;
+    side: SideKey;
     members: DiagramNode[];
 }
 
 interface BandColumn {
-    side: Side;
+    side: SideKey;
     clusters: Cluster[];
 }
 
@@ -145,11 +146,22 @@ interface ChordCurve {
 
 function linkColor(context: RenderContext, link: DiagramLink): string {
     const source = context.store.node(link.sourceNodeId);
-    return context.palette.sides[source ? source.side : Side.Unknown].color;
+    return context.palette.side(source ? source.side : Side.Unknown).color;
 }
 
 function labelsShown(context: RenderContext): boolean {
     return optionValue(context, labelsOption(context.strings)) === GraphLabels.Shown;
+}
+
+function bandOrder(context: RenderContext, present: ReadonlySet<SideKey>): SideKey[] {
+    const { store } = context;
+    const catalogOrder = store.catalog.sides.map(entry => entry.side);
+    const rank = (side: SideKey): number => BAND_ROLES.indexOf(store.sideRole(side));
+    const position = (side: SideKey): number => {
+        const index = catalogOrder.indexOf(side);
+        return index < 0 ? catalogOrder.length : index;
+    };
+    return [...present].sort((left, right) => rank(left) - rank(right) || position(left) - position(right));
 }
 
 /**
@@ -157,8 +169,7 @@ function labelsShown(context: RenderContext): boolean {
  * own them. A company keeps its members, and anything without a container falls into a loose group.
  */
 function buildBands(context: RenderContext, nodes: readonly DiagramNode[]): BandColumn[] {
-    const present = new Set(nodes.map(node => node.side));
-    const bands = BAND_ORDER.filter(side => present.has(side)).map(side => ({ side, clusters: [] as Cluster[] }));
+    const bands = bandOrder(context, new Set(nodes.map(node => node.side))).map(side => ({ side, clusters: [] as Cluster[] }));
     const bandBySide = new Map(bands.map(band => [band.side, band]));
     const containers = nodes.filter(node => nodes.some(candidate => candidate.parentId === node.id));
     const containerIds = new Set(containers.map(node => node.id));
@@ -193,10 +204,10 @@ function bandWidthFor(count: number): number {
     return (CONTENT.width - BAND_GAP * count) / count;
 }
 
-function bandHeading(context: RenderContext, side: Side, x: number, width: number, y: number): SVGGElement {
+function bandHeading(context: RenderContext, side: SideKey, x: number, width: number, y: number): SVGGElement {
     const { palette, icons, store } = context;
     const info = store.sideInfo(side);
-    const color = palette.sides[side].color;
+    const color = palette.side(side).color;
     return group({}, [
         rect(x, y + 8, width, 3, { rx: 1.5, fill: color }),
         icons.draw(info.icon, x + 8, y - 4, 12, color),
@@ -206,7 +217,7 @@ function bandHeading(context: RenderContext, side: Side, x: number, width: numbe
 
 function clusterBox(context: RenderContext, cluster: Cluster, x: number, y: number, width: number, height: number): SVGGElement {
     const { palette, icons, store } = context;
-    const color = palette.sides[cluster.side].color;
+    const color = palette.side(cluster.side).color;
     const node = group();
 
     node.appendChild(rect(x, y, width, height, {
@@ -431,7 +442,7 @@ function drawBands(context: RenderContext, bands: readonly BandColumn[], pageInd
         page: pageIndex,
         pageCount,
         subtitle: `${store.visibleNodes().length} records, ${store.links.length} relationships`,
-        legend: bands.map(band => ({ label: store.sideInfo(band.side).label, color: palette.sides[band.side].color, icon: store.sideInfo(band.side).icon }))
+        legend: bands.map(band => ({ label: store.sideInfo(band.side).label, color: palette.side(band.side).color, icon: store.sideInfo(band.side).icon }))
     });
 
     const drawable = bands.filter(band => band.clusters.length > 0);
@@ -659,7 +670,7 @@ function sideArcs(palette: Palette, ordered: readonly DiagramNode[], places: Rea
         const to = (places.get(record.id)?.angle ?? 0) + step / 2;
         node.appendChild(path(
             `M${centerX + Math.cos(from) * radius},${centerY + Math.sin(from) * radius} A${radius},${radius} 0 ${to - from > Math.PI ? 1 : 0} 1 ${centerX + Math.cos(to) * radius},${centerY + Math.sin(to) * radius}`,
-            { fill: "none", stroke: palette.tint(palette.sides[record.side].color, 0.5), "stroke-width": 3, "stroke-linecap": "round" }
+            { fill: "none", stroke: palette.tint(palette.side(record.side).color, 0.5), "stroke-width": 3, "stroke-linecap": "round" }
         ));
         start = index + 1;
     });
@@ -675,7 +686,7 @@ function drawNetwork(context: RenderContext, nodes: readonly DiagramNode[]): SVG
         subtitle: `${nodes.length} records, ${store.links.length} relationships on one ring`,
         legend: store.catalog.sides
             .filter(side => nodes.some(node => node.side === side.side))
-            .map(side => ({ label: side.label, color: palette.sides[side.side].color, icon: side.icon }))
+            .map(side => ({ label: side.label, color: palette.side(side.side).color, icon: side.icon }))
     });
 
     if (nodes.length === 0) {

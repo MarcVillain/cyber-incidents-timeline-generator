@@ -1,9 +1,9 @@
 // The written account, generated from the same records, with the full list underneath. This is the
 // appendix slide, and the one that still reads correctly with no colour at all.
 
-import { AttackTactic, Representation, ResponsePhase, Side, StepOutcome } from "../../core/enums.js";
+import { AttackTactic, Representation, ResponsePhase, SideRole, StepOutcome } from "../../core/enums.js";
 import { Icon } from "../../core/icon.js";
-import { outcomeColor } from "../cards.js";
+import { outcomeColor, stoppedOutcome } from "../cards.js";
 import { CONTENT, frame } from "../chrome.js";
 import type { TimelineStep } from "../diagram-store.js";
 import { circle, group, line, rect, text, truncate, wrap } from "../svg.js";
@@ -138,8 +138,8 @@ function summarise(context: RenderContext): string[] {
         return [words.nothingRecorded];
     }
 
-    const attacker = steps.filter(step => step.side === Side.Attacker);
-    const defender = steps.filter(step => step.side === Side.Defender);
+    const attacker = steps.filter(step => store.sideRole(step.side) === SideRole.Attacker);
+    const defender = steps.filter(step => store.sideRole(step.side) === SideRole.Defender);
     const compromised = store.nodes.filter(node => node.compromised);
     const sentences: string[] = [];
 
@@ -167,7 +167,7 @@ function summarise(context: RenderContext): string[] {
         sentences.push(words.compromisedRecords(compromised.length, named, compromised.length > COMPROMISED_NAMED));
     }
 
-    const stopped = steps.filter(step => step.outcome === StepOutcome.Blocked || step.outcome === StepOutcome.Failed);
+    const stopped = steps.filter(step => stoppedOutcome(store.outcomeMeaning(step.outcome)));
     if (stopped.length > 0) {
         sentences.push(words.stoppedAttempts(stopped.length));
     }
@@ -243,7 +243,7 @@ function table(context: RenderContext, page: NarrativePage, x: number, y: number
         // which on flat text only makes the words glow
         row.appendChild(rect(x, rowY, width, layout.height, { class: "tlg-row-band", fill: palette.accent, opacity: 0 }));
         row.appendChild(line(x, rowY + layout.height, x + width, rowY + layout.height, { stroke: palette.border, "stroke-width": 0.75 }));
-        row.appendChild(rect(x, centerY - layout.sideMark / 2, SIDE_MARK_WIDTH, layout.sideMark, { rx: SIDE_MARK_WIDTH / 2, fill: palette.sides[step.side].color }));
+        row.appendChild(rect(x, centerY - layout.sideMark / 2, SIDE_MARK_WIDTH, layout.sideMark, { rx: SIDE_MARK_WIDTH / 2, fill: palette.side(step.side).color }));
 
         columns.forEach(column => {
             if (column.key === TableColumn.Stage) {
@@ -251,7 +251,7 @@ function table(context: RenderContext, page: NarrativePage, x: number, y: number
                 // the outcome still reads off the dot in front of it
                 const dotX = column.x + layout.pad + OUTCOME_DOT;
                 if (step.outcome !== StepOutcome.Unknown) {
-                    row.appendChild(circle(dotX, centerY, OUTCOME_DOT, { fill: outcomeColor(palette, step) }));
+                    row.appendChild(circle(dotX, centerY, OUTCOME_DOT, { fill: outcomeColor(context, step) }));
                 }
                 const labelX = dotX + OUTCOME_DOT + OUTCOME_GAP * 2;
                 row.appendChild(text(truncate(stageLabel(store, step), layout.mutedSize, column.x + column.size - layout.pad - labelX), labelX, centerY, {

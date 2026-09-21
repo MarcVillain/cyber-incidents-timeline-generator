@@ -3,6 +3,7 @@ import { createTimelineHandler, type TimelineHttpOptions, type TimelineRequestHa
 import { createStaticHandler, type StaticMount } from "./static.js";
 import { SqliteDriver } from "./sql/sqlite-driver.js";
 import { SqlTimelineStore, type SqlTimelineStoreOptions } from "./sql/sql-store.js";
+import { SqlCatalogStore } from "./sql/sql-catalog-store.js";
 import { sqliteSchema } from "./sql/schema.js";
 
 export * from "./http.js";
@@ -10,6 +11,7 @@ export * from "./static.js";
 export * from "./sql/driver.js";
 export * from "./sql/schema.js";
 export * from "./sql/sql-store.js";
+export * from "./sql/sql-catalog-store.js";
 export * from "./sql/sqlite-driver.js";
 
 export interface TimelineServerOptions extends TimelineHttpOptions {
@@ -37,11 +39,15 @@ export function createTimelineServer(options: TimelineServerOptions): Server {
 }
 
 /**
- * Opens a SQLite file, creates the tables it is missing and returns a store over it.
+ * Opens a SQLite file, creates the tables it is missing and returns a store over it, with the store of
+ * the catalog settings kept in the same file.
  */
-export async function openSqliteStore(path: string, options: SqlTimelineStoreOptions = {}): Promise<{ driver: SqliteDriver; store: SqlTimelineStore }> {
+export async function openSqliteStore(
+    path: string,
+    options: SqlTimelineStoreOptions = {}
+): Promise<{ driver: SqliteDriver; store: SqlTimelineStore; catalogStore: SqlCatalogStore }> {
     const driver = new SqliteDriver(path);
     const store = new SqlTimelineStore(driver, options);
     await driver.executeScript(sqliteSchema(store.tables));
-    return { driver, store };
+    return { driver, store, catalogStore: new SqlCatalogStore(driver, options) };
 }

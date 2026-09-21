@@ -189,8 +189,15 @@ Three ports make it pluggable:
   your own levels, labels and colours. Validation, the inspector and every view follow it.
 - **Slide header.** Pass `slideHeader` to `mountTimeline` to rewrite the title block of every slide, or add your
   own facts to it, on screen and in exports.
-- **Vocabulary.** Pass a modified `buildCatalog()` to `new TimelineService(store, { catalog })` to relabel
-  kinds, sides, tactics or views, or to point them at other icons or colour tokens.
+- **Vocabulary.** Pass `buildCatalog({ vocabulary })` to `new TimelineService(store, { catalog })` to add,
+  remove, reorder or relabel the entries of any list: sides, kinds of record, tactics, kill chain and response
+  phases, outcomes, link kinds, confidences, involvements and audiences. A new side names its camp, a new
+  tactic its kill chain phase, a new response phase the figure it counts toward and a new outcome what it
+  means, and every view follows.
+- **Vocabulary at run time.** Give the service a `catalogStore` and users edit those lists, the impact scale and
+  the milestones from the settings of the app, on the reference server and in the browser desk alike, with a
+  reset per list. The settings travel over `/catalog/settings`, are kept by any `CatalogStore` you plug in,
+  and are guarded by the `Configure` permission. See [docs/storage.md](docs/storage.md#catalog-settings).
 - **Icons.** `new IconSet(new Map([["my-icon", ["M4 4h16v16H4z"]]]))` adds or replaces stroke icons on a
   24 by 24 grid.
 - **Views.** Pass `renderers` to `mountTimeline` to offer a subset of the built in views, in your own order.

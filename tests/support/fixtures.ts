@@ -3,6 +3,7 @@ import { NodeKind, Side } from "../../src/core/enums.js";
 import type { Incident, NodeCreateInput } from "../../src/core/models.js";
 import { seedSampleData } from "../../src/core/sample.js";
 import { TimelineService } from "../../src/core/service.js";
+import { MemoryCatalogStore } from "../../src/storage/catalog-stores.js";
 import { MemoryTimelineStore } from "../../src/storage/memory-store.js";
 
 export const SAMPLE_START = new Date(2026, 0, 12, 8, 0, 0);
@@ -22,7 +23,7 @@ export const INCIDENT_TITLE = "Test incident";
 
 export function createService(): { service: TimelineService; store: MemoryTimelineStore } {
     const store = new MemoryTimelineStore();
-    return { service: new TimelineService(store), store };
+    return { service: new TimelineService(store, { catalogStore: new MemoryCatalogStore() }), store };
 }
 
 export async function createIncident(service: TimelineService, title = INCIDENT_TITLE): Promise<Incident> {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { NodeKind } from "../../src/core/enums.js";
+import { Audience, NodeKind } from "../../src/core/enums.js";
 import type { Diagram } from "../../src/core/models.js";
 import { seedSampleData } from "../../src/core/sample.js";
 import { TimelineService } from "../../src/core/service.js";
@@ -10,12 +10,20 @@ import { TableNames } from "../../src/server/sql/schema.js";
 import { RowReader } from "../../src/server/sql/driver.js";
 import { IN_MEMORY_DATABASE } from "../../src/server/sql/sqlite-driver.js";
 import { BrowserStorageTimelineStore, type KeyValueStorage } from "../../src/storage/browser-storage-store.js";
-import { MemoryTimelineStore } from "../../src/storage/memory-store.js";
+import { MemoryTimelineStore, type StoreSnapshot } from "../../src/storage/memory-store.js";
 import { SAMPLE_START } from "../support/fixtures.js";
 import { runStoreContract } from "./store-contract.js";
+import { runCatalogStoreContract } from "./catalog-store-contract.js";
+import { BrowserStorageCatalogStore, MemoryCatalogStore } from "../../src/storage/catalog-stores.js";
 
 const STORAGE_KEY = "test-timeline";
 const CONCURRENT_WRITES = 20;
+const SAMPLE_TIMESTAMP = "2026-01-12T08:00";
+const SINGLE_AUDIENCE_VERSION = 1;
+
+function isStoredSnapshot(value: unknown): value is StoreSnapshot {
+    return typeof value === "object" && value !== null && "steps" in value && Array.isArray(value.steps);
+}
 
 class MapStorage implements KeyValueStorage {
     readonly entries = new Map<string, string>();
@@ -33,6 +41,11 @@ runStoreContract("MemoryTimelineStore", async () => new MemoryTimelineStore());
 runStoreContract("BrowserStorageTimelineStore", async () => new BrowserStorageTimelineStore(new MapStorage(), STORAGE_KEY));
 runStoreContract("SqlTimelineStore on SQLite", async () => (await openSqliteStore(IN_MEMORY_DATABASE)).store);
 runStoreContract("SqlTimelineStore with a table prefix", async () => (await openSqliteStore(IN_MEMORY_DATABASE, { tablePrefix: "host_tlg_" })).store);
+
+runCatalogStoreContract("MemoryCatalogStore", async () => new MemoryCatalogStore());
+runCatalogStoreContract("BrowserStorageCatalogStore", async () => new BrowserStorageCatalogStore(new MapStorage(), STORAGE_KEY));
+runCatalogStoreContract("SqlCatalogStore on SQLite", async () => (await openSqliteStore(IN_MEMORY_DATABASE)).catalogStore);
+runCatalogStoreContract("SqlCatalogStore with a table prefix", async () => (await openSqliteStore(IN_MEMORY_DATABASE, { tablePrefix: "host_tlg_" })).catalogStore);
 
 describe("BrowserStorageTimelineStore", () => {
     it("survives a reload of the page", async () => {
@@ -52,6 +65,23 @@ describe("BrowserStorageTimelineStore", () => {
             throw new Error("abort");
         }));
         assert.deepEqual(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").incidents, []);
+    });
+
+    it("upgrades a snapshot holding one audience per step", async () => {
+        const storage = new MapStorage();
+        const service = new TimelineService(new BrowserStorageTimelineStore(storage, STORAGE_KEY));
+        const incident = await service.createIncident({ title: "Earlier" });
+        await service.createStep(incident.id, { title: "For everyone", timestamp: SAMPLE_TIMESTAMP });
+        await service.createStep(incident.id, { title: "For executives", timestamp: SAMPLE_TIMESTAMP, audiences: [Audience.Executive] });
+
+        const stored: unknown = JSON.parse(storage.getItem(STORAGE_KEY) ?? "null");
+        assert.ok(isStoredSnapshot(stored));
+        const earlier = { ...stored, version: SINGLE_AUDIENCE_VERSION, steps: stored.steps.map(({ audiences, ...rest }) => ({ ...rest, audience: audiences[0] ?? Audience.Both })) };
+        storage.setItem(STORAGE_KEY, JSON.stringify(earlier));
+
+        const reloaded = new TimelineService(new BrowserStorageTimelineStore(storage, STORAGE_KEY));
+        const steps = (await reloaded.getDiagram(incident.id)).steps;
+        assert.deepEqual(steps.map(step => step.audiences), [[], [Audience.Executive]]);
     });
 
     it("refuses data that is not a snapshot", () => {
@@ -81,6 +111,19 @@ describe("SqlTimelineStore", () => {
             benchmark: diagram.benchmark
         });
         assert.deepEqual(shape(await sqlite.getDiagram(fromSqlite.id)), shape(await memory.getDiagram(fromMemory.id)));
+    });
+
+    it("reads the single audience a database written by an earlier release holds", async () => {
+        const { driver, store } = await openSqliteStore(IN_MEMORY_DATABASE);
+        const service = new TimelineService(store);
+        const incident = await service.createIncident({ title: "Earlier" });
+        const everyone = await service.createStep(incident.id, { title: "For everyone", timestamp: SAMPLE_TIMESTAMP });
+        const technical = await service.createStep(incident.id, { title: "For engineers", timestamp: SAMPLE_TIMESTAMP });
+        await driver.execute(`UPDATE ${store.tables.steps} SET audience = ? WHERE id = ?`, [Audience.Both, everyone.id]);
+        await driver.execute(`UPDATE ${store.tables.steps} SET audience = ? WHERE id = ?`, [Audience.Technical, technical.id]);
+
+        assert.deepEqual((await store.findStep(everyone.id))?.audiences, []);
+        assert.deepEqual((await store.findStep(technical.id))?.audiences, [Audience.Technical]);
     });
 
     it("keeps concurrent writes apart", async () => {

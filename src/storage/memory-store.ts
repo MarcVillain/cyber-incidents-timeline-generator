@@ -2,7 +2,7 @@ import type { RepresentationKey } from "../core/enums.js";
 import type { Incident, IncidentFields, LayoutRecord, LinkRecord, NodeRecord, RecordId, StepRecord } from "../core/models.js";
 import type { LinkData, NodeData, StepData, TimelineStore } from "../core/store.js";
 
-export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_VERSION = 2;
 
 /**
  * Everything a memory store holds, in a shape that survives JSON. Used to persist the store in the

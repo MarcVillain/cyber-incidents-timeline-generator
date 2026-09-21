@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-09-21
+
+### Added
+
+- Every vocabulary list can be fitted to a team: parties, kinds of record, tactics, kill chain and response phases, outcomes, link kinds, confidences, involvements and audiences. Entries can be added, renamed, reordered, given another icon and removed in the settings of the app, and each list has its own reset.
+- An entry says what it means for the views. A party names its camp, a tactic its kill chain phase, a response phase the figure it counts toward and an outcome what it says, so an added entry is drawn and measured like the built in one it resembles.
+- A step can be written for several audiences, picked on the step, and the audience filter offers every audience of the catalog.
+- Integrators get `vocabulary` on `buildCatalog`, `checkVocabulary`, the `Vocabulary` lookup, and `role`, `stage` and `meaning` on the catalog entries.
+- The vocabulary, the impact scale and the milestones can be edited on the reference server too, for every viewer. A new `CatalogStore` port keeps them, with memory, browser storage and SQL implementations, and the REST API gains `GET` and `PUT /catalog/settings` and `POST /catalog/usage`, which counts the records still holding what a change removes.
+- A `Configure` permission guards changing the catalog, so a host can keep it to administrators.
+- Each entry of a list sits on one line. What it means for the views, and the key it is stored under, stay behind a tick box and a Details button, and open by themselves for an entry just added.
+- Each setting in the settings panel of a view has its own reset, shown while the setting is off its default.
+
+### Changed
+
+- A step holds `audiences`, a list that is empty for everyone, instead of one `audience`. A client sending `audience` is still understood, databases and browser storage written before are read as they were, and browser storage is upgraded on the first read.
+- Vocabulary fields are keys of the catalog rather than fixed enumerations, and are validated against it.
+- `categoryOf`, `killChainPhaseOf` and `diamondVertexOf` moved onto `Vocabulary`, and the response helpers take one.
+- The full settings of the app save the vocabulary, the scale and the milestones through the api rather than in the browser, so the service needs a `catalogStore`. What an earlier release kept in the browser is handed over on the first start. `loadAppCatalog` still reads it for hosts that build their service that way.
+- `openSqliteStore` also returns `catalogStore`, and the schemas gain the `catalog_settings` table.
+- The palette hands out side and outcome colours through `side()` and `outcome()`, with a colour per camp beside them.
+
 ## [0.4.1] - 2026-09-21
 
 ### Added

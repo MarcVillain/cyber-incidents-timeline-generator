@@ -9,18 +9,31 @@ import {
     LinkKind,
     NodeCategory,
     NodeKind,
+    OutcomeMeaning,
     Representation,
-    type RepresentationKey,
     ResponsePhase,
+    ResponseStage,
     Side,
+    SideRole,
     StepOutcome,
-    enumValues
+    enumValues,
+    type AttackTacticKey,
+    type AudienceKey,
+    type ConfidenceKey,
+    type InvolvementKey,
+    type KillChainPhaseKey,
+    type LinkKindKey,
+    type NodeKindKey,
+    type OutcomeKey,
+    type RepresentationKey,
+    type ResponsePhaseKey,
+    type SideKey
 } from "./enums.js";
 import { Icon } from "./icon.js";
 import { ThemeToken } from "./theme-token.js";
 
 export interface NodeKindInfo {
-    kind: NodeKind;
+    kind: NodeKindKey;
     category: NodeCategory;
     label: string;
     icon: string;
@@ -28,44 +41,47 @@ export interface NodeKindInfo {
 }
 
 export interface SideInfo {
-    side: Side;
+    side: SideKey;
     label: string;
     icon: string;
+    role: SideRole;
     colorToken: ThemeToken;
     surfaceToken: ThemeToken;
 }
 
 export interface AttackTacticInfo {
-    tactic: AttackTactic;
+    tactic: AttackTacticKey;
     label: string;
     attackId: string | null;
     icon: string;
-    killChainPhase: KillChainPhase;
+    killChainPhase: KillChainPhaseKey;
 }
 
 export interface KillChainPhaseInfo {
-    phase: KillChainPhase;
+    phase: KillChainPhaseKey;
     label: string;
     icon: string;
 }
 
 export interface ResponsePhaseInfo {
-    phase: ResponsePhase;
+    phase: ResponsePhaseKey;
     label: string;
     icon: string;
+    stage: ResponseStage;
 }
 
 export interface LinkKindInfo {
-    kind: LinkKind;
+    kind: LinkKindKey;
     label: string;
     directed: boolean;
 }
 
 export interface OutcomeInfo {
-    outcome: StepOutcome;
+    outcome: OutcomeKey;
     label: string;
     icon: string;
     colorToken: ThemeToken;
+    meaning: OutcomeMeaning;
 }
 
 /**
@@ -87,8 +103,26 @@ export interface ImpactScale {
     levels: ImpactLevelInfo[];
 }
 
+/**
+ * Lists that replace the built in ones whole, for a deployment that adds, removes or reorders entries. A
+ * list left out keeps the built in one.
+ */
+export interface VocabularyOptions {
+    sides?: SideInfo[];
+    nodeKinds?: NodeKindInfo[];
+    attackTactics?: AttackTacticInfo[];
+    killChainPhases?: KillChainPhaseInfo[];
+    responsePhases?: ResponsePhaseInfo[];
+    outcomes?: OutcomeInfo[];
+    linkKinds?: LinkKindInfo[];
+    confidences?: OptionInfo<ConfidenceKey>[];
+    involvements?: OptionInfo<InvolvementKey>[];
+    audiences?: OptionInfo<AudienceKey>[];
+}
+
 export interface CatalogOptions {
     impactScale?: ImpactScale;
+    vocabulary?: VocabularyOptions;
     /** The named moments steps may claim. Empty by default: what counts as a milestone is the host's to say. */
     milestones?: MilestoneInfo[];
     /** Representations of the host's own, added after the built in ones. A key may not be claimed twice. */
@@ -131,9 +165,10 @@ export interface Catalog {
     linkKinds: LinkKindInfo[];
     outcomes: OutcomeInfo[];
     impactScale: ImpactScale;
-    confidences: OptionInfo<Confidence>[];
-    involvements: OptionInfo<Involvement>[];
-    audiences: OptionInfo<Audience>[];
+    confidences: OptionInfo<ConfidenceKey>[];
+    involvements: OptionInfo<InvolvementKey>[];
+    /** The audiences a step may be written for. A step listing none is written for everyone. */
+    audiences: OptionInfo<AudienceKey>[];
     representations: RepresentationInfo[];
     milestones: MilestoneInfo[];
 }
@@ -178,11 +213,11 @@ const NODE_KINDS: Readonly<Record<NodeKind, NodeKindInfo>> = {
 };
 
 const SIDES: Readonly<Record<Side, SideInfo>> = {
-    [Side.Unknown]: { side: Side.Unknown, label: "Unknown", icon: Icon.Unknown, colorToken: ThemeToken.SideUnknown, surfaceToken: ThemeToken.SurfaceUnknown },
-    [Side.Attacker]: { side: Side.Attacker, label: "Attacker", icon: Icon.ThreatActor, colorToken: ThemeToken.SideAttacker, surfaceToken: ThemeToken.SurfaceAttacker },
-    [Side.Victim]: { side: Side.Victim, label: "Victim", icon: Icon.Target, colorToken: ThemeToken.SideVictim, surfaceToken: ThemeToken.SurfaceVictim },
-    [Side.Defender]: { side: Side.Defender, label: "Defender", icon: Icon.Shield, colorToken: ThemeToken.SideDefender, surfaceToken: ThemeToken.SurfaceDefender },
-    [Side.ThirdParty]: { side: Side.ThirdParty, label: "Third party", icon: Icon.Helper, colorToken: ThemeToken.SideThirdParty, surfaceToken: ThemeToken.SurfaceUnknown }
+    [Side.Unknown]: { side: Side.Unknown, label: "Unknown", icon: Icon.Unknown, role: SideRole.Neutral, colorToken: ThemeToken.SideUnknown, surfaceToken: ThemeToken.SurfaceUnknown },
+    [Side.Attacker]: { side: Side.Attacker, label: "Attacker", icon: Icon.ThreatActor, role: SideRole.Attacker, colorToken: ThemeToken.SideAttacker, surfaceToken: ThemeToken.SurfaceAttacker },
+    [Side.Victim]: { side: Side.Victim, label: "Victim", icon: Icon.Target, role: SideRole.Victim, colorToken: ThemeToken.SideVictim, surfaceToken: ThemeToken.SurfaceVictim },
+    [Side.Defender]: { side: Side.Defender, label: "Defender", icon: Icon.Shield, role: SideRole.Defender, colorToken: ThemeToken.SideDefender, surfaceToken: ThemeToken.SurfaceDefender },
+    [Side.ThirdParty]: { side: Side.ThirdParty, label: "Third party", icon: Icon.Helper, role: SideRole.Ally, colorToken: ThemeToken.SideThirdParty, surfaceToken: ThemeToken.SurfaceUnknown }
 };
 
 const ATTACK_TACTICS: Readonly<Record<AttackTactic, AttackTacticInfo>> = {
@@ -215,13 +250,13 @@ const KILL_CHAIN_PHASES: Readonly<Record<KillChainPhase, KillChainPhaseInfo>> = 
 };
 
 const RESPONSE_PHASES: Readonly<Record<ResponsePhase, ResponsePhaseInfo>> = {
-    [ResponsePhase.None]: { phase: ResponsePhase.None, label: "Unclassified", icon: Icon.Unknown },
-    [ResponsePhase.Detect]: { phase: ResponsePhase.Detect, label: "Detect", icon: Icon.Search },
-    [ResponsePhase.Analyze]: { phase: ResponsePhase.Analyze, label: "Analyze", icon: Icon.Microscope },
-    [ResponsePhase.Contain]: { phase: ResponsePhase.Contain, label: "Contain", icon: Icon.Shield },
-    [ResponsePhase.Eradicate]: { phase: ResponsePhase.Eradicate, label: "Eradicate", icon: Icon.Trash },
-    [ResponsePhase.Recover]: { phase: ResponsePhase.Recover, label: "Recover", icon: Icon.Recover },
-    [ResponsePhase.Review]: { phase: ResponsePhase.Review, label: "Review", icon: Icon.Review }
+    [ResponsePhase.None]: { phase: ResponsePhase.None, label: "Unclassified", icon: Icon.Unknown, stage: ResponseStage.None },
+    [ResponsePhase.Detect]: { phase: ResponsePhase.Detect, label: "Detect", icon: Icon.Search, stage: ResponseStage.Detection },
+    [ResponsePhase.Analyze]: { phase: ResponsePhase.Analyze, label: "Analyze", icon: Icon.Microscope, stage: ResponseStage.None },
+    [ResponsePhase.Contain]: { phase: ResponsePhase.Contain, label: "Contain", icon: Icon.Shield, stage: ResponseStage.Containment },
+    [ResponsePhase.Eradicate]: { phase: ResponsePhase.Eradicate, label: "Eradicate", icon: Icon.Trash, stage: ResponseStage.Eradication },
+    [ResponsePhase.Recover]: { phase: ResponsePhase.Recover, label: "Recover", icon: Icon.Recover, stage: ResponseStage.Recovery },
+    [ResponsePhase.Review]: { phase: ResponsePhase.Review, label: "Review", icon: Icon.Review, stage: ResponseStage.None }
 };
 
 const LINK_KINDS: Readonly<Record<LinkKind, LinkKindInfo>> = {
@@ -240,11 +275,11 @@ const LINK_KINDS: Readonly<Record<LinkKind, LinkKindInfo>> = {
 };
 
 const OUTCOMES: Readonly<Record<StepOutcome, OutcomeInfo>> = {
-    [StepOutcome.Unknown]: { outcome: StepOutcome.Unknown, label: "Unknown", icon: Icon.Unknown, colorToken: ThemeToken.InkMuted },
-    [StepOutcome.Succeeded]: { outcome: StepOutcome.Succeeded, label: "Succeeded", icon: Icon.Success, colorToken: ThemeToken.SideAttacker },
-    [StepOutcome.Failed]: { outcome: StepOutcome.Failed, label: "Failed", icon: Icon.Failure, colorToken: ThemeToken.Good },
-    [StepOutcome.Blocked]: { outcome: StepOutcome.Blocked, label: "Blocked", icon: Icon.Blocked, colorToken: ThemeToken.Good },
-    [StepOutcome.Detected]: { outcome: StepOutcome.Detected, label: "Detected", icon: Icon.Eye, colorToken: ThemeToken.SideDefender }
+    [StepOutcome.Unknown]: { outcome: StepOutcome.Unknown, label: "Unknown", icon: Icon.Unknown, colorToken: ThemeToken.InkMuted, meaning: OutcomeMeaning.Unknown },
+    [StepOutcome.Succeeded]: { outcome: StepOutcome.Succeeded, label: "Succeeded", icon: Icon.Success, colorToken: ThemeToken.SideAttacker, meaning: OutcomeMeaning.Succeeded },
+    [StepOutcome.Failed]: { outcome: StepOutcome.Failed, label: "Failed", icon: Icon.Failure, colorToken: ThemeToken.Good, meaning: OutcomeMeaning.Failed },
+    [StepOutcome.Blocked]: { outcome: StepOutcome.Blocked, label: "Blocked", icon: Icon.Blocked, colorToken: ThemeToken.Good, meaning: OutcomeMeaning.Blocked },
+    [StepOutcome.Detected]: { outcome: StepOutcome.Detected, label: "Detected", icon: Icon.Eye, colorToken: ThemeToken.SideDefender, meaning: OutcomeMeaning.Detected }
 };
 
 const DEFAULT_IMPACT_SCALE: ImpactScale = {
@@ -260,6 +295,78 @@ const DEFAULT_IMPACT_SCALE: ImpactScale = {
 
 const IMPACT_LEVEL_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_LABEL_LENGTH = 60;
+
+const DEFAULT_AUDIENCES: readonly OptionInfo<AudienceKey>[] = [
+    { value: Audience.Executive, label: "Executive" },
+    { value: Audience.Technical, label: "Technical" }
+];
+
+interface VocabularyEntry {
+    key: string;
+    label: string;
+}
+
+/**
+ * What a list must hold besides well formed entries: the entry a record holds when nothing was said, and
+ * whether the list may be left empty, which only a list nothing depends on may.
+ */
+interface ListRule {
+    name: string;
+    keeps: string | null;
+    mayBeEmpty: boolean;
+}
+
+/**
+ * Refuses a list whose keys could not be stored or told apart, the same way as an impact scale.
+ */
+function checkList(rule: ListRule, entries: readonly VocabularyEntry[]): void {
+    const { name } = rule;
+    if (entries.length === 0 && !rule.mayBeEmpty) {
+        throw new Error(`The ${name} list needs at least one entry.`);
+    }
+    const seen = new Set<string>();
+    entries.forEach(entry => {
+        if (!IMPACT_LEVEL_PATTERN.test(entry.key)) {
+            throw new Error(`The ${name} entry "${entry.key}" must be 1 to 40 letters, digits, dashes or underscores.`);
+        }
+        if (seen.has(entry.key)) {
+            throw new Error(`The ${name} entry "${entry.key}" appears twice.`);
+        }
+        if (!entry.label.trim() || entry.label.length > MAX_LABEL_LENGTH) {
+            throw new Error(`The ${name} entry "${entry.key}" needs a label of at most ${MAX_LABEL_LENGTH} characters.`);
+        }
+        seen.add(entry.key);
+    });
+    if (rule.keeps !== null && !seen.has(rule.keeps)) {
+        throw new Error(`The ${name} list must keep its "${rule.keeps}" entry, which records hold when nothing was said.`);
+    }
+}
+
+/**
+ * Checks every vocabulary list of a catalog, and that each tactic lands in a kill chain phase the catalog has.
+ */
+export function checkVocabulary(catalog: Catalog): void {
+    checkList({ name: "side", keeps: Side.Unknown, mayBeEmpty: false }, catalog.sides.map(entry => ({ key: entry.side, label: entry.label })));
+    checkList({ name: "node kind", keeps: null, mayBeEmpty: false }, catalog.nodeKinds.map(entry => ({ key: entry.kind, label: entry.label })));
+    checkList({ name: "tactic", keeps: AttackTactic.None, mayBeEmpty: false }, catalog.attackTactics.map(entry => ({ key: entry.tactic, label: entry.label })));
+    checkList({ name: "kill chain phase", keeps: KillChainPhase.None, mayBeEmpty: false }, catalog.killChainPhases.map(entry => ({ key: entry.phase, label: entry.label })));
+    checkList({ name: "response phase", keeps: ResponsePhase.None, mayBeEmpty: false }, catalog.responsePhases.map(entry => ({ key: entry.phase, label: entry.label })));
+    checkList({ name: "outcome", keeps: StepOutcome.Unknown, mayBeEmpty: false }, catalog.outcomes.map(entry => ({ key: entry.outcome, label: entry.label })));
+    checkList({ name: "link kind", keeps: null, mayBeEmpty: false }, catalog.linkKinds.map(entry => ({ key: entry.kind, label: entry.label })));
+    checkList({ name: "confidence", keeps: Confidence.Unknown, mayBeEmpty: false }, catalog.confidences.map(entry => ({ key: entry.value, label: entry.label })));
+    checkList({ name: "involvement", keeps: null, mayBeEmpty: false }, catalog.involvements.map(entry => ({ key: entry.value, label: entry.label })));
+    checkList({ name: "audience", keeps: null, mayBeEmpty: true }, catalog.audiences.map(entry => ({ key: entry.value, label: entry.label })));
+
+    if (catalog.audiences.some(entry => entry.value === Audience.Both)) {
+        throw new Error(`The audience "${Audience.Both}" is kept for everyone and cannot be an entry.`);
+    }
+    const phases = new Set(catalog.killChainPhases.map(entry => entry.phase));
+    catalog.attackTactics.forEach(entry => {
+        if (!phases.has(entry.killChainPhase)) {
+            throw new Error(`The tactic "${entry.tactic}" lands in the kill chain phase "${entry.killChainPhase}", which the catalog does not have.`);
+        }
+    });
+}
 
 /**
  * Refuses a scale that could not be stored or told apart: level keys end up in the database and in every
@@ -369,53 +476,30 @@ export function buildCatalog(settings: CatalogOptions = {}): Catalog {
     checkMilestones(milestones);
     const representations = [...copies(REPRESENTATIONS), ...structuredClone(settings.representations ?? [])];
     checkRepresentations(representations);
-    return {
-        nodeKinds: copies(NODE_KINDS),
-        sides: copies(SIDES),
-        attackTactics: copies(ATTACK_TACTICS),
-        killChainPhases: copies(KILL_CHAIN_PHASES),
-        responsePhases: copies(RESPONSE_PHASES),
-        linkKinds: copies(LINK_KINDS),
-        outcomes: copies(OUTCOMES),
+    const vocabulary = structuredClone(settings.vocabulary ?? {});
+    const catalog: Catalog = {
+        nodeKinds: vocabulary.nodeKinds ?? copies(NODE_KINDS),
+        sides: vocabulary.sides ?? copies(SIDES),
+        attackTactics: vocabulary.attackTactics ?? copies(ATTACK_TACTICS),
+        killChainPhases: vocabulary.killChainPhases ?? copies(KILL_CHAIN_PHASES),
+        responsePhases: vocabulary.responsePhases ?? copies(RESPONSE_PHASES),
+        linkKinds: vocabulary.linkKinds ?? copies(LINK_KINDS),
+        outcomes: vocabulary.outcomes ?? copies(OUTCOMES),
         impactScale,
-        confidences: options(Confidence),
-        involvements: options(Involvement),
-        audiences: options(Audience),
+        confidences: vocabulary.confidences ?? options(Confidence),
+        involvements: vocabulary.involvements ?? options(Involvement),
+        audiences: vocabulary.audiences ?? DEFAULT_AUDIENCES.map(entry => ({ ...entry })),
         representations,
         milestones
     };
-}
-
-export function categoryOf(kind: NodeKind): NodeCategory {
-    return NODE_KINDS[kind].category;
-}
-
-export function killChainPhaseOf(value: AttackTactic): KillChainPhase {
-    return ATTACK_TACTICS[value].killChainPhase;
-}
-
-/**
- * Where a record sits on the Diamond Model. The side wins over the kind, because a workstation run by
- * the attacker is their infrastructure while the same kind owned by the victim is not.
- */
-export function diamondVertexOf(kind: NodeKind, side: Side): DiamondVertex {
-    const info = NODE_KINDS[kind];
-    if (side === Side.Attacker && info.category === NodeCategory.Actor) {
-        return DiamondVertex.Adversary;
-    }
-    if (side === Side.Attacker) {
-        return info.diamondVertex === DiamondVertex.Victim ? DiamondVertex.Infrastructure : info.diamondVertex;
-    }
-    if (info.category === NodeCategory.Actor) {
-        return DiamondVertex.Victim;
-    }
-    return info.diamondVertex === DiamondVertex.Adversary ? DiamondVertex.Victim : info.diamondVertex;
+    checkVocabulary(catalog);
+    return catalog;
 }
 
 /**
  * Normalized identity of a record, so the same host or person can be recognised across incidents.
  */
-export function canonicalKeyOf(kind: NodeKind, identifier: string | null, name: string): string | null {
+export function canonicalKeyOf(kind: NodeKindKey, identifier: string | null, name: string): string | null {
     const value = identifier && identifier.trim() ? identifier : name;
     if (!value || !value.trim()) {
         return null;

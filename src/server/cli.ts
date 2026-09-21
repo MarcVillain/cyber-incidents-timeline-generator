@@ -44,8 +44,8 @@ if (!Number.isInteger(port) || port < 1 || port > HIGHEST_PORT) {
     process.exit(1);
 }
 
-const { store } = await openSqliteStore(values.db);
-const service = new TimelineService(store);
+const { store, catalogStore } = await openSqliteStore(values.db);
+const service = new TimelineService(store, { catalogStore });
 
 if (values.seed && (await service.listIncidents()).length === 0) {
     const incident = await seedSampleData(service);

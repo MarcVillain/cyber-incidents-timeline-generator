@@ -2,7 +2,7 @@
 // document, so a theme change needs no change here and exports keep matching what is on screen.
 
 import { impactLevelsOf, type Catalog, type ImpactLevelInfo, type SideInfo } from "../core/catalog.js";
-import { Side, StepOutcome, isEnumValue } from "../core/enums.js";
+import { Side, SideRole, isEnumValue, type OutcomeKey, type SideKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { DEFAULT_TOKEN_VALUES, ThemeToken } from "../core/theme-token.js";
 import { measure } from "./svg.js";
@@ -67,12 +67,12 @@ export function blend(color: string, ratio: number, towards: string): string {
     return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 }
 
-function sideColors(info: SideInfo | undefined, side: Side, resolve: TokenResolver): SideColors {
+function sideColors(info: SideInfo, resolve: TokenResolver): SideColors {
     return {
-        label: info?.label ?? side,
-        icon: info?.icon ?? Icon.Unknown,
-        color: resolve(info?.colorToken ?? ThemeToken.SideUnknown),
-        surface: resolve(info?.surfaceToken ?? ThemeToken.SurfaceUnknown)
+        label: info.label,
+        icon: info.icon,
+        color: resolve(info.colorToken),
+        surface: resolve(info.surfaceToken)
     };
 }
 
@@ -80,8 +80,6 @@ function sideColors(info: SideInfo | undefined, side: Side, resolve: TokenResolv
  * The colours every renderer paints with. Built once per draw so a theme switch is picked up.
  */
 export class Palette {
-    readonly sides: Readonly<Record<Side, SideColors>>;
-    readonly outcomes: Readonly<Record<StepOutcome, string>>;
     readonly ink: string;
     readonly inkMuted: string;
     readonly surface: string;
@@ -91,28 +89,31 @@ export class Palette {
     readonly accent: string;
     readonly good: string;
     readonly onColor: string;
+    /*
+     * The colours of the roles, for what belongs to a camp rather than to one side: the attacker line of a
+     * chart, or a success of the attack. Any side of a role is drawn in its own colour.
+     */
+    readonly attacker: string;
+    readonly defender: string;
+    readonly victim: string;
+    readonly ally: string;
+    private readonly sides: ReadonlyMap<string, SideColors>;
+    private readonly outcomes: ReadonlyMap<string, string>;
+    private readonly unknownSide: SideColors;
     private readonly shadow: string;
     private readonly resolve: TokenResolver;
     private readonly impactLevels: ReadonlyMap<string, ImpactLevelInfo>;
 
     constructor(catalog: Catalog, resolve: TokenResolver = defaultTokenResolver) {
-        const side = (value: Side): SideColors => sideColors(catalog.sides.find(entry => entry.side === value), value, resolve);
-        const outcome = (value: StepOutcome): string => resolve(catalog.outcomes.find(entry => entry.outcome === value)?.colorToken ?? ThemeToken.InkMuted);
-
-        this.sides = {
-            [Side.Unknown]: side(Side.Unknown),
-            [Side.Attacker]: side(Side.Attacker),
-            [Side.Victim]: side(Side.Victim),
-            [Side.Defender]: side(Side.Defender),
-            [Side.ThirdParty]: side(Side.ThirdParty)
+        this.sides = new Map(catalog.sides.map(entry => [entry.side, sideColors(entry, resolve)]));
+        this.outcomes = new Map(catalog.outcomes.map(entry => [entry.outcome, resolve(entry.colorToken)]));
+        this.unknownSide = {
+            label: Side.Unknown, icon: Icon.Unknown, color: resolve(ThemeToken.SideUnknown), surface: resolve(ThemeToken.SurfaceUnknown)
         };
-        this.outcomes = {
-            [StepOutcome.Unknown]: outcome(StepOutcome.Unknown),
-            [StepOutcome.Succeeded]: outcome(StepOutcome.Succeeded),
-            [StepOutcome.Failed]: outcome(StepOutcome.Failed),
-            [StepOutcome.Blocked]: outcome(StepOutcome.Blocked),
-            [StepOutcome.Detected]: outcome(StepOutcome.Detected)
-        };
+        this.attacker = resolve(ThemeToken.SideAttacker);
+        this.defender = resolve(ThemeToken.SideDefender);
+        this.victim = resolve(ThemeToken.SideVictim);
+        this.ally = resolve(ThemeToken.SideThirdParty);
         this.ink = resolve(ThemeToken.Ink);
         this.inkMuted = resolve(ThemeToken.InkMuted);
         this.surface = resolve(ThemeToken.Surface);
@@ -146,8 +147,28 @@ export class Palette {
         return info ? this.color(info.color, this.inkMuted) : this.inkMuted;
     }
 
-    side(side: Side): SideColors {
-        return this.sides[side];
+    roleColor(role: SideRole): string {
+        switch (role) {
+            case SideRole.Attacker:
+                return this.attacker;
+            case SideRole.Defender:
+                return this.defender;
+            case SideRole.Victim:
+                return this.victim;
+            case SideRole.Ally:
+                return this.ally;
+            case SideRole.Neutral:
+                return this.unknownSide.color;
+        }
+    }
+
+    /** The colours of a side. One the catalog no longer has is drawn as unknown, under its own name. */
+    side(side: SideKey): SideColors {
+        return this.sides.get(side) ?? { ...this.unknownSide, label: side };
+    }
+
+    outcome(outcome: OutcomeKey): string {
+        return this.outcomes.get(outcome) ?? this.inkMuted;
     }
 
     /**

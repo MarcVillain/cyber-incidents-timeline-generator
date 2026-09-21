@@ -3,6 +3,7 @@
 
 import { h, uniqueId } from "./dom.js";
 import type { Choice } from "./forms.js";
+import type { IconSet } from "./icons/icon-set.js";
 
 export interface ComboboxStrings {
     searchHint: string;
@@ -15,11 +16,25 @@ export interface ComboboxOptions {
     emptyLabel?: string;
     /** A handful of choices reads faster without a search box above it. */
     searchable?: boolean;
+    /** Draws the icons the choices name. */
+    icons?: IconSet | null;
 }
 
 interface Entry<TValue extends string> {
     value: TValue | null;
     label: string;
+    swatch?: string;
+    icon?: string;
+}
+
+/** The colour or icon a choice is shown with, before its label, in the list and on the closed picker. */
+function markOf(entry: { swatch?: string; icon?: string }, icons: IconSet | null): Node | null {
+    if (entry.swatch !== undefined) {
+        const swatch = h("span", "tlg-combo-swatch", { "aria-hidden": "true" });
+        swatch.style.background = entry.swatch;
+        return swatch;
+    }
+    return entry.icon !== undefined && icons ? icons.element(entry.icon) : null;
 }
 
 const ACTIVE = "is-active";
@@ -29,20 +44,23 @@ function matching(labels: readonly string[], query: string): number[] {
     return labels.flatMap((label, index) => (needle === "" || label.toLowerCase().includes(needle) ? [index] : []));
 }
 
-function paintOptions(
+function paintOptions<TValue extends string>(
     list: HTMLUListElement,
-    labels: readonly string[],
+    entries: readonly Entry<TValue>[],
+    icons: IconSet | null,
     activeIndex: number,
     selectedIndex: number,
     noMatch: string,
     pick: (index: number) => void
 ): void {
-    if (labels.length === 0) {
+    if (entries.length === 0) {
         list.replaceChildren(h("li", "tlg-combo-empty", { role: "presentation" }, [noMatch]));
         return;
     }
-    list.replaceChildren(...labels.map((label, index) => {
-        const option = h("li", "tlg-combo-option", { role: "option", "aria-selected": String(index === selectedIndex) }, [label]);
+    list.replaceChildren(...entries.map((entry, index) => {
+        const mark = markOf(entry, icons);
+        const content = mark ? h("span", "tlg-combo-marked", {}, [mark, entry.label]) : entry.label;
+        const option = h("li", "tlg-combo-option", { role: "option", "aria-selected": String(index === selectedIndex) }, [content]);
         if (index === activeIndex) {
             option.classList.add(ACTIVE);
         }
@@ -123,7 +141,7 @@ export function combobox<TValue extends string>(
     choices: readonly Choice<TValue>[],
     onChange: (value: TValue | null) => void,
     strings: ComboboxStrings,
-    { allowEmpty = false, emptyLabel = "", searchable = true }: ComboboxOptions = {}
+    { allowEmpty = false, emptyLabel = "", searchable = true, icons = null }: ComboboxOptions = {}
 ): HTMLDivElement {
     const entries: Entry<TValue>[] = allowEmpty ? [{ value: null, label: emptyLabel }, ...choices] : [...choices];
     const toggle = h("button", "tlg-combo-toggle", {
@@ -144,12 +162,16 @@ export function combobox<TValue extends string>(
     let shown: number[] = entries.map((_, index) => index);
     let active = 0;
 
-    const labelOf = (): string => entries.find(entry => entry.value === chosen)?.label ?? emptyLabel;
+    const showChosen = (): void => {
+        const entry = entries.find(candidate => candidate.value === chosen);
+        const mark = entry ? markOf(entry, icons) : null;
+        caption.replaceChildren(...(mark ? [mark] : []), entry?.label ?? emptyLabel);
+    };
 
     const pick = (position: number): void => {
         const entry = entries[shown[position]];
         chosen = entry.value;
-        caption.textContent = entry.label;
+        showChosen();
         panel.close();
         onChange(chosen);
     };
@@ -157,7 +179,7 @@ export function combobox<TValue extends string>(
     const paint = (): void => {
         shown = matching(entries.map(entry => entry.label), search.value);
         active = Math.min(active, Math.max(shown.length - 1, 0));
-        paintOptions(list, shown.map(index => entries[index].label), active, shown.findIndex(index => entries[index].value === chosen), strings.noMatch, pick);
+        paintOptions(list, shown.map(index => entries[index]), icons, active, shown.findIndex(index => entries[index].value === chosen), strings.noMatch, pick);
     };
 
     const openPopup = (): void => {
@@ -171,7 +193,7 @@ export function combobox<TValue extends string>(
         scrollToActive(list, active);
     };
 
-    caption.textContent = labelOf();
+    showChosen();
 
     // Safari does not focus a button that is clicked, so the press blurs the search box and the list has
     // already closed by the time the click arrives. Pressing the button is what says open or shut, not the
@@ -257,7 +279,7 @@ export function suggestInput(
         // Nothing is offered until a letter is typed, so the field is a place to write first and a list second
         shown = input.value.trim() === "" ? [] : matching(suggestions, input.value);
         active = Math.min(active, shown.length - 1);
-        paintOptions(list, shown.map(index => suggestions[index]), active, -1, strings.noMatch, position => commit(suggestions[shown[position]]));
+        paintOptions(list, shown.map(index => ({ value: suggestions[index], label: suggestions[index] })), null, active, -1, strings.noMatch, position => commit(suggestions[shown[position]]));
         if (shown.length > 0) panel.open();
         else panel.close();
     };

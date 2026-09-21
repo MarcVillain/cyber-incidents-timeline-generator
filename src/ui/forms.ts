@@ -12,6 +12,10 @@ import { DEFAULT_STRINGS, type FormStrings } from "./strings.js";
 export interface Choice<TValue extends string> {
     value: TValue;
     label: string;
+    /** A colour shown beside the label, as any CSS colour or a var() of a custom property. */
+    swatch?: string;
+    /** An icon shown beside the label, drawn when the picker is given an icon set. */
+    icon?: string;
 }
 
 const MIN_TEXTAREA_HEIGHT = 24;
@@ -88,6 +92,8 @@ export interface SelectOptions {
     allowEmpty?: boolean;
     emptyLabel?: string;
     strings?: FormStrings;
+    /** Draws the icons the choices name. */
+    icons?: IconSet;
 }
 
 /**
@@ -98,9 +104,9 @@ export function select<TValue extends string>(
     value: TValue | null,
     choices: readonly Choice<TValue>[],
     onChange: (value: TValue | null) => void,
-    { allowEmpty = false, emptyLabel = DEFAULT_STRINGS.forms.none, strings = DEFAULT_STRINGS.forms }: SelectOptions = {}
+    { allowEmpty = false, emptyLabel = DEFAULT_STRINGS.forms.none, strings = DEFAULT_STRINGS.forms, icons }: SelectOptions = {}
 ): HTMLElement {
-    return combobox(value, choices, onChange, strings, { allowEmpty, emptyLabel, searchable: choices.length >= SEARCHABLE_FROM });
+    return combobox(value, choices, onChange, strings, { allowEmpty, emptyLabel, searchable: choices.length >= SEARCHABLE_FROM, icons: icons ?? null });
 }
 
 /**

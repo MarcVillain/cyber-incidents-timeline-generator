@@ -262,31 +262,26 @@ describe("mountTimelineApp", () => {
         app.destroy();
     });
 
-    it("keeps what an entry means out of sight until asked for, and opens it for a new entry", async () => {
+    it("keeps the advanced settings of an entry behind its own button, and opens them for a new entry", async () => {
         const { service } = await seededService();
         const element = mountPoint();
         const app = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: memoryStorage(), preferenceKey: PREFERENCE_KEY, settingsButton: true, settingsScope: SettingsScope.Everything });
         const form = await openSettings(element);
         openTab(form, "Vocabulary");
-        const shownDetails = (): number => [...form.querySelectorAll<HTMLElement>(".tlg-vocabulary-details")].filter(panel => !panel.hidden).length;
-        const detailButtons = (): number => form.querySelectorAll(".tlg-vocabulary-more").length;
-        assert.equal(detailButtons(), 0);
-        assert.equal(shownDetails(), 0);
+        const shown = (): number => [...form.querySelectorAll<HTMLElement>(".tlg-vocabulary-details")].filter(panel => !panel.hidden).length;
+        assert.equal(shown(), 0);
 
-        const advanced = [...form.querySelectorAll<HTMLInputElement>(".tlg-vocabulary input[type=checkbox]")][0];
+        const advanced = form.querySelector<HTMLButtonElement>("[aria-label=\"Advanced settings of Attacker\"]");
         assert.ok(advanced);
-        advanced.checked = true;
-        advanced.dispatchEvent(syntheticEvent("change"));
-        assert.ok(detailButtons() > 0);
-        assert.equal(shownDetails(), 0);
+        advanced.click();
+        assert.equal(shown(), 1);
+        assert.equal(form.querySelector("[aria-label=\"Advanced settings of Attacker\"]")?.getAttribute("aria-expanded"), "true");
 
-        advanced.checked = false;
-        advanced.dispatchEvent(syntheticEvent("change"));
         const adder = form.querySelector<HTMLInputElement>(".tlg-settings-adder input");
         assert.ok(adder);
         adder.value = "Insider";
         adder.dispatchEvent(syntheticEvent("keydown", { key: "Enter" }));
-        assert.equal(shownDetails(), 1);
+        assert.equal(shown(), 2);
         app.destroy();
     });
 

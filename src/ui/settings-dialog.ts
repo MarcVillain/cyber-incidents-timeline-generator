@@ -10,7 +10,7 @@ import { CanvasMode } from "./canvas-mode.js";
 import { ViewPicker } from "./view-picker.js";
 import { h, uniqueId } from "./dom.js";
 import { download } from "./export.js";
-import { button, checkbox, field, row, select, textInput, type Choice } from "./forms.js";
+import { button, field, row, select, textInput, type Choice } from "./forms.js";
 import type { IconSet } from "./icons/icon-set.js";
 import {
     ColorSection, EDITABLE_COLORS, LOCALES, PAGE_PRESETS, SettingsGroup, SettingsScope,
@@ -205,10 +205,8 @@ class SettingsDialog {
     private theme: ThemeMode;
     private tab = SettingsTab.Appearance;
     private group = SettingsGroup.Sides;
-    // The entries whose details are open, kept across the repaints every change makes
+    // The entries whose advanced settings are open, kept across the repaints every change makes
     private readonly opened = new Set<string>();
-    // What an entry means for the views is rarely changed, so it stays out of sight until asked for
-    private advanced = false;
     private acknowledged = false;
 
     constructor(options: SettingsDialogOptions) {
@@ -406,7 +404,7 @@ class SettingsDialog {
      */
     private paintEditor<TEntry>(list: HTMLElement, editor: ListEditor<TEntry>): void {
         const words = this.strings.settings;
-        const forms = { strings: this.strings.forms };
+        const forms = { strings: this.strings.forms, icons: this.icons };
         const catalog = settingsCatalog(this.draft);
         const entries = editor.entries(catalog);
         const phasesInUse = new Set(catalog.attackTactics.map(entry => entry.killChainPhase));
@@ -439,18 +437,23 @@ class SettingsDialog {
                 ? h("div", "tlg-vocabulary-details", {}, [...fields, field(words.entryKey, h("code", "tlg-settings-key", {}, [key]))])
                 : null;
             const open = this.opened.has(openKey);
-            const meaning = details && (this.advanced || open)
-                ? button(this.icons, words.entryDetails, "tlg-button tlg-button-quiet tlg-vocabulary-more", () => {
+            // What an entry means for the views is rarely changed, so it waits behind a button of its own
+            const meaning = details
+                ? button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet tlg-vocabulary-more", () => {
                     if (this.opened.has(openKey)) this.opened.delete(openKey);
                     else this.opened.add(openKey);
                     this.paintGroup(list);
-                }, open ? Icon.ChevronDown : Icon.ChevronRight)
+                }, Icon.Settings)
                 : null;
             if (details) details.hidden = !open;
             if (meaning) {
                 meaning.setAttribute("aria-expanded", String(open));
-                meaning.title = words.meaningOf(label);
+                meaning.setAttribute("aria-label", words.advancedOf(label));
+                meaning.title = words.advancedOf(label);
             }
+            // The colour is what tells the entries apart on a slide, so it shows on the row rather than behind it
+            const color = editor.color?.(entry);
+            if (picker && color) picker.toggle.style.color = `var(${color})`;
             const move = (offset: number): void => {
                 const next = entries.filter((_, position) => position !== index);
                 next.splice(index + offset, 0, entry);
@@ -486,14 +489,7 @@ class SettingsDialog {
             this.draft.entries.delete(this.group);
             this.paintGroup(list);
         }, Icon.Undo);
-        const advanced = editor.fields.length > 0
-            ? checkbox(words.showAdvanced, this.advanced, value => {
-                this.advanced = value;
-                this.paintGroup(list);
-            })
-            : null;
         list.replaceChildren(
-            ...(advanced ? [advanced] : []),
             ...rows,
             this.adder(words.addEntry, name => {
                 const created = editor.create(keyFor(name, taken), name);

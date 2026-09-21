@@ -14,7 +14,8 @@ All notable changes to this project are documented here. The format follows
 - Integrators get `vocabulary` on `buildCatalog`, `checkVocabulary`, the `Vocabulary` lookup, and `role`, `stage` and `meaning` on the catalog entries.
 - The vocabulary, the impact scale and the milestones can be edited on the reference server too, for every viewer. A new `CatalogStore` port keeps them, with memory, browser storage and SQL implementations, and the REST API gains `GET` and `PUT /catalog/settings` and `POST /catalog/usage`, which counts the records still holding what a change removes.
 - A `Configure` permission guards changing the catalog, so a host can keep it to administrators.
-- Each entry of a list sits on one line. What it means for the views, and the key it is stored under, stay behind a tick box and a Details button, and open by themselves for an entry just added.
+- Each entry of a list sits on one line, its icon in its colour. What it means for the views, and the key it is stored under, open from a button of its own on the entry, and open by themselves for an entry just added.
+- Pickers show a swatch beside a colour and an icon beside a camp, a meaning, a phase or a kind of record.
 - Each setting in the settings panel of a view has its own reset, shown while the setting is off its default.
 
 ### Changed

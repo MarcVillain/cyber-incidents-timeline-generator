@@ -108,6 +108,8 @@ export interface ListEditor<TEntry> {
     keeps: string | null;
     /** Only a list nothing falls back to may be left empty, such as the audiences. */
     mayBeEmpty: boolean;
+    /** The colour an entry is drawn in, shown on its row, for the lists whose entries carry one. */
+    color?(entry: TEntry): ThemeToken;
     fields: readonly EntryField<TEntry>[];
 }
 
@@ -115,10 +117,10 @@ function tokenChoices(strings: Strings): Choice<string>[] {
     const words = strings.settings;
     const defaults = buildCatalog();
     return [
-        ...defaults.sides.map(entry => ({ value: entry.colorToken, label: entry.label })),
-        { value: ThemeToken.Accent, label: words.accent },
-        { value: ThemeToken.Good, label: words.positive },
-        ...defaults.impactScale.levels.flatMap(level => (isEnumValue(ThemeToken, level.color) ? [{ value: level.color, label: level.label }] : []))
+        ...defaults.sides.map(entry => ({ value: entry.colorToken, label: words.sameColorAs(entry.label), swatch: `var(${entry.colorToken})` })),
+        { value: ThemeToken.Accent, label: words.accent, swatch: `var(${ThemeToken.Accent})` },
+        { value: ThemeToken.Good, label: words.positive, swatch: `var(${ThemeToken.Good})` },
+        ...defaults.impactScale.levels.flatMap(level => (isEnumValue(ThemeToken, level.color) ? [{ value: level.color, label: words.sameColorAs(level.label), swatch: `var(${level.color})` }] : []))
     ];
 }
 
@@ -150,11 +152,11 @@ function optionEditor(list: VocabularyList.Confidences | VocabularyList.Involvem
 export function sideEditor(strings: Strings): ListEditor<SideInfo> {
     const words = strings.settings;
     const roles: Choice<string>[] = [
-        { value: SideRole.Attacker, label: words.roleAttacker },
-        { value: SideRole.Defender, label: words.roleDefender },
-        { value: SideRole.Ally, label: words.roleAlly },
-        { value: SideRole.Victim, label: words.roleVictim },
-        { value: SideRole.Neutral, label: words.roleNeutral }
+        { value: SideRole.Attacker, label: words.roleAttacker, icon: Icon.ThreatActor },
+        { value: SideRole.Defender, label: words.roleDefender, icon: Icon.Shield },
+        { value: SideRole.Ally, label: words.roleAlly, icon: Icon.Helper },
+        { value: SideRole.Victim, label: words.roleVictim, icon: Icon.Target },
+        { value: SideRole.Neutral, label: words.roleNeutral, icon: Icon.Unknown }
     ];
     return {
         list: VocabularyList.Sides,
@@ -167,6 +169,7 @@ export function sideEditor(strings: Strings): ListEditor<SideInfo> {
         create: (key, label) => ({ side: key, label, icon: Icon.Users, role: SideRole.Neutral, colorToken: ThemeToken.SideUnknown, surfaceToken: ThemeToken.SurfaceUnknown }),
         keeps: Side.Unknown,
         mayBeEmpty: false,
+        color: entry => entry.colorToken,
         fields: [
             {
                 label: words.role, choices: roles, value: entry => entry.role,
@@ -184,14 +187,14 @@ export function nodeKindEditor(strings: Strings): ListEditor<NodeKindInfo> {
     const words = strings.settings;
     const scene = strings.scene;
     const categories: Choice<string>[] = [
-        { value: NodeCategory.Actor, label: words.categoryActor },
-        { value: NodeCategory.Resource, label: words.categoryResource }
+        { value: NodeCategory.Actor, label: words.categoryActor, icon: Icon.User },
+        { value: NodeCategory.Resource, label: words.categoryResource, icon: Icon.Server }
     ];
     const vertices: Choice<string>[] = [
-        { value: DiamondVertex.Adversary, label: scene.adversary },
-        { value: DiamondVertex.Capability, label: scene.capability },
-        { value: DiamondVertex.Infrastructure, label: scene.infrastructure },
-        { value: DiamondVertex.Victim, label: scene.victim }
+        { value: DiamondVertex.Adversary, label: scene.adversary, icon: Icon.ThreatActor },
+        { value: DiamondVertex.Capability, label: scene.capability, icon: Icon.Tool },
+        { value: DiamondVertex.Infrastructure, label: scene.infrastructure, icon: Icon.Server },
+        { value: DiamondVertex.Victim, label: scene.victim, icon: Icon.Target }
     ];
     return {
         list: VocabularyList.NodeKinds,
@@ -218,7 +221,7 @@ export function nodeKindEditor(strings: Strings): ListEditor<NodeKindInfo> {
 }
 
 export function tacticEditor(strings: Strings, catalog: Catalog): ListEditor<AttackTacticInfo> {
-    const phases: Choice<string>[] = catalog.killChainPhases.map(entry => ({ value: entry.phase, label: entry.label }));
+    const phases: Choice<string>[] = catalog.killChainPhases.map(entry => ({ value: entry.phase, label: entry.label, icon: entry.icon }));
     return {
         list: VocabularyList.AttackTactics,
         entries: current => current.attackTactics.map(entry => ({ ...entry })),
@@ -256,11 +259,11 @@ export function killChainEditor(): ListEditor<KillChainPhaseInfo> {
 export function responsePhaseEditor(strings: Strings): ListEditor<ResponsePhaseInfo> {
     const words = strings.settings;
     const stages: Choice<string>[] = [
-        { value: ResponseStage.None, label: words.stageNone },
-        { value: ResponseStage.Detection, label: words.stageDetection },
-        { value: ResponseStage.Containment, label: words.stageContainment },
-        { value: ResponseStage.Eradication, label: words.stageEradication },
-        { value: ResponseStage.Recovery, label: words.stageRecovery }
+        { value: ResponseStage.None, label: words.stageNone, icon: Icon.Unknown },
+        { value: ResponseStage.Detection, label: words.stageDetection, icon: Icon.Search },
+        { value: ResponseStage.Containment, label: words.stageContainment, icon: Icon.Shield },
+        { value: ResponseStage.Eradication, label: words.stageEradication, icon: Icon.Trash },
+        { value: ResponseStage.Recovery, label: words.stageRecovery, icon: Icon.Recover }
     ];
     return {
         list: VocabularyList.ResponsePhases,
@@ -283,11 +286,11 @@ export function responsePhaseEditor(strings: Strings): ListEditor<ResponsePhaseI
 export function outcomeEditor(strings: Strings): ListEditor<OutcomeInfo> {
     const words = strings.settings;
     const meanings: Choice<string>[] = [
-        { value: OutcomeMeaning.Unknown, label: words.meaningUnknown },
-        { value: OutcomeMeaning.Succeeded, label: words.meaningSucceeded },
-        { value: OutcomeMeaning.Failed, label: words.meaningFailed },
-        { value: OutcomeMeaning.Blocked, label: words.meaningBlocked },
-        { value: OutcomeMeaning.Detected, label: words.meaningDetected }
+        { value: OutcomeMeaning.Unknown, label: words.meaningUnknown, icon: Icon.Unknown },
+        { value: OutcomeMeaning.Succeeded, label: words.meaningSucceeded, icon: Icon.Success },
+        { value: OutcomeMeaning.Failed, label: words.meaningFailed, icon: Icon.Failure },
+        { value: OutcomeMeaning.Blocked, label: words.meaningBlocked, icon: Icon.Blocked },
+        { value: OutcomeMeaning.Detected, label: words.meaningDetected, icon: Icon.Eye }
     ];
     return {
         list: VocabularyList.Outcomes,
@@ -300,13 +303,14 @@ export function outcomeEditor(strings: Strings): ListEditor<OutcomeInfo> {
         create: (key, label) => ({ outcome: key, label, icon: Icon.Unknown, colorToken: ThemeToken.InkMuted, meaning: OutcomeMeaning.Unknown }),
         keeps: StepOutcome.Unknown,
         mayBeEmpty: false,
+        color: entry => entry.colorToken,
         fields: [
             {
                 label: words.meaning, choices: meanings, value: entry => entry.meaning,
                 update: (entry, value) => (isEnumValue(OutcomeMeaning, value) ? { ...entry, meaning: value } : entry)
             },
             {
-                label: words.entryColor, choices: [{ value: ThemeToken.InkMuted, label: words.meaningUnknown }, ...tokenChoices(strings)], value: entry => entry.colorToken,
+                label: words.entryColor, choices: [{ value: ThemeToken.InkMuted, label: words.mutedColor, swatch: `var(${ThemeToken.InkMuted})` }, ...tokenChoices(strings)], value: entry => entry.colorToken,
                 update: (entry, value) => (isEnumValue(ThemeToken, value) ? { ...entry, colorToken: value } : entry)
             }
         ]

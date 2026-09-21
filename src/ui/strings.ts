@@ -486,9 +486,9 @@ export interface SettingsStrings {
     bothWays: string;
     invalidVocabulary: string;
     entryKey: string;
-    entryDetails: string;
-    showAdvanced: string;
-    meaningOf(label: string): string;
+    advancedOf(label: string): string;
+    sameColorAs(label: string): string;
+    mutedColor: string;
 }
 
 export interface Strings {
@@ -1014,9 +1014,9 @@ export const DEFAULT_STRINGS: Strings = {
         bothWays: "Both ways",
         invalidVocabulary: "These lists do not fit together. Check that every tactic lands in a kill chain phase that still exists.",
         entryKey: "Stored as",
-        entryDetails: "Details",
-        showAdvanced: "Show what each entry means for the views",
-        meaningOf: label => `What ${label} means for the views`
+        advancedOf: label => `Advanced settings of ${label}`,
+        sameColorAs: label => `Same as ${label}`,
+        mutedColor: "Muted grey"
     }
 };
 

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-09-21
+
+### Changed
+
+- The audiences of a step are picked from a dropdown that holds several at once, like every other picker, instead of a row of chips. It reads Everyone when none or all of them are picked.
+
 ## [0.5.0] - 2026-09-21
 
 ### Added

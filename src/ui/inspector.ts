@@ -10,7 +10,7 @@ import type { DiagramLink, DiagramNode, LinkUpdateInput, NodeUpdateInput, Record
 import { joinWallClock, splitWallClock } from "../core/time.js";
 import type { Selection, TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
-import { button, checkbox, dateAndTime, field, recordSelect, row, select, tagChips, textArea, textInput, toggleChips, type Choice, type SelectOptions } from "./forms.js";
+import { button, checkbox, dateAndTime, field, multiSelect, recordSelect, row, select, tagChips, textArea, textInput, type Choice, type SelectOptions } from "./forms.js";
 import type { PanelContext } from "./panels.js";
 
 type InspectedRecord =
@@ -243,7 +243,7 @@ export class Inspector {
             ),
             row(
                 field(w.confidence, this.pick(step.confidence, catalog.confidences, value => { if (value) save({ confidence: value }); })),
-                field(w.audience, toggleChips(step.audiences, catalog.audiences, value => save({ audiences: value }), w.everyone))
+                field(w.audience, multiSelect(step.audiences, catalog.audiences, value => save({ audiences: value }), { emptyLabel: w.everyone }))
             ),
             field(w.evidenceSource, textInput(step.evidenceSource, value => save({ evidenceSource: value }), w.evidenceSourceHint)),
             checkbox(w.milestone, step.isMilestone, value => save({ isMilestone: value })),

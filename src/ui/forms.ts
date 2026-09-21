@@ -4,7 +4,7 @@
 import { Icon } from "../core/icon.js";
 import type { DiagramNode, RecordId } from "../core/models.js";
 import type { WallClockParts } from "../core/time.js";
-import { combobox, suggestInput } from "./combobox.js";
+import { combobox, multiCombobox, suggestInput } from "./combobox.js";
 import { h, uniqueId } from "./dom.js";
 import type { IconSet } from "./icons/icon-set.js";
 import { DEFAULT_STRINGS, type FormStrings } from "./strings.js";
@@ -190,25 +190,15 @@ export function tagChips(
 }
 
 /**
- * A chip per choice that turns on and off, for a field holding several of them. Nothing on is a value
- * of its own, which the hint beside the chips names.
+ * The same picker for a field holding several choices. Nothing or everything picked shows the empty label.
  */
-export function toggleChips<TValue extends string>(values: readonly TValue[], choices: readonly Choice<TValue>[], onChange: (values: TValue[]) => void, hint: string): HTMLDivElement {
-    const chosen = new Set<TValue>(values);
-    const note = h("span", "tlg-toggle-hint", {}, [hint]);
-    const chips = choices.map(choice => {
-        const chip = h("button", "tlg-chip-toggle", { type: "button", "aria-pressed": String(chosen.has(choice.value)) }, [choice.label]);
-        chip.addEventListener("click", () => {
-            if (chosen.has(choice.value)) chosen.delete(choice.value);
-            else chosen.add(choice.value);
-            chip.setAttribute("aria-pressed", String(chosen.has(choice.value)));
-            note.hidden = chosen.size > 0;
-            onChange(choices.map(entry => entry.value).filter(value => chosen.has(value)));
-        });
-        return chip;
-    });
-    note.hidden = chosen.size > 0;
-    return h("div", "tlg-chips", {}, [...chips, note]);
+export function multiSelect<TValue extends string>(
+    values: readonly TValue[],
+    choices: readonly Choice<TValue>[],
+    onChange: (values: TValue[]) => void,
+    { emptyLabel = DEFAULT_STRINGS.forms.none, strings = DEFAULT_STRINGS.forms, icons }: SelectOptions = {}
+): HTMLElement {
+    return multiCombobox(values, choices, onChange, strings, { emptyLabel, searchable: choices.length >= SEARCHABLE_FROM, icons: icons ?? null });
 }
 
 export function button(icons: IconSet, label: string, className: string, onClick: () => void, icon: string | null = null): HTMLButtonElement {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { select, tagChips } from "../../src/ui/forms.js";
+import { multiSelect, select, tagChips } from "../../src/ui/forms.js";
 import { IconSet } from "../../src/ui/icons/icon-set.js";
 import { DEFAULT_STRINGS } from "../../src/ui/strings.js";
 import { installDom, syntheticEvent } from "../support/dom.js";
@@ -13,6 +13,7 @@ const NOTHING_LIKE_IT = "zzz";
 const RANSOMWARE = "ransomware";
 const PHISHING = "phishing";
 const NEW_TAG = "lateral movement";
+const EVERYONE = "Everyone";
 
 function choicesOf(labels: readonly string[]): { value: string; label: string }[] {
     return labels.map(label => ({ value: label.toLowerCase(), label }));
@@ -79,6 +80,44 @@ describe("a picker over a long list", () => {
         const control = select<string>(null, choicesOf(LONG), () => undefined, { allowEmpty: true, emptyLabel: DEFAULT_STRINGS.forms.none });
         assert.equal(control.querySelector("button")?.textContent, DEFAULT_STRINGS.forms.none);
         assert.equal(optionsOf(control).length, LONG.length + 1);
+    });
+});
+
+describe("a picker holding several choices", () => {
+    function toggleOf(root: HTMLElement): HTMLButtonElement {
+        const toggle = root.querySelector<HTMLButtonElement>(".tlg-combo-toggle");
+        assert.ok(toggle);
+        return toggle;
+    }
+
+    function optionNamed(root: HTMLElement, label: string): HTMLElement {
+        const option = [...root.querySelectorAll<HTMLElement>(".tlg-combo-option")].find(node => node.textContent === label);
+        assert.ok(option);
+        return option;
+    }
+
+    it("names the empty label when nothing or everything is picked", () => {
+        assert.equal(toggleOf(multiSelect([], choicesOf(SHORT), () => undefined, { emptyLabel: EVERYONE })).textContent, EVERYONE);
+        const all = choicesOf(SHORT).map(choice => choice.value);
+        assert.equal(toggleOf(multiSelect(all, choicesOf(SHORT), () => undefined, { emptyLabel: EVERYONE })).textContent, EVERYONE);
+    });
+
+    it("turns choices on and off and keeps the list open", () => {
+        const saved: string[][] = [];
+        const control = multiSelect(["bravo"], choicesOf(SHORT), values => saved.push(values), { emptyLabel: EVERYONE });
+        const toggle = toggleOf(control);
+        assert.equal(toggle.textContent, "Bravo");
+        toggle.dispatchEvent(syntheticEvent("click"));
+
+        optionNamed(control, "Alpha").dispatchEvent(syntheticEvent("mousedown"));
+        assert.deepEqual(saved.at(-1), ["alpha", "bravo"]);
+        assert.equal(toggle.textContent, "Alpha, Bravo");
+        assert.equal(toggle.getAttribute("aria-expanded"), "true");
+
+        optionNamed(control, "Bravo").dispatchEvent(syntheticEvent("mousedown"));
+        optionNamed(control, "Alpha").dispatchEvent(syntheticEvent("mousedown"));
+        assert.deepEqual(saved.at(-1), []);
+        assert.equal(toggle.textContent, EVERYONE);
     });
 });
 

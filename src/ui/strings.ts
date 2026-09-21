@@ -652,7 +652,7 @@ export const DEFAULT_STRINGS: Strings = {
         severity: "Severity",
         confidence: "Confidence",
         audience: "Audience",
-        everyone: "Everyone, when none is picked",
+        everyone: "Everyone",
         evidenceSource: "Evidence source",
         evidenceSourceHint: "EDR, SIEM, user report",
         milestone: "Milestone",

@@ -48,6 +48,7 @@ function densityOption(strings: Strings): RendererOption<Density> {
     return {
         id: "density",
         label: strings.options.density,
+        description: strings.options.densityDescription,
         fallback: Density.Comfortable,
         choices: [
             { value: Density.Comfortable, label: strings.options.densityComfortable },
@@ -152,6 +153,7 @@ function axis(palette: Palette, steps: readonly TimelineStep[], positions: reado
 
 export const sequentialTimeline = defineRenderer<TimelineStep[]>({
     representation: Representation.SequentialTimeline,
+    filters: strings => strings.filters.sequentialTimeline,
     options: strings => [densityOption(strings)],
 
     pages(context) {

@@ -6,7 +6,7 @@ export * from "./storage/memory-store.js";
 export * from "./storage/browser-storage-store.js";
 export * from "./storage/http-api.js";
 export * from "./storage/sourced-store.js";
-export { mountTimeline, CanvasMode, ThemeMode, type TimelineHandle, type TimelineOptions, type TimelineState } from "./ui/workspace.js";
+export { mountTimeline, CanvasMode, ThemeMode, ViewPicker, type TimelineHandle, type TimelineOptions, type TimelineState } from "./ui/workspace.js";
 export { loadAppCatalog, loadAppSettings, mountTimelineApp, type TimelineAppHandle, type TimelineAppOptions } from "./ui/app.js";
 export {
     SettingsGroup, SettingsScope, defaultSettings, parseSettings, relabelCatalog, serializeSettings, settingsCatalog,

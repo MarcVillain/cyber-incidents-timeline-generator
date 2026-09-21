@@ -10,6 +10,7 @@ import type { DurationUnits } from "../core/time.js";
 import { ColorScheme } from "./theme-detection.js";
 import { blend, type TokenResolver } from "./theme.js";
 import { CanvasMode } from "./canvas-mode.js";
+import { ViewPicker } from "./view-picker.js";
 import type { PageSize } from "./viewport.js";
 
 /** What the settings may change. */
@@ -60,6 +61,7 @@ export interface AppSettings {
     milestones: MilestoneInfo[] | null;
     pageSize: PageSize | null;
     canvasMode: CanvasMode | null;
+    viewPicker: ViewPicker | null;
     locale: string | null;
     durationUnits: DurationUnits | null;
 }
@@ -130,6 +132,7 @@ export function defaultSettings(): AppSettings {
         milestones: null,
         pageSize: null,
         canvasMode: null,
+        viewPicker: null,
         locale: null,
         durationUnits: null
     };
@@ -253,6 +256,7 @@ export function parseSettings(value: unknown): AppSettings {
     settings.milestones = parseMilestones(value["milestones"]);
     settings.pageSize = parsePageSize(value["pageSize"]);
     settings.canvasMode = isEnumValue(CanvasMode, value["canvasMode"]) ? value["canvasMode"] : null;
+    settings.viewPicker = isEnumValue(ViewPicker, value["viewPicker"]) ? value["viewPicker"] : null;
     settings.locale = isKnownLocale(value["locale"]) ? value["locale"] : null;
     settings.durationUnits = parseDurationUnits(value["durationUnits"]);
     return settings;

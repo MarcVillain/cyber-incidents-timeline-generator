@@ -21,6 +21,11 @@ export interface WorkspaceStrings {
     exportHtml: string;
     exportPrint: string;
     exportDocument: string;
+    exportXlsx: string;
+    exportCsv: string;
+    exportMarkdown: string;
+    exportClipboard: string;
+    copied: string;
     import: string;
     imported(records: number, steps: number): string;
     importFailed: string;
@@ -53,6 +58,14 @@ export interface WorkspaceStrings {
     exportFailed: string;
     placementFailed: string;
     noRenderer: string;
+    settings: string;
+    moveUp(label: string): string;
+    moveDown(label: string): string;
+    rename(label: string): string;
+    milestones: string;
+    everyStep: string;
+    viewsBefore: string;
+    viewsAfter: string;
 }
 
 export interface AppStrings {
@@ -191,6 +204,83 @@ export interface OptionStrings {
     compareAgainstTarget: string;
     compareAgainstHistory: string;
     compareCauses: string;
+    densityDescription: string;
+    detailDescription: string;
+    layoutDescription: string;
+    labelsDescription: string;
+    compareDescription: string;
+    rows: string;
+    rowsDescription: string;
+    summary: string;
+    summaryDescription: string;
+    summaryShown: string;
+    summaryHidden: string;
+    columns: string;
+    columnsDescription: string;
+}
+
+/** What the filters shared by every view, the audience and the milestones, do to one of them. */
+export interface FilterDescriptions {
+    audience: string;
+    milestones: string;
+}
+
+/** The descriptions of the shared filters, for each built in view and for any other. */
+export interface FilterStrings {
+    shared: FilterDescriptions;
+    sequentialTimeline: FilterDescriptions;
+    actorSwimlanes: FilterDescriptions;
+    attackerDefender: FilterDescriptions;
+    relationshipGraph: FilterDescriptions;
+    killChainBoard: FilterDescriptions;
+    attackFlow: FilterDescriptions;
+    diamondModel: FilterDescriptions;
+    attackMatrix: FilterDescriptions;
+    blastRadius: FilterDescriptions;
+    responseMetrics: FilterDescriptions;
+    evidenceTimeline: FilterDescriptions;
+    narrative: FilterDescriptions;
+}
+
+/** The headings of the timeline table, on the narrative slide and in the tabular exports. */
+export interface TableStrings {
+    number: string;
+    when: string;
+    date: string;
+    time: string;
+    until: string;
+    duration: string;
+    elapsed: string;
+    who: string;
+    whoKind: string;
+    what: string;
+    details: string;
+    where: string;
+    whereKind: string;
+    whereIdentifier: string;
+    whereCriticality: string;
+    whereCompromised: string;
+    involved: string;
+    side: string;
+    stage: string;
+    tactic: string;
+    killChain: string;
+    responsePhase: string;
+    technique: string;
+    severity: string;
+    confidence: string;
+    outcome: string;
+    audience: string;
+    milestone: string;
+    evidence: string;
+    tags: string;
+    reference: string;
+    yes: string;
+    no: string;
+    sinceStart(duration: string): string;
+    involvement(name: string, role: string): string;
+    /** The name of the worksheet in the spreadsheet export. */
+    sheet: string;
 }
 
 /** What the representations write on the scene itself: legends, column headings and empty states. */
@@ -218,11 +308,6 @@ export interface SceneStrings {
     noPartyRecorded: string;
     noSourceRecorded: string;
     nothingRecorded: string;
-    when: string;
-    who: string;
-    whatHappened: string;
-    onWhat: string;
-    stage: string;
     action: string;
     assetTouched: string;
     ledTo: string;
@@ -340,6 +425,9 @@ export interface SettingsStrings {
     layout: string;
     layoutSlides: string;
     layoutContinuous: string;
+    viewPicker: string;
+    viewPickerScroll: string;
+    viewPickerMenu: string;
     datesHeading: string;
     datesHint: string;
     dateFormat: string;
@@ -373,6 +461,8 @@ export interface Strings {
     deck: DeckStrings;
     slide: SlideStrings;
     options: OptionStrings;
+    table: TableStrings;
+    filters: FilterStrings;
     scene: SceneStrings;
     narrative: NarrativeStrings;
     settings: SettingsStrings;
@@ -402,6 +492,11 @@ export const DEFAULT_STRINGS: Strings = {
         exportHtml: "Interactive HTML",
         exportPrint: "Print or save as PDF",
         exportDocument: "Timeline file, to open elsewhere",
+        exportXlsx: "Excel workbook, the timeline as a table",
+        exportCsv: "CSV, the timeline as a table",
+        exportMarkdown: "Markdown table",
+        exportClipboard: "Copy the table, to paste anywhere",
+        copied: "The timeline table is on the clipboard.",
         import: "Open a timeline file",
         imported: (records, steps) => `Added ${records} record(s) and ${steps} step(s).`,
         importFailed: "The timeline file could not be read.",
@@ -433,7 +528,15 @@ export const DEFAULT_STRINGS: Strings = {
         deleteFailed: "The record could not be deleted.",
         exportFailed: "The export could not be produced.",
         placementFailed: "The new position could not be saved.",
-        noRenderer: "No renderer is available."
+        noRenderer: "No renderer is available.",
+        settings: "Settings of this view",
+        moveUp: label => `Move ${label} up`,
+        moveDown: label => `Move ${label} down`,
+        rename: label => `Heading shown for ${label}`,
+        milestones: "Milestones",
+        everyStep: "Every step",
+        viewsBefore: "Show the views before",
+        viewsAfter: "Show the views after"
     },
     app: {
         title: "Incident timelines",
@@ -563,7 +666,112 @@ export const DEFAULT_STRINGS: Strings = {
         compareBreakdown: "Where the time went",
         compareAgainstTarget: "Against target",
         compareAgainstHistory: "Against our history",
-        compareCauses: "What let it run"
+        compareCauses: "What let it run",
+        densityDescription: "How much room each step takes. Compact fits more steps on a slide, Stacked and Rows trade width for height.",
+        detailDescription: "Compact names the tactics only. Detailed lists the steps under each one.",
+        layoutDescription: "Bands lines the records up by party. Network lets the connections decide where each one sits.",
+        labelsDescription: "Writes the kind of each connection on its line. Hide them when the map gets crowded.",
+        compareDescription: "What the response times are measured against.",
+        rows: "Rows",
+        rowsDescription: "Compact rows fit more steps on each slide and in each page of a print.",
+        summary: "Summary",
+        summaryDescription: "The written account above the table on the first slide. Hiding it leaves the whole slide to the table.",
+        summaryShown: "Summary shown",
+        summaryHidden: "Summary hidden",
+        columns: "Columns",
+        columnsDescription: "What the table shows, in order, under the headings you give them. The spreadsheet, CSV, Markdown and copied exports use the same columns."
+    },
+    filters: {
+        shared: {
+            audience: "Which steps are drawn: every step, or only those written for executives or for technical readers.",
+            milestones: "Draws only the steps marked as milestones."
+        },
+        sequentialTimeline: {
+            audience: "Keeps the blocks written for the chosen readers on the arrow.",
+            milestones: "Leaves only the milestone blocks on the arrow, so the story fits fewer slides."
+        },
+        actorSwimlanes: {
+            audience: "Keeps the steps written for the chosen readers in the lanes.",
+            milestones: "Leaves only the milestone steps in each lane."
+        },
+        attackerDefender: {
+            audience: "Keeps the moves written for the chosen readers on both sides.",
+            milestones: "Shows only the milestone moves of the attacker and the defender."
+        },
+        relationshipGraph: {
+            audience: "Keeps the records touched by steps written for the chosen readers, with the groups holding them.",
+            milestones: "Keeps only the records the milestone steps touch."
+        },
+        killChainBoard: {
+            audience: "Places only the attacker steps written for the chosen readers in their phase.",
+            milestones: "Places only the milestone steps on the board."
+        },
+        attackFlow: {
+            audience: "Chains only the attacker steps written for the chosen readers.",
+            milestones: "Chains only the milestone steps."
+        },
+        diamondModel: {
+            audience: "Keeps the parties and tooling of the steps written for the chosen readers.",
+            milestones: "Keeps only what the milestone steps involve."
+        },
+        attackMatrix: {
+            audience: "Marks only the techniques of steps written for the chosen readers.",
+            milestones: "Marks only the techniques of milestone steps."
+        },
+        blastRadius: {
+            audience: "Keeps the records reached by steps written for the chosen readers.",
+            milestones: "Keeps only the records the milestone steps reach."
+        },
+        responseMetrics: {
+            audience: "Draws only the steps written for the chosen readers.",
+            milestones: "Draws only the milestone steps."
+        },
+        evidenceTimeline: {
+            audience: "Keeps the evidence of the steps written for the chosen readers.",
+            milestones: "Keeps only the evidence of the milestone steps."
+        },
+        narrative: {
+            audience: "Lists only the steps written for the chosen readers, in the table and in every table export.",
+            milestones: "Lists only the milestone steps, in the table and in every table export."
+        }
+    },
+    table: {
+        number: "#",
+        when: "When",
+        date: "Date",
+        time: "Time",
+        until: "Until",
+        duration: "Duration",
+        elapsed: "Since start",
+        who: "Who",
+        whoKind: "Who, kind",
+        what: "What happened",
+        details: "Details",
+        where: "On what",
+        whereKind: "Target kind",
+        whereIdentifier: "Target identifier",
+        whereCriticality: "Target criticality",
+        whereCompromised: "Target compromised",
+        involved: "Also involved",
+        side: "Side",
+        stage: "Stage",
+        tactic: "Tactic",
+        killChain: "Kill chain phase",
+        responsePhase: "Response phase",
+        technique: "Technique",
+        severity: "Severity",
+        confidence: "Confidence",
+        outcome: "Outcome",
+        audience: "Audience",
+        milestone: "Milestone",
+        evidence: "Evidence source",
+        tags: "Tags",
+        reference: "Reference",
+        yes: "Yes",
+        no: "No",
+        sinceStart: duration => `T+${duration}`,
+        involvement: (name, role) => `${name} (${role})`,
+        sheet: "Timeline"
     },
     scene: {
         emptyTimelineTitle: "No steps recorded yet",
@@ -589,11 +797,6 @@ export const DEFAULT_STRINGS: Strings = {
         noPartyRecorded: "No party recorded",
         noSourceRecorded: "No source recorded",
         nothingRecorded: "Nothing recorded",
-        when: "When",
-        who: "Who",
-        whatHappened: "What happened",
-        onWhat: "On what",
-        stage: "Stage",
         action: "Action",
         assetTouched: "Asset touched",
         ledTo: "Led to",
@@ -711,6 +914,9 @@ export const DEFAULT_STRINGS: Strings = {
         layout: "Layout",
         layoutSlides: "Slides",
         layoutContinuous: "One long page",
+        viewPicker: "Switching views",
+        viewPickerScroll: "A strip that scrolls",
+        viewPickerMenu: "A dropdown menu",
         datesHeading: "Dates and durations",
         datesHint: "How dates are written, and the short units durations end with.",
         dateFormat: "Date format",
@@ -750,6 +956,8 @@ export function buildStrings(override: StringsOverride = {}): Strings {
         deck: { ...DEFAULT_STRINGS.deck, ...override.deck },
         slide: { ...DEFAULT_STRINGS.slide, ...override.slide },
         options: { ...DEFAULT_STRINGS.options, ...override.options },
+        table: { ...DEFAULT_STRINGS.table, ...override.table },
+        filters: { ...DEFAULT_STRINGS.filters, ...override.filters },
         scene: { ...DEFAULT_STRINGS.scene, ...override.scene },
         narrative: { ...DEFAULT_STRINGS.narrative, ...override.narrative },
         settings: { ...DEFAULT_STRINGS.settings, ...override.settings }

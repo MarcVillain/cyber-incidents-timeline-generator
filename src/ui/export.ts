@@ -6,6 +6,9 @@ import { SVG_NS, svgDocument } from "./svg.js";
 import { FONT_STACK } from "./theme.js";
 import { pageSize } from "./chrome.js";
 import { DEFAULT_STRINGS, type DeckStrings } from "./strings.js";
+import { escapeHtml, toCsv, toHtmlTable, toMarkdown, toTsv } from "./table-formats.js";
+import type { TableData } from "./timeline-table.js";
+import { XLSX_MIME, xlsxWorkbook } from "./xlsx.js";
 
 export enum ExportFormat {
     Png = "png",
@@ -13,7 +16,13 @@ export enum ExportFormat {
     Html = "html",
     Print = "print",
     /** The records themselves rather than a picture of them, for moving a timeline to another instance. */
-    Document = "document"
+    Document = "document",
+    /** The timeline as a table, with the columns chosen for the narrative. */
+    Xlsx = "xlsx",
+    Csv = "csv",
+    Markdown = "markdown",
+    /** The table on the clipboard, as tab separated text and as HTML, rather than in a file. */
+    Clipboard = "clipboard"
 }
 
 const PNG_SCALE = 2;
@@ -22,10 +31,6 @@ const PRINT_CLEANUP_MS = 1000;
 
 function slug(value: string): string {
     return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, SLUG_LENGTH) || "diagram";
-}
-
-function escapeHtml(value: string): string {
-    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**
@@ -211,6 +216,28 @@ ${slides}
 
 export async function exportDocumentFile(document: unknown, name: string): Promise<void> {
     download(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }), `${slug(name)}.timeline.json`);
+}
+
+export async function exportXlsx(table: TableData, name: string, sheet: string): Promise<void> {
+    download(new Blob([xlsxWorkbook(table, sheet)], { type: XLSX_MIME }), `${slug(name)}.xlsx`);
+}
+
+export async function exportCsv(table: TableData, name: string): Promise<void> {
+    download(new Blob([toCsv(table)], { type: "text/csv;charset=utf-8" }), `${slug(name)}.csv`);
+}
+
+export async function exportMarkdown(table: TableData, name: string): Promise<void> {
+    download(new Blob([toMarkdown(table)], { type: "text/markdown;charset=utf-8" }), `${slug(name)}.md`);
+}
+
+/**
+ * Puts the table on the clipboard twice: as HTML for word processors and mail, and as tab separated
+ * text, which spreadsheets split into cells.
+ */
+export async function copyTable(table: TableData): Promise<void> {
+    const html = new Blob([toHtmlTable(table)], { type: "text/html" });
+    const plain = new Blob([toTsv(table)], { type: "text/plain" });
+    await navigator.clipboard.write([new ClipboardItem({ "text/html": html, "text/plain": plain })]);
 }
 
 export async function exportHtml(pages: readonly SVGGElement[], name: string, title: string, strings: DeckStrings = DEFAULT_STRINGS.deck, locale = "en"): Promise<void> {

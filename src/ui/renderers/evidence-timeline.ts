@@ -122,6 +122,7 @@ function coverage(palette: Palette, scale: TimeScale, steps: readonly TimelineSt
 
 export const evidenceTimeline = defineRenderer<Source[]>({
     representation: Representation.EvidenceTimeline,
+    filters: strings => strings.filters.evidenceTimeline,
 
     pages(context) {
         const sources = buildSources(context.store.visibleSteps(), context.strings.scene);

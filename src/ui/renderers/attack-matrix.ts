@@ -39,6 +39,7 @@ function detailOption(strings: Strings): RendererOption<Detail> {
     return {
         id: "detail",
         label: strings.options.detail,
+        description: strings.options.detailDescription,
         fallback: Detail.Compact,
         choices: [
             { value: Detail.Compact, label: strings.options.densityCompact },
@@ -166,6 +167,7 @@ function matrixCell(palette: Palette, cell: Cell, x: number, y: number, width: n
 
 export const attackMatrix = defineRenderer<MatrixPage>({
     representation: Representation.AttackMatrix,
+    filters: strings => strings.filters.attackMatrix,
     options: strings => [detailOption(strings)],
 
     pages(context) {

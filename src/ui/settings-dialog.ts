@@ -7,6 +7,7 @@ import { Icon } from "../core/icon.js";
 import { DEFAULT_TOKEN_VALUES, ThemeToken } from "../core/theme-token.js";
 import { DEFAULT_DURATION_UNITS, type DurationUnits } from "../core/time.js";
 import { CanvasMode } from "./canvas-mode.js";
+import { ViewPicker } from "./view-picker.js";
 import { h, uniqueId } from "./dom.js";
 import { download } from "./export.js";
 import { button, field, row, select, textInput, type Choice } from "./forms.js";
@@ -522,6 +523,11 @@ class SettingsDialog {
             { value: CanvasMode.Continuous, label: words.layoutContinuous }
         ];
         const layout = select(this.draft.canvasMode ?? CanvasMode.Slides, layouts, value => { this.draft.canvasMode = value; }, forms);
+        const pickers: Choice<ViewPicker>[] = [
+            { value: ViewPicker.Scroll, label: words.viewPickerScroll },
+            { value: ViewPicker.Menu, label: words.viewPickerMenu }
+        ];
+        const picker = select(this.draft.viewPicker ?? ViewPicker.Scroll, pickers, value => { this.draft.viewPicker = value; }, forms);
 
         const locale = this.draft.locale ?? LOCALES[0] ?? "";
         const locales: Choice<string>[] = [...new Set([...LOCALES, locale])].map(value => ({ value, label: value }));
@@ -541,7 +547,7 @@ class SettingsDialog {
         };
 
         return [
-            section(words.pagesHeading, words.pagesHint, [row(field(words.pageShape, pageShape), field(words.layout, layout))]),
+            section(words.pagesHeading, words.pagesHint, [row(field(words.pageShape, pageShape), field(words.layout, layout)), field(words.viewPicker, picker)]),
             section(words.datesHeading, words.datesHint, [
                 field(words.dateFormat, dates),
                 row(unitInput("minutes", words.minutes), unitInput("hours", words.hours), unitInput("days", words.days))

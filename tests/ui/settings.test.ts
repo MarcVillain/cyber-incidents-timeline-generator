@@ -6,6 +6,7 @@ import { Icon } from "../../src/core/icon.js";
 import { ThemeToken } from "../../src/core/theme-token.js";
 import { loadAppCatalog, loadAppSettings } from "../../src/ui/app.js";
 import { CanvasMode } from "../../src/ui/canvas-mode.js";
+import { ViewPicker } from "../../src/ui/view-picker.js";
 import { Preferences } from "../../src/ui/preferences.js";
 import { RelabeledTimelineApi } from "../../src/ui/relabeled-api.js";
 import {
@@ -41,6 +42,7 @@ function customised(): ReturnType<typeof defaultSettings> {
     settings.entries.set(SettingsGroup.Sides, new Map([[Side.Attacker, { label: ATTACKER_LABEL, icon: Icon.Skull }]]));
     settings.milestones = [MILESTONE];
     settings.canvasMode = CanvasMode.Continuous;
+    settings.viewPicker = ViewPicker.Menu;
     settings.locale = LOCALE;
     return settings;
 }
@@ -59,6 +61,7 @@ describe("settings", () => {
             milestones: [MILESTONE, MILESTONE],
             pageSize: { width: 10, height: 10 },
             canvasMode: "sideways",
+            viewPicker: "carousel",
             locale: "not a locale at all",
             durationUnits: { minutes: "m", hours: "h" }
         });
@@ -70,6 +73,7 @@ describe("settings", () => {
         assert.equal(parsed.milestones, null);
         assert.equal(parsed.pageSize, null);
         assert.equal(parsed.canvasMode, null);
+        assert.equal(parsed.viewPicker, null);
         assert.equal(parsed.locale, null);
         assert.equal(parsed.durationUnits, null);
     });

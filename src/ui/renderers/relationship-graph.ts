@@ -26,6 +26,7 @@ function layoutOption(strings: Strings): RendererOption<GraphLayout> {
     return {
         id: "layout",
         label: strings.options.layout,
+        description: strings.options.layoutDescription,
         fallback: GraphLayout.Bands,
         choices: [
             { value: GraphLayout.Bands, label: strings.options.layoutBands },
@@ -38,6 +39,7 @@ function labelsOption(strings: Strings): RendererOption<GraphLabels> {
     return {
         id: "labels",
         label: strings.options.labels,
+        description: strings.options.labelsDescription,
         fallback: GraphLabels.Shown,
         choices: [
             { value: GraphLabels.Shown, label: strings.options.labelsShown },
@@ -729,6 +731,7 @@ function drawNetwork(context: RenderContext, nodes: readonly DiagramNode[]): SVG
 
 export const relationshipGraph = defineRenderer<GraphPage>({
     representation: Representation.RelationshipGraph,
+    filters: strings => strings.filters.relationshipGraph,
     draggable: true,
     options: strings => [layoutOption(strings), labelsOption(strings)],
 

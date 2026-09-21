@@ -63,6 +63,7 @@ function boardCard(context: RenderContext, step: TimelineStep, x: number, y: num
 
 export const killChainBoard = defineRenderer<BoardPage>({
     representation: Representation.KillChainBoard,
+    filters: strings => strings.filters.killChainBoard,
 
     pages(context) {
         const { store } = context;

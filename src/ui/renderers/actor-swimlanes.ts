@@ -287,6 +287,7 @@ function handoffs(palette: Palette, steps: readonly TimelineStep[], chips: Reado
 
 export const actorSwimlanes = defineRenderer<Lane[]>({
     representation: Representation.ActorSwimlanes,
+    filters: strings => strings.filters.actorSwimlanes,
 
     pages(context) {
         const steps = context.store.visibleSteps();

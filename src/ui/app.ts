@@ -449,6 +449,7 @@ class TimelineApp implements TimelineAppHandle {
             ...this.options.timeline,
             ...(settings?.pageSize ? { pageSize: settings.pageSize } : {}),
             ...(settings?.canvasMode ? { canvasMode: settings.canvasMode } : {}),
+            ...(settings?.viewPicker ? { viewPicker: settings.viewPicker } : {}),
             ...(settings?.durationUnits ? { durationUnits: settings.durationUnits } : {}),
             api: this.api,
             incidentId,

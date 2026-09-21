@@ -97,6 +97,7 @@ function metricsStrip(context: RenderContext, x: number, y: number): SVGGElement
 
 export const attackerDefender = defineRenderer<TimelineStep[]>({
     representation: Representation.AttackerDefender,
+    filters: strings => strings.filters.attackerDefender,
 
     pages(context) {
         const steps = context.store.visibleSteps().filter(step => step.side === Side.Attacker || step.side === Side.Defender);

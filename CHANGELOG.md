@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-09-21
+
+### Added
+
+- Each view has a settings button beside the filters, listing every setting of that view with a description. The audience and milestone filters stay in the toolbar and appear in the panel too, described for the view on screen.
+- The narrative table shows any of thirty one columns, picked, reordered and renamed in its settings, with a compact row size and an option to hide the summary. New columns include the row number, the date and the time apart, the duration, the time since the start, the kind, identifier, criticality and compromise of the target, the other records involved, the tactic, the kill chain and response phases, the audience and the milestone.
+- The timeline table exports to Excel, CSV and Markdown, or is copied to paste into a spreadsheet, a document or a mail. Exports use the columns and headings chosen for the narrative, from any view.
+- The views can be switched from a scrolling strip, which now shows arrows where more views are hidden, or from a dropdown. The choice sits in the settings dialog and in `viewPicker` for integrators.
+- Integrators get `description` on renderer options, list options through `OptionKind.List`, and `filters` on renderer definitions to describe the shared filters.
+
+### Changed
+
+- The narrative table headings moved from the `scene` strings to a new `table` group.
+
 ## [0.3.0] - 2026-09-21
 
 ### Added

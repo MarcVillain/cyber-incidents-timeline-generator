@@ -4,7 +4,7 @@
 // Edits are applied here first and saved behind them. That is what lets an open form keep its scroll
 // position and its half typed fields while the drawing updates.
 
-import { Audience, RecordType, type RepresentationKey } from "../core/enums.js";
+import { Audience, RecordType, Representation, type RepresentationKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { linkFieldsOf, nodeFieldsOf, stepFieldsOf } from "../core/mapping.js";
 import type { LinkCreateInput, RecordId, StepInvolvement } from "../core/models.js";
@@ -12,7 +12,8 @@ import type { TimelineApi } from "../core/service.js";
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
 import { DiagramStore, StoreChange, type Selection, type StepFilters, type TimelineStep } from "./diagram-store.js";
 import { h } from "./dom.js";
-import { ExportFormat, exportDocumentFile, exportHtml, exportPng, exportSvg, printPages } from "./export.js";
+import { ExportFormat, copyTable, exportCsv, exportDocumentFile, exportHtml, exportMarkdown, exportPng, exportSvg, exportXlsx, printPages } from "./export.js";
+import { button } from "./forms.js";
 import { History, type HistoryEntry } from "./history.js";
 import { IconSet } from "./icons/icon-set.js";
 import { Inspector } from "./inspector.js";
@@ -21,19 +22,21 @@ import type { RecordDraft, RecordEdit, TimelinePermissions, WorkspaceActions } f
 import { Preferences, defaultPreferenceStorage } from "./preferences.js";
 import { Rail } from "./rail.js";
 import { BUILT_IN_RENDERERS } from "./renderers/index.js";
-import type { Pagination, RenderContext, Renderer, RendererChoice } from "./renderers/registry.js";
+import { LIST_LABEL_LENGTH, OptionKind, cleanListLabel, parseOptionList, serializeOptionList, type ListEntry, type Pagination, type RenderContext, type Renderer, type RendererChoice, type RendererListOption, type RendererOption } from "./renderers/registry.js";
+import { tableColumnsOption, timelineTable } from "./timeline-table.js";
 import { Palette, elementTokenResolver } from "./theme.js";
 import type { SlideHeaderCustomizer } from "./slide-header.js";
 import { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./theme-detection.js";
 import { ThemeMode } from "./theme-mode.js";
 import { CanvasMode } from "./canvas-mode.js";
+import { ViewPicker } from "./view-picker.js";
 import { TimeFormats, type DurationUnits } from "../core/time.js";
 import { buildStrings, type Strings, type StringsOverride } from "./strings.js";
 import { DEFAULT_PAGE_SIZE, Viewport, type PageSize, type Point } from "./viewport.js";
 import type { DiagramSummary } from "../core/summary.js";
 import { withPageSize } from "./chrome.js";
 
-export { CanvasMode, ThemeMode };
+export { CanvasMode, ThemeMode, ViewPicker };
 
 export interface TimelineOptions {
     /** Where the diagram lives: a TimelineService in the page, or an HttpTimelineApi talking to a server. */
@@ -66,6 +69,8 @@ export interface TimelineOptions {
     pageSize?: PageSize;
     /** Whether the scene is cut into slides, or laid out in one run as tall as it needs. */
     canvasMode?: CanvasMode;
+    /** Whether the views are offered as a scrolling strip of pills or as one dropdown. Defaults to the strip. */
+    viewPicker?: ViewPicker;
     /** The words of the interface. Anything left out keeps the English default. */
     strings?: StringsOverride;
     /** The locale dates are written in. Defaults to en-GB, whatever the browser is set to. */
@@ -110,6 +115,30 @@ export interface TimelineHandle {
 
 const DEFAULT_PREFERENCE_KEY = "cyber-incidents-timeline";
 const TOAST_MS = 4000;
+// Names each control of the settings panel, so the focus survives the panel being rebuilt
+const CONTROL_KEY = "data-control";
+const AUDIENCE_CONTROL = "filter-audience";
+const MILESTONES_CONTROL = "filter-milestones";
+// How much of the strip one press of an edge arrow scrolls, leaving a pill of the old view in sight
+const VIEW_SCROLL_SHARE = 0.8;
+// Sub pixel widths never line up exactly, so an edge closer than this counts as reached
+const SCROLL_EDGE = 2;
+// The gap kept between an open menu and the edge of the window
+const VIEWPORT_MARGIN = 8;
+// Below this a menu is left taller than the room under it, since a sliver of a list is no use
+const MENU_MIN_HEIGHT = 160;
+
+enum MilestoneChoice {
+    Every = "every",
+    Only = "only"
+}
+
+function milestoneChoices(strings: Strings): readonly RendererChoice<MilestoneChoice>[] {
+    return [
+        { value: MilestoneChoice.Every, label: strings.workspace.everyStep },
+        { value: MilestoneChoice.Only, label: strings.workspace.milestonesOnly }
+    ];
+}
 
 // Growing the canvas is a search, not a measurement: a renderer only ever says how many pages it took
 const CANVAS_GROWTH_TRIES = 6;
@@ -130,7 +159,11 @@ function exportChoices(strings: Strings): readonly { format: ExportFormat; label
         { format: ExportFormat.Svg, label: strings.workspace.exportSvg, icon: Icon.Vector },
         { format: ExportFormat.Html, label: strings.workspace.exportHtml, icon: Icon.Code },
         { format: ExportFormat.Print, label: strings.workspace.exportPrint, icon: Icon.Print },
-        { format: ExportFormat.Document, label: strings.workspace.exportDocument, icon: Icon.Download }
+        { format: ExportFormat.Document, label: strings.workspace.exportDocument, icon: Icon.Download },
+        { format: ExportFormat.Xlsx, label: strings.workspace.exportXlsx, icon: Icon.Grid },
+        { format: ExportFormat.Csv, label: strings.workspace.exportCsv, icon: Icon.FileText },
+        { format: ExportFormat.Markdown, label: strings.workspace.exportMarkdown, icon: Icon.FileCode },
+        { format: ExportFormat.Clipboard, label: strings.workspace.exportClipboard, icon: Icon.ClipboardList }
     ];
 }
 
@@ -203,8 +236,14 @@ interface Captured {
 }
 
 interface Elements {
-    views: HTMLElement;
+    /** The strip of pills, absent when the views are offered as a dropdown. */
+    views: HTMLElement | null;
+    viewsBefore: HTMLButtonElement | null;
+    viewsAfter: HTMLButtonElement | null;
+    viewSelect: HTMLSelectElement | null;
     filters: HTMLElement;
+    settingsMenu: HTMLDetailsElement;
+    settingsPanel: HTMLElement;
     canvas: HTMLElement;
     caption: HTMLElement;
     pager: HTMLElement;
@@ -242,6 +281,7 @@ class Workspace implements TimelineHandle {
     private readonly onStateChange: ((state: TimelineState) => void) | null;
     private readonly slideHeader: SlideHeaderCustomizer | null;
     private readonly canvasMode: CanvasMode;
+    private readonly viewPicker: ViewPicker;
     private readonly slideSize: PageSize;
     private canvas: PageSize;
     private readonly strings: Strings;
@@ -272,6 +312,7 @@ class Workspace implements TimelineHandle {
         this.onStateChange = options.onStateChange ?? null;
         this.slideHeader = options.slideHeader ?? null;
         this.canvasMode = options.canvasMode ?? CanvasMode.Slides;
+        this.viewPicker = options.viewPicker ?? ViewPicker.Scroll;
         this.slideSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
         this.canvas = this.slideSize;
         this.strings = buildStrings(options.strings);
@@ -326,7 +367,7 @@ class Workspace implements TimelineHandle {
         const zoomIn = iconButton(Icon.ZoomIn, words.zoomIn);
         const themeButton = themeToggle ? iconButton(themes[this.theme].icon, themes[this.theme].label) : null;
 
-        const exportMenu = this.permissions.canExport ? h("details", "tlg-menu", {}, [
+        const exportMenu = this.permissions.canExport ? h("details", "tlg-menu tlg-export-menu", {}, [
             h("summary", "tlg-button", {}, [icons.element(Icon.Download), words.export]),
             h("div", "tlg-menu-list", { role: "menu" }, exportChoices(this.strings).map(entry => h("button", "tlg-menu-item", { type: "button", role: "menuitem", "data-export": entry.format }, [icons.element(entry.icon), entry.label])))
         ]) : null;
@@ -338,8 +379,19 @@ class Workspace implements TimelineHandle {
             : null;
         const importPicker = h("input", "tlg-import-picker", { type: "file", accept: "application/json,.json", hidden: "" });
 
-        const views = h("div", "tlg-views", { role: "tablist", "aria-label": words.representations });
+        const scrolling = this.viewPicker === ViewPicker.Scroll;
+        const views = scrolling ? h("div", "tlg-views", { role: "tablist", "aria-label": words.representations }) : null;
+        const viewsBefore = scrolling ? iconButton(Icon.ChevronLeft, words.viewsBefore) : null;
+        const viewsAfter = scrolling ? iconButton(Icon.ChevronRight, words.viewsAfter) : null;
+        viewsBefore?.classList.add("tlg-views-more", "tlg-views-before");
+        viewsAfter?.classList.add("tlg-views-more", "tlg-views-after");
+        const viewSelect = scrolling ? null : h("select", "tlg-input tlg-view-select", { "aria-label": words.representations });
         const filters = h("div", "tlg-filters");
+        const settingsPanel = h("div", "tlg-menu-list tlg-view-settings", { role: "group", "aria-label": words.settings });
+        const settingsMenu = h("details", "tlg-menu tlg-settings-menu", {}, [
+            h("summary", "tlg-button tlg-button-icon", { title: words.settings, "aria-label": words.settings }, [icons.element(Icon.Settings)]),
+            settingsPanel
+        ]);
         const search = h("input", "tlg-input", { type: "search", placeholder: words.filterRecords, "aria-label": words.filterRecords });
         const addButton = this.permissions.canCreate
             ? h("button", "tlg-button tlg-button-primary tlg-add", { type: "button", "aria-haspopup": "true", "aria-expanded": "false" }, [icons.element(Icon.Plus), words.add])
@@ -367,9 +419,10 @@ class Workspace implements TimelineHandle {
         this.root.setAttribute("data-tlg-theme", this.scheme());
         this.root.replaceChildren(
             h("div", "tlg-toolbar", {}, [
-                views,
+                h("div", "tlg-views-frame", {}, [viewsBefore, views, viewsAfter, viewSelect]),
                 h("div", "tlg-actions", {}, [
                     filters,
+                    settingsMenu,
                     undo && redo ? h("div", "tlg-button-group", {}, [undo, redo]) : null,
                     h("div", "tlg-button-group", {}, [zoomOut, zoomFit, zoomIn]),
                     themeButton,
@@ -386,7 +439,7 @@ class Workspace implements TimelineHandle {
             addMenu
         );
 
-        return { views, filters, canvas, caption, pager, empty, emptyAdd, list, search, stats, addButton, addMenu, inspector, undo, redo, zoomIn, zoomOut, zoomFit, exportMenu, importButton, importPicker, themeButton, stage };
+        return { views, viewsBefore, viewsAfter, viewSelect, filters, settingsMenu, settingsPanel, canvas, caption, pager, empty, emptyAdd, list, search, stats, addButton, addMenu, inspector, undo, redo, zoomIn, zoomOut, zoomFit, exportMenu, importButton, importPicker, themeButton, stage };
     }
 
     async start(): Promise<void> {
@@ -432,6 +485,17 @@ class Workspace implements TimelineHandle {
             this.rail.openMenu();
         }, { signal });
 
+        // A menu left open would hide the slide it settles, so a press anywhere else closes it
+        document.addEventListener("pointerdown", event => {
+            [elements.exportMenu, elements.settingsMenu].forEach(menu => {
+                if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+            });
+        }, { signal });
+
+        const menus = [elements.exportMenu, elements.settingsMenu].flatMap(menu => (menu ? [menu] : []));
+        menus.forEach(menu => menu.addEventListener("toggle", () => fitMenu(menu), { signal }));
+        window.addEventListener("resize", () => menus.forEach(fitMenu), { signal });
+
         elements.importButton?.addEventListener("click", () => elements.importPicker.click(), { signal });
         elements.importPicker.addEventListener("change", () => void this.importChosenFile(), { signal });
 
@@ -460,13 +524,22 @@ class Workspace implements TimelineHandle {
             }
         }, { signal });
 
-        // A horizontal strip is expected to answer the wheel, which by default only scrolls the page
-        elements.views.addEventListener("wheel", event => {
-            const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-            const before = elements.views.scrollLeft;
-            elements.views.scrollLeft += delta;
-            if (elements.views.scrollLeft !== before) event.preventDefault();
-        }, { passive: false, signal });
+        const { views } = elements;
+        if (views) {
+            // A horizontal strip is expected to answer the wheel, which by default only scrolls the page
+            views.addEventListener("wheel", event => {
+                const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+                const before = views.scrollLeft;
+                views.scrollLeft += delta;
+                if (views.scrollLeft !== before) event.preventDefault();
+            }, { passive: false, signal });
+            views.addEventListener("scroll", () => this.renderViewHints(), { passive: true, signal });
+            window.addEventListener("resize", () => this.renderViewHints(), { signal });
+            elements.viewsBefore?.addEventListener("click", () => views.scrollBy({ left: -views.clientWidth * VIEW_SCROLL_SHARE, behavior: "smooth" }), { signal });
+            elements.viewsAfter?.addEventListener("click", () => views.scrollBy({ left: views.clientWidth * VIEW_SCROLL_SHARE, behavior: "smooth" }), { signal });
+        }
+        const { viewSelect } = elements;
+        viewSelect?.addEventListener("change", () => this.selectRepresentation(viewSelect.value), { signal });
 
         // The colours come from CSS, so a theme change on the page or in the system has to be drawn again
         this.stopWatchingTheme = watchPageTheme(() => this.applyTheme());
@@ -516,6 +589,19 @@ class Workspace implements TimelineHandle {
      * send the strip back to its first representation, losing the place the reader had scrolled to.
      */
     private renderViewSwitcher(): void {
+        const { views, viewSelect } = this.elements;
+        if (viewSelect) {
+            if (viewSelect.options.length === 0) {
+                viewSelect.replaceChildren(...this.renderers.map(renderer => {
+                    const info = this.store.representationInfo(renderer.representation);
+                    return h("option", null, { value: renderer.representation, title: info.description }, [info.label]);
+                }));
+            }
+            const current = Array.from(viewSelect.options).find(option => option.value === this.representation);
+            if (current) current.selected = true;
+            return;
+        }
+        if (!views) return;
         if (this.viewPills.length === 0) {
             this.viewPills = this.renderers.map(renderer => {
                 const info = this.store.representationInfo(renderer.representation);
@@ -526,11 +612,22 @@ class Workspace implements TimelineHandle {
                 pill.addEventListener("click", () => this.selectRepresentation(renderer.representation));
                 return pill;
             });
-            this.elements.views.replaceChildren(...this.viewPills);
+            views.replaceChildren(...this.viewPills);
         }
         this.renderers.forEach((renderer, index) => {
             this.viewPills[index]?.setAttribute("aria-selected", String(renderer.representation === this.representation));
         });
+        this.renderViewHints();
+    }
+
+    /**
+     * Shows an arrow at each end of the strip that hides views, so a cut off pill does not pass for the last.
+     */
+    private renderViewHints(): void {
+        const { views, viewsBefore, viewsAfter } = this.elements;
+        if (!views || !viewsBefore || !viewsAfter) return;
+        viewsBefore.hidden = views.scrollLeft <= SCROLL_EDGE;
+        viewsAfter.hidden = views.scrollLeft + views.clientWidth >= views.scrollWidth - SCROLL_EDGE;
     }
 
     /**
@@ -548,32 +645,133 @@ class Workspace implements TimelineHandle {
 
     private renderFilters(): void {
         const filters = this.store.filters;
-        const controls: HTMLButtonElement[] = [
-            this.cycleButton(audienceChoices(this.strings), filters.audience, filters.audience !== Audience.Both, value => {
-                this.store.setFilters({ audience: value });
-                this.renderFilters();
-            })
-        ];
-
+        const audience = this.cycleButton(audienceChoices(this.strings), filters.audience, filters.audience !== Audience.Both, value => this.applyFilters({ audience: value }));
         const milestones = h("button", "tlg-chip-toggle", { type: "button", "aria-pressed": String(filters.milestonesOnly) }, [this.strings.workspace.milestonesOnly]);
-        milestones.addEventListener("click", () => {
-            this.store.setFilters({ milestonesOnly: !this.store.filters.milestonesOnly });
-            this.renderFilters();
-        });
-        controls.push(milestones);
+        milestones.addEventListener("click", () => this.applyFilters({ milestonesOnly: !this.store.filters.milestonesOnly }));
+        this.elements.filters.replaceChildren(audience, milestones);
+        this.renderSettings();
+    }
 
+    private applyFilters(filters: Partial<StepFilters>): void {
+        this.store.setFilters(filters);
+        this.renderFilters();
+    }
+
+    private chosenValue(option: RendererOption, chosen: ReadonlyMap<string, string>): string {
+        return option.choices.find(choice => choice.value === chosen.get(option.id))?.value ?? option.fallback;
+    }
+
+    /**
+     * Every setting of the representation on screen, described, in the panel behind the settings button.
+     * The filters every view shares come first, in the words of this view. The panel is rebuilt on each
+     * change, so the control that had the focus is found again by its key.
+     */
+    private renderSettings(): void {
+        const panel = this.elements.settingsPanel;
+        const words = this.strings.workspace;
+        const filters = this.store.filters;
+        const described = this.renderer.filters(this.strings);
         const chosen = this.preferences.choices(this.representation);
-        this.renderer.options(this.strings).forEach(option => {
-            const current = option.choices.find(choice => choice.value === chosen.get(option.id))?.value ?? option.fallback;
-            controls.push(this.cycleButton(option.choices, current, current !== option.fallback, value => {
-                this.preferences.setChoice(this.representation, option.id, value);
-                this.pageIndex = 0;
-                this.renderFilters();
-                this.redraw();
-            }));
-        });
+        const focused = document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)
+            ? document.activeElement.getAttribute(CONTROL_KEY)
+            : null;
 
-        this.elements.filters.replaceChildren(...controls);
+        const shared = [
+            this.settingSection(words.audience, described.audience, this.choiceGroup(AUDIENCE_CONTROL, words.audience, audienceChoices(this.strings), filters.audience,
+                value => this.applyFilters({ audience: value }))),
+            this.settingSection(words.milestones, described.milestones, this.choiceGroup(MILESTONES_CONTROL, words.milestones, milestoneChoices(this.strings),
+                filters.milestonesOnly ? MilestoneChoice.Only : MilestoneChoice.Every, value => this.applyFilters({ milestonesOnly: value === MilestoneChoice.Only })))
+        ];
+        const own = this.renderer.options(this.strings).map(setting => this.settingSection(setting.label, setting.description ?? null, setting.kind === OptionKind.List
+            ? this.listSetting(setting, chosen.get(setting.id))
+            : this.choiceGroup(setting.id, setting.label, setting.choices, this.chosenValue(setting, chosen), value => this.setOption(this.representation, setting.id, value))));
+        panel.replaceChildren(...shared, ...own);
+
+        if (focused !== null) {
+            Array.from(panel.querySelectorAll<HTMLElement>(`[${CONTROL_KEY}]`)).find(control => control.getAttribute(CONTROL_KEY) === focused)?.focus();
+        }
+    }
+
+    private settingSection(label: string, description: string | null, body: HTMLElement): HTMLElement {
+        return h("section", "tlg-view-setting", {}, [
+            h("h3", "tlg-view-setting-label", {}, [label]),
+            description ? h("p", "tlg-view-setting-hint", {}, [description]) : null,
+            body
+        ]);
+    }
+
+    private choiceGroup<TValue extends string>(key: string, label: string, choices: readonly RendererChoice<TValue>[], current: string, onPick: (value: TValue) => void): HTMLElement {
+        return h("div", "tlg-view-setting-choices", { role: "radiogroup", "aria-label": label }, choices.map(choice => {
+            const node = h("button", "tlg-chip-toggle", {
+                type: "button", role: "radio", "aria-checked": String(choice.value === current), [CONTROL_KEY]: `${key}:${choice.value}`
+            }, [choice.label]);
+            node.addEventListener("click", () => onPick(choice.value));
+            return node;
+        }));
+    }
+
+    /**
+     * The chosen entries first, in their order and with arrows to move them, then the others to tick.
+     */
+    private listSetting(option: RendererListOption, stored: string | undefined): HTMLElement {
+        const words = this.strings.workspace;
+        const context = this.renderContext();
+        const selected = parseOptionList(stored, option);
+        const save = (entries: readonly ListEntry[]): void => this.setOption(this.representation, option.id, serializeOptionList(entries));
+        const unselected = option.choices.filter(choice => !selected.some(entry => entry.value === choice.value));
+        const order: ListEntry[] = [...selected, ...unselected.map(choice => ({ value: choice.value, label: null }))];
+
+        return h("ol", "tlg-view-setting-list", { "aria-label": option.label }, order.map(entry => {
+            const { value } = entry;
+            const label = option.choices.find(choice => choice.value === value)?.label ?? value;
+            const index = selected.findIndex(chosen => chosen.value === value);
+            const others = selected.filter(chosen => chosen.value !== value);
+            const move = (offset: number): void => {
+                const next = [...others];
+                next.splice(index + offset, 0, entry);
+                save(next);
+            };
+
+            const box = h("input", null, { type: "checkbox", [CONTROL_KEY]: `${option.id}:${value}:pick` });
+            box.checked = index >= 0;
+            // A table needs at least one column, so the last one cannot be taken away
+            box.disabled = index >= 0 && selected.length === 1;
+            box.addEventListener("change", () => save(box.checked ? [...selected, entry] : others));
+
+            const up = button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", () => move(-1), Icon.ChevronUp);
+            const down = button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", () => move(1), Icon.ChevronDown);
+            up.setAttribute("aria-label", words.moveUp(label));
+            down.setAttribute("aria-label", words.moveDown(label));
+            up.setAttribute(CONTROL_KEY, `${option.id}:${value}:up`);
+            down.setAttribute(CONTROL_KEY, `${option.id}:${value}:down`);
+            up.disabled = index <= 0;
+            down.disabled = index < 0 || index === selected.length - 1;
+
+            if (index >= 0 && option.renamable === true) {
+                // A chosen entry is named in place, and giving it back its own name clears the rename
+                box.setAttribute("aria-label", label);
+                const name = h("input", "tlg-input tlg-view-setting-name", {
+                    type: "text", placeholder: label, maxlength: String(LIST_LABEL_LENGTH), "aria-label": words.rename(label), [CONTROL_KEY]: `${option.id}:${value}:name`
+                });
+                name.value = entry.label ?? label;
+                name.addEventListener("change", () => {
+                    const renamed = cleanListLabel(name.value);
+                    const next = [...selected];
+                    next[index] = { value, label: renamed === label ? null : renamed };
+                    save(next);
+                });
+                return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row", {}, [box, name, up, down])]);
+            }
+
+            // Only an entry still to be added needs showing what it holds; a chosen one is on the slide
+            const example = index < 0 ? option.example?.(context, value) ?? null : null;
+            const check = h("label", "tlg-view-setting-check", {}, [
+                box,
+                h("span", "tlg-view-setting-choice", {}, [label]),
+                example === null ? null : h("span", "tlg-view-setting-example", { title: example }, [example])
+            ]);
+            return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row", {}, [check, up, down])]);
+        }));
     }
 
     private renderHistoryButtons(): void {
@@ -1076,6 +1274,11 @@ class Workspace implements TimelineHandle {
             return;
         }
 
+        if (format === ExportFormat.Xlsx || format === ExportFormat.Csv || format === ExportFormat.Markdown || format === ExportFormat.Clipboard) {
+            await this.exportTable(format);
+            return;
+        }
+
         const context = this.renderContext();
         const pages = this.renderer.paginate(context);
         const drawn = Array.from({ length: pages.count }, (_, index) => pages.draw(index));
@@ -1101,6 +1304,36 @@ class Workspace implements TimelineHandle {
         }
     }
 
+    /**
+     * The table uses the columns chosen for the narrative, whichever view is on screen, so what was
+     * arranged there is what lands in the file.
+     */
+    private async exportTable(format: ExportFormat.Xlsx | ExportFormat.Csv | ExportFormat.Markdown | ExportFormat.Clipboard): Promise<void> {
+        const option = tableColumnsOption(this.strings);
+        const columns = parseOptionList(this.preferences.choices(Representation.Narrative).get(option.id), option);
+        const table = timelineTable(this.store, this.time, this.strings, columns);
+        const name = this.store.incident.title;
+        try {
+            switch (format) {
+                case ExportFormat.Xlsx:
+                    await exportXlsx(table, name, this.strings.table.sheet);
+                    break;
+                case ExportFormat.Csv:
+                    await exportCsv(table, name);
+                    break;
+                case ExportFormat.Markdown:
+                    await exportMarkdown(table, name);
+                    break;
+                case ExportFormat.Clipboard:
+                    await copyTable(table);
+                    this.notify(this.strings.workspace.copied);
+                    break;
+            }
+        } catch {
+            this.notify(this.strings.workspace.exportFailed);
+        }
+    }
+
     private notify(message: string): void {
         if (this.onNotify) {
             this.onNotify(message);
@@ -1119,6 +1352,21 @@ class Workspace implements TimelineHandle {
         this.root.classList.remove("tlg");
         this.root.removeAttribute("data-tlg-theme");
     }
+}
+
+/**
+ * Keeps an open menu inside the window: as tall as the room under it, scrolling past that, and pushed
+ * back in when its left edge would leave the screen. The list is placed by CSS first, then measured.
+ */
+function fitMenu(menu: HTMLDetailsElement): void {
+    const list = menu.querySelector<HTMLElement>(".tlg-menu-list");
+    if (!list || !menu.open) return;
+    list.style.maxHeight = "";
+    list.style.transform = "";
+    const box = list.getBoundingClientRect();
+    list.style.maxHeight = `${Math.max(MENU_MIN_HEIGHT, window.innerHeight - box.top - VIEWPORT_MARGIN)}px`;
+    const spill = VIEWPORT_MARGIN - box.left;
+    if (spill > 0) list.style.transform = `translateX(${spill}px)`;
 }
 
 function withoutMoments(step: TimelineStep): Omit<TimelineStep, "at" | "until"> {

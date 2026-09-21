@@ -6,8 +6,9 @@ import { Icon } from "../../core/icon.js";
 import { outcomeColor } from "../cards.js";
 import { CONTENT, frame } from "../chrome.js";
 import type { TimelineStep } from "../diagram-store.js";
-import { circle, group, line, rect, stripTags, text, truncate, wrap } from "../svg.js";
-import { defineRenderer, type RenderContext } from "./registry.js";
+import { circle, group, line, rect, text, truncate, wrap } from "../svg.js";
+import { TableColumn, cellText, columnWeight, headingOf, stageLabel, tableColumnsOption, tableSource } from "../timeline-table.js";
+import { defineRenderer, optionList, optionValue, type RenderContext, type RendererOption } from "./registry.js";
 import type { Strings } from "../strings.js";
 
 const SUMMARY_PAD = 18;
@@ -16,47 +17,98 @@ const SUMMARY_LINE = 16;
 const SUMMARY_SIZE = 12.5;
 const SUMMARY_MAX_LINES = 6;
 const SUMMARY_LINES_PER_SENTENCE = 3;
-const ROW_HEIGHT = 34;
-const TABLE_HEADER = 26;
-const TABLE_GAP = 52;
+const SUMMARY_GAP = 18;
+const SUMMARY_ROOM = SUMMARY_PAD * 2 + SUMMARY_HEADER + SUMMARY_LINE * SUMMARY_MAX_LINES + SUMMARY_GAP;
+const TABLE_FOOT = 8;
 const COMPROMISED_NAMED = 4;
+const SIDE_MARK_WIDTH = 3;
+const OUTCOME_DOT = 4;
+const OUTCOME_GAP = 2;
+const EMPTY_CELL = "-";
 
-enum ColumnKey {
-    When = "when",
-    Who = "who",
-    What = "what",
-    Where = "where",
-    Stage = "stage"
+enum RowDensity {
+    Comfortable = "comfortable",
+    Compact = "compact"
 }
 
-interface ColumnDefinition {
-    key: ColumnKey;
-    label: string;
-    share: number;
+enum SummaryDisplay {
+    Shown = "shown",
+    Hidden = "hidden"
 }
 
-interface PlacedColumn extends ColumnDefinition {
+interface RowLayout {
+    height: number;
+    header: number;
+    pad: number;
+    headingSize: number;
+    textSize: number;
+    mutedSize: number;
+    sideMark: number;
+}
+
+const ROW_LAYOUTS: Readonly<Record<RowDensity, RowLayout>> = {
+    [RowDensity.Comfortable]: { height: 34, header: 26, pad: 14, headingSize: 9.5, textSize: 11.5, mutedSize: 10.5, sideMark: 14 },
+    [RowDensity.Compact]: { height: 21, header: 20, pad: 7, headingSize: 8.5, textSize: 10, mutedSize: 9.5, sideMark: 11 }
+};
+
+function rowsOption(strings: Strings): RendererOption<RowDensity> {
+    return {
+        id: "rows",
+        label: strings.options.rows,
+        description: strings.options.rowsDescription,
+        fallback: RowDensity.Comfortable,
+        choices: [
+            { value: RowDensity.Comfortable, label: strings.options.densityComfortable },
+            { value: RowDensity.Compact, label: strings.options.densityCompact }
+        ]
+    };
+}
+
+function summaryOption(strings: Strings): RendererOption<SummaryDisplay> {
+    return {
+        id: "summary",
+        label: strings.options.summary,
+        description: strings.options.summaryDescription,
+        fallback: SummaryDisplay.Shown,
+        choices: [
+            { value: SummaryDisplay.Shown, label: strings.options.summaryShown },
+            { value: SummaryDisplay.Hidden, label: strings.options.summaryHidden }
+        ]
+    };
+}
+
+interface PlacedColumn {
+    key: TableColumn;
+    heading: string;
     x: number;
     size: number;
 }
 
-function tableColumns(strings: Strings): readonly ColumnDefinition[] {
-    return [
-        { key: ColumnKey.When, label: strings.scene.when, share: 0.16 },
-        { key: ColumnKey.Who, label: strings.scene.who, share: 0.16 },
-        { key: ColumnKey.What, label: strings.scene.whatHappened, share: 0.40 },
-        { key: ColumnKey.Where, label: strings.scene.onWhat, share: 0.16 },
-        { key: ColumnKey.Stage, label: strings.scene.stage, share: 0.12 }
-    ];
-}
+// Columns written in the ink of the story; the rest are the quieter annotations around it
+const PLAIN_COLUMNS: ReadonlySet<TableColumn> = new Set([TableColumn.Who, TableColumn.What, TableColumn.Details, TableColumn.Involved]);
 
 interface NarrativePage {
     summary: string[] | null;
     rows: TimelineStep[];
+    /** Where the first row of the page sits in the whole timeline. */
+    offset: number;
 }
 
-function rowsPerPage(): number {
-    return Math.max(1, Math.floor((CONTENT.height - SUMMARY_PAD * 2 - SUMMARY_HEADER - SUMMARY_LINE * SUMMARY_MAX_LINES - TABLE_GAP) / ROW_HEIGHT));
+function rowsThatFit(room: number, layout: RowLayout): number {
+    return Math.max(1, Math.floor((room - layout.header - TABLE_FOOT) / layout.height));
+}
+
+/**
+ * The first slide gives the summary its room and every later one hands the whole slide to the table.
+ */
+function paginateRows(steps: readonly TimelineStep[], layout: RowLayout, withSummary: boolean): TimelineStep[][] {
+    const first = rowsThatFit(CONTENT.height - (withSummary ? SUMMARY_ROOM : 0), layout);
+    const rest = rowsThatFit(CONTENT.height, layout);
+    const pages: TimelineStep[][] = [steps.slice(0, first)];
+    for (let index = first; index < steps.length; index += rest) {
+        pages.push(steps.slice(index, index + rest));
+    }
+    return pages;
 }
 
 function lower(value: string): string {
@@ -152,67 +204,68 @@ function summaryPanel(context: RenderContext, sentences: readonly string[], x: n
     return { node, height };
 }
 
-function table(context: RenderContext, rows: readonly TimelineStep[], x: number, y: number, width: number): SVGGElement {
-    const { store, palette } = context;
-    const node = group();
+function placeColumns(context: RenderContext, x: number, width: number): PlacedColumn[] {
+    const entries = optionList(context, tableColumnsOption(context.strings));
+    const total = entries.reduce((sum, entry) => sum + columnWeight(entry.value), 0);
     let cursor = x;
-    const columns: PlacedColumn[] = tableColumns(context.strings).map(column => {
-        const placed = { ...column, x: cursor, size: width * column.share };
+    return entries.map(entry => {
+        const placed = { key: entry.value, heading: headingOf(context.strings, entry), x: cursor, size: width * columnWeight(entry.value) / total };
         cursor += placed.size;
         return placed;
     });
+}
 
-    node.appendChild(rect(x, y, width, TABLE_HEADER, { rx: 6, fill: palette.surfaceAlt }));
+function table(context: RenderContext, page: NarrativePage, x: number, y: number, width: number): SVGGElement {
+    const { store, palette } = context;
+    const layout = ROW_LAYOUTS[optionValue(context, rowsOption(context.strings))];
+    const columns = placeColumns(context, x, width);
+    const source = tableSource(store, context.time, context.strings);
+    const node = group();
+
+    node.appendChild(rect(x, y, width, layout.header, { rx: 6, fill: palette.surfaceAlt }));
     columns.forEach(column => {
-        node.appendChild(text(column.label.toUpperCase(), column.x + 14, y + TABLE_HEADER / 2, {
-            "font-size": 9.5, "font-weight": 700, "letter-spacing": 0.7, fill: palette.inkMuted, "dominant-baseline": "central"
+        node.appendChild(text(truncate(column.heading.toUpperCase(), layout.headingSize, column.size - layout.pad * 2), column.x + layout.pad, y + layout.header / 2, {
+            "font-size": layout.headingSize, "font-weight": 700, "letter-spacing": 0.7, fill: palette.inkMuted, "dominant-baseline": "central"
         }));
     });
 
-    rows.forEach((step, index) => {
-        const rowY = y + TABLE_HEADER + index * ROW_HEIGHT;
-        const centerY = rowY + ROW_HEIGHT / 2;
+    page.rows.forEach((step, index) => {
+        const rowY = y + layout.header + index * layout.height;
+        const centerY = rowY + layout.height / 2;
         const row = group({ class: "tlg-step tlg-row", "data-step-id": step.id });
 
         // Only painted pixels catch the pointer, so without this the gaps between words would not be clickable
-        row.appendChild(rect(x, rowY, width, ROW_HEIGHT, { class: "tlg-hit", fill: "none", "pointer-events": "all" }));
+        row.appendChild(rect(x, rowY, width, layout.height, { class: "tlg-hit", fill: "none", "pointer-events": "all" }));
         if (index % 2 === 1) {
-            row.appendChild(rect(x, rowY, width, ROW_HEIGHT, { fill: palette.surfaceAlt, opacity: 0.6 }));
+            row.appendChild(rect(x, rowY, width, layout.height, { fill: palette.surfaceAlt, opacity: 0.6 }));
         }
         // A row is a line of a table, so it is marked by tinting the whole line rather than by a halo,
         // which on flat text only makes the words glow
-        row.appendChild(rect(x, rowY, width, ROW_HEIGHT, { class: "tlg-row-band", fill: palette.accent, opacity: 0 }));
-        row.appendChild(line(x, rowY + ROW_HEIGHT, x + width, rowY + ROW_HEIGHT, { stroke: palette.border, "stroke-width": 0.75 }));
+        row.appendChild(rect(x, rowY, width, layout.height, { class: "tlg-row-band", fill: palette.accent, opacity: 0 }));
+        row.appendChild(line(x, rowY + layout.height, x + width, rowY + layout.height, { stroke: palette.border, "stroke-width": 0.75 }));
+        row.appendChild(rect(x, centerY - layout.sideMark / 2, SIDE_MARK_WIDTH, layout.sideMark, { rx: SIDE_MARK_WIDTH / 2, fill: palette.sides[step.side].color }));
 
-        const cell = (key: ColumnKey, content: string, size: number, fill: string, weight = 400): void => {
-            const column = columns.find(candidate => candidate.key === key);
-            if (!column) return;
-            row.appendChild(text(truncate(content, size, column.size - 26), column.x + 14, centerY, {
-                "font-size": size, "font-weight": weight, fill, "dominant-baseline": "central"
-            }));
-        };
-
-        const when = columns[0];
-        if (when) {
-            row.appendChild(rect(when.x, centerY - 7, 3, 14, { rx: 1.5, fill: palette.sides[step.side].color }));
-        }
-        cell(ColumnKey.When, context.time.formatMoment(step), 10.5, palette.inkMuted);
-        cell(ColumnKey.Who, store.node(step.sourceNodeId)?.name ?? "-", 11, palette.ink);
-        cell(ColumnKey.What, stripTags(step.title), 11.5, palette.ink, 600);
-        cell(ColumnKey.Where, store.node(step.targetNodeId)?.name ?? "-", 11, palette.inkMuted);
-
-        // Where the step sits in the attack or the response says more than a tick or a cross, and the
-        // outcome still reads off the dot in front of it
-        const stage = columns.find(column => column.key === ColumnKey.Stage);
-        if (stage) {
-            const label = step.side === Side.Defender ? store.responseInfo(step.responsePhase).label : store.tacticInfo(step.attackTactic).label;
-            if (step.outcome !== StepOutcome.Unknown) {
-                row.appendChild(circle(stage.x + 18, centerY, 4, { fill: outcomeColor(palette, step) }));
+        columns.forEach(column => {
+            if (column.key === TableColumn.Stage) {
+                // Where the step sits in the attack or the response says more than a tick or a cross, and
+                // the outcome still reads off the dot in front of it
+                const dotX = column.x + layout.pad + OUTCOME_DOT;
+                if (step.outcome !== StepOutcome.Unknown) {
+                    row.appendChild(circle(dotX, centerY, OUTCOME_DOT, { fill: outcomeColor(palette, step) }));
+                }
+                const labelX = dotX + OUTCOME_DOT + OUTCOME_GAP * 2;
+                row.appendChild(text(truncate(stageLabel(store, step), layout.mutedSize, column.x + column.size - layout.pad - labelX), labelX, centerY, {
+                    "font-size": layout.mutedSize, "font-weight": 600, fill: palette.inkMuted, "dominant-baseline": "central"
+                }));
+                return;
             }
-            row.appendChild(text(truncate(label, 10.5, stage.size - 42), stage.x + 28, centerY, {
-                "font-size": 10.5, "font-weight": 600, fill: palette.inkMuted, "dominant-baseline": "central"
+            const strong = column.key === TableColumn.What;
+            const plain = PLAIN_COLUMNS.has(column.key);
+            const size = plain ? layout.textSize : layout.mutedSize;
+            row.appendChild(text(truncate(cellText(source, step, column.key, page.offset + index) || EMPTY_CELL, size, column.size - layout.pad * 2), column.x + layout.pad, centerY, {
+                "font-size": size, "font-weight": strong ? 600 : 400, fill: plain ? palette.ink : palette.inkMuted, "dominant-baseline": "central"
             }));
-        }
+        });
         node.appendChild(row);
     });
     return node;
@@ -220,15 +273,18 @@ function table(context: RenderContext, rows: readonly TimelineStep[], x: number,
 
 export const narrative = defineRenderer<NarrativePage>({
     representation: Representation.Narrative,
+    filters: strings => strings.filters.narrative,
+    options: strings => [rowsOption(strings), summaryOption(strings), tableColumnsOption(strings)],
 
     pages(context) {
-        const steps = context.store.visibleSteps();
-        const perPage = rowsPerPage();
-        const pageCount = Math.max(1, Math.ceil(steps.length / perPage));
-        return Array.from({ length: pageCount }, (_, index) => ({
-            summary: index === 0 ? summarise(context) : null,
-            rows: steps.slice(index * perPage, (index + 1) * perPage)
-        }));
+        const layout = ROW_LAYOUTS[optionValue(context, rowsOption(context.strings))];
+        const withSummary = optionValue(context, summaryOption(context.strings)) === SummaryDisplay.Shown;
+        let offset = 0;
+        return paginateRows(context.store.visibleSteps(), layout, withSummary).map((rows, index) => {
+            const page = { summary: withSummary && index === 0 ? summarise(context) : null, rows, offset };
+            offset += rows.length;
+            return page;
+        });
     },
 
     draw(context, page, pageIndex, pageCount) {
@@ -243,9 +299,9 @@ export const narrative = defineRenderer<NarrativePage>({
         if (page.summary) {
             const panel = summaryPanel(context, page.summary, CONTENT.x, top);
             content.appendChild(panel.node);
-            top += panel.height + 18;
+            top += panel.height + SUMMARY_GAP;
         }
-        content.appendChild(table(context, page.rows, CONTENT.x, top, CONTENT.width));
+        content.appendChild(table(context, page, CONTENT.x, top, CONTENT.width));
         return root;
     }
 });

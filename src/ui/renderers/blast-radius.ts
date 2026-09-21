@@ -138,6 +138,7 @@ function orb(context: RenderContext, spot: Spot): SVGGElement {
 
 export const blastRadius = defineRenderer<BlastPage>({
     representation: Representation.BlastRadius,
+    filters: strings => strings.filters.blastRadius,
 
     pages(context) {
         const nodes = context.store.visibleNodes();

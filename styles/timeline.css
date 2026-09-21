@@ -229,6 +229,14 @@ textarea.tlg-input {
     flex: 0 0 auto;
 }
 
+.tlg-views-frame {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .tlg-views {
     display: flex;
     align-items: center;
@@ -239,6 +247,44 @@ textarea.tlg-input {
     scrollbar-color: var(--tlg-border-strong) transparent;
     padding-bottom: .3rem;
     flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Sits over the end of the strip, fading the pills it covers, so a cut off pill reads as more to come */
+.tlg-views-more {
+    position: absolute;
+    top: 0;
+    bottom: .3rem;
+    z-index: 1;
+    border: 0;
+    border-radius: 0;
+    color: var(--tlg-accent);
+}
+
+.tlg-views-before {
+    left: 0;
+    padding-right: 1.1rem;
+    background: linear-gradient(to right, var(--tlg-surface-alt) 55%, transparent);
+}
+
+.tlg-views-after {
+    right: 0;
+    padding-left: 1.1rem;
+    background: linear-gradient(to left, var(--tlg-surface-alt) 55%, transparent);
+}
+
+.tlg-views-more:hover:not(:disabled) {
+    background: linear-gradient(to right, var(--tlg-surface-alt) 55%, transparent);
+    filter: brightness(1.1);
+}
+
+.tlg-views-after:hover:not(:disabled) {
+    background: linear-gradient(to left, var(--tlg-surface-alt) 55%, transparent);
+}
+
+.tlg-view-select {
+    width: auto;
+    max-width: 18rem;
 }
 
 /* Keeping the bar out of the pills, on the machines that always draw one */
@@ -333,6 +379,10 @@ textarea.tlg-input {
     top: calc(100% + 4px);
     z-index: 20;
     min-width: 15rem;
+    max-width: calc(100vw - 1rem);
+    /* The height fitted to the window has to hold the padding and border too */
+    box-sizing: border-box;
+    overflow-y: auto;
     padding: .3rem;
     background: var(--tlg-surface);
     border: 1px solid var(--tlg-border);
@@ -358,6 +408,95 @@ textarea.tlg-input {
 
 .tlg-menu-item:hover {
     background: var(--tlg-hover);
+}
+
+.tlg-chip-toggle[aria-checked="true"] {
+    background: var(--tlg-accent-soft);
+    border-color: var(--tlg-accent);
+    color: var(--tlg-accent);
+}
+
+.tlg-view-settings {
+    width: 20rem;
+    padding: .6rem .75rem;
+}
+
+.tlg-view-setting + .tlg-view-setting {
+    margin-top: .7rem;
+    padding-top: .7rem;
+    border-top: 1px solid var(--tlg-border);
+}
+
+.tlg-view-setting-label {
+    margin: 0;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--tlg-ink);
+}
+
+.tlg-view-setting-hint {
+    margin: .2rem 0 .45rem;
+    font-size: .74rem;
+    line-height: 1.35;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-view-setting-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+}
+
+.tlg-view-setting-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tlg-view-setting-row {
+    display: flex;
+    align-items: center;
+    gap: .15rem;
+}
+
+.tlg-view-setting-choice {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* Gives way before the name does, since the name is what is being chosen */
+.tlg-view-setting-example {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--tlg-ink-muted);
+    font-size: .74rem;
+}
+
+.tlg-view-setting-row > input[type="checkbox"] {
+    margin: 0 .3rem 0 0;
+}
+
+.tlg-view-setting-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    padding: .1rem .35rem;
+    font-size: .8rem;
+}
+
+.tlg-view-setting-check {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: .15rem 0;
+    font-size: .8rem;
+    color: var(--tlg-ink);
+    cursor: pointer;
 }
 
 /* Body */

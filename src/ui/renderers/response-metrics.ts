@@ -46,6 +46,7 @@ function viewOption(strings: Strings): RendererOption<View> {
     return {
         id: "view",
         label: strings.options.compare,
+        description: strings.options.compareDescription,
         fallback: View.Breakdown,
         choices: [
             { value: View.Breakdown, label: strings.options.compareBreakdown },
@@ -377,6 +378,7 @@ function causes(context: RenderContext, steps: readonly TimelineStep[], episodes
 
 export const responseMetrics = defineRenderer<ResponseMetrics>({
     representation: Representation.ResponseMetrics,
+    filters: strings => strings.filters.responseMetrics,
     options: strings => [viewOption(strings)],
 
     pages(context) {

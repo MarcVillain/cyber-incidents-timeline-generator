@@ -123,6 +123,7 @@ function connector(palette: Palette, from: Placed, to: Placed): SVGPathElement {
 
 export const attackFlow = defineRenderer<TimelineStep[]>({
     representation: Representation.AttackFlow,
+    filters: strings => strings.filters.attackFlow,
 
     pages(context) {
         return paginate(context.store.visibleSteps(), columnsPerRow() * rowsPerPage());

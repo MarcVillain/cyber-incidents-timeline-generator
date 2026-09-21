@@ -137,6 +137,7 @@ function panel(context: RenderContext, vertex: VertexPage, x: number, y: number)
 
 export const diamondModel = defineRenderer<VertexPage[]>({
     representation: Representation.DiamondModel,
+    filters: strings => strings.filters.diamondModel,
 
     pages(context) {
         const nodes = context.store.visibleNodes();

@@ -57,11 +57,11 @@ describe("Access", () => {
 describe("what the workspace offers", () => {
     it("leaves the export menu out when exporting is refused", async () => {
         const allowed = await mounted({});
-        assert.ok(allowed.element.querySelector(".tlg-menu"));
+        assert.ok(allowed.element.querySelector(".tlg-export-menu"));
         allowed.handle.destroy();
 
         const refused = await mounted({ canExport: false });
-        assert.equal(refused.element.querySelector(".tlg-menu"), null);
+        assert.equal(refused.element.querySelector(".tlg-export-menu"), null);
         refused.handle.destroy();
     });
 

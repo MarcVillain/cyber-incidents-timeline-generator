@@ -9,12 +9,12 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - A settings button next to the theme toggle, on the GitHub Pages desk and on both pages of the reference server. Settings are kept in the browser.
-- Appearance: the theme and the main colours, for light and dark.
-- Vocabulary: the names and icons of parties, record kinds, tactics, phases and more, with a searchable picker of over two hundred icons. Entries sharing an icon are flagged.
-- Scales: the impact levels and milestones. Removing one still in use asks first. Only offered where the browser holds the incidents.
-- Display: the page shape, slides or one long page, the date format and the duration units.
-- Backup: export, import or reset the settings.
-- For integrators: `settingsButton` and `settingsScope` on the app, and `loadAppCatalog` to build a service from the saved settings.
+- The theme and the main colours can be changed, for light and dark separately.
+- Parties, record kinds, tactics, phases and more can be renamed and given another icon, picked from over two hundred with a search. Entries sharing an icon are flagged.
+- Impact levels and milestones can be edited where the browser holds the incidents. Removing one still in use asks first.
+- The page shape, slides or one long page, the date format and the duration units can be chosen.
+- Settings can be exported to a file, imported back or reset.
+- Integrators get `settingsButton` and `settingsScope` on the app, and `loadAppCatalog` to build a service from the saved settings.
 
 ## [0.2.1] - 2026-09-18
 

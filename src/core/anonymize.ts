@@ -66,7 +66,8 @@ export const DEFAULT_PREFIXES: Readonly<Record<SensitiveCategory, string>> = {
 
 /** Every censored name gets the same bar, so its length gives nothing away. */
 export const CENSOR_LENGTH = 8;
-export const CENSOR_BAR = "█".repeat(CENSOR_LENGTH);
+export const CENSOR_GLYPH = "\u2588";
+export const CENSOR_BAR = CENSOR_GLYPH.repeat(CENSOR_LENGTH);
 export const MAX_PREFIX_LENGTH = 20;
 export const MAX_TERM_LENGTH = 120;
 

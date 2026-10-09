@@ -1,5 +1,7 @@
 // Minimal SVG construction helpers. Renderers describe what they draw, not how elements are created.
 
+import { CENSOR_GLYPH } from "../core/anonymize.js";
+
 export const SVG_NS = "http://www.w3.org/2000/svg";
 
 let target: Document | null = null;
@@ -62,9 +64,31 @@ export function path(d: string, attrs: SvgAttributes = {}): SVGPathElement {
     return el("path", { d, ...attrs });
 }
 
+// What a text without a size of its own is measured at, the size SVG text takes by default
+const DEFAULT_FONT_SIZE = 12;
+const CENSOR_RUN = new RegExp(`${CENSOR_GLYPH}+`, "g");
+
 export function text(content: string | number | null, x: number, y: number, attrs: SvgAttributes = {}): SVGTextElement {
     const node = el("text", { x, y, ...attrs });
-    node.textContent = content === null ? "" : String(content);
+    const value = content === null ? "" : String(content);
+    if (!value.includes(CENSOR_GLYPH)) {
+        node.textContent = value;
+        return node;
+    }
+
+    // The bar glyph is missing from the interface font and borrowed, much wider, from another one. Each
+    // bar is held to the width the layout reserved for its characters, so it never runs over its neighbours
+    const declared = Number(attrs["font-size"]);
+    const size = Number.isFinite(declared) && declared > 0 ? declared : DEFAULT_FONT_SIZE;
+    let cursor = 0;
+    for (const run of value.matchAll(CENSOR_RUN)) {
+        if (run.index > cursor) node.appendChild(svgDocument().createTextNode(value.slice(cursor, run.index)));
+        const bar = el("tspan", { textLength: measure(run[0], size), lengthAdjust: "spacingAndGlyphs", "letter-spacing": 0 });
+        bar.textContent = run[0];
+        node.appendChild(bar);
+        cursor = run.index + run[0].length;
+    }
+    if (cursor < value.length) node.appendChild(svgDocument().createTextNode(value.slice(cursor)));
     return node;
 }
 

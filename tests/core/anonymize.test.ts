@@ -101,6 +101,11 @@ describe("Masker", () => {
         assert.equal(confirmed.mask(COMPANY_TWO_TYPOS, Disclosure.Anonymized), COMPANY_ALIAS);
     });
 
+    it("offers no review for ordinary words close to a single part of a name", async () => {
+        const diagram = await diagramWith({ person: "Finance clerk", description: "Alert raised, host clean" });
+        assert.deepEqual(new Masker(diagram, rules()).nearMisses, []);
+    });
+
     it("protects text added by hand and uses the prefixes chosen", async () => {
         const diagram = await diagramWith({ company: COMPANY });
         const patch = { terms: [{ text: "Project Falcon", category: SensitiveCategory.Other }], prefixes: { [SensitiveCategory.Organization]: "Company" } };

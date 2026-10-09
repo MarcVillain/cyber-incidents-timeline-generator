@@ -78,8 +78,8 @@ const NORMAL_TYPO_MIN_LENGTH = 5;
 const AGGRESSIVE_MIN_LENGTH = 4;
 const AGGRESSIVE_LENGTH_PER_TYPO = 4;
 const AGGRESSIVE_MAX_TYPOS = 2;
-// Short names sit one letter away from too many ordinary words to be worth reviewing
-const NEAR_MISS_MIN_LENGTH = 5;
+// Short names sit two letters away from too many ordinary words to be worth reviewing
+const NEAR_MISS_MIN_LENGTH = 6;
 const HOSTNAME_MIN_LABELS = 3;
 
 // Marks stay inside the word, so a name typed with decomposed accents is still one word
@@ -214,6 +214,8 @@ interface Term {
     tokens: string[];
     compared: string;
     budget: number;
+    /** Whether a mention just out of reach is offered for review. Not for a single part of a name, which is too often an ordinary word. */
+    reviewed: boolean;
 }
 
 interface Span {
@@ -268,7 +270,7 @@ export class Masker {
             this.addTerm(node.name, category);
             if (category === SensitiveCategory.Person) {
                 const key = foldTerm(node.name);
-                words(node.name).filter(part => part.text.length >= PERSON_PART_MIN_LENGTH).forEach(part => this.addForm(part.text, key, category));
+                words(node.name).filter(part => part.text.length >= PERSON_PART_MIN_LENGTH).forEach(part => this.addForm(part.text, key, category, false));
             }
             if (node.identifier !== null && patternCategory(node.identifier) === null) this.addTerm(node.identifier, category);
         });
@@ -303,12 +305,12 @@ export class Masker {
         this.addForm(text, foldTerm(text), category);
     }
 
-    private addForm(text: string, key: string, category: SensitiveCategory): void {
+    private addForm(text: string, key: string, category: SensitiveCategory, reviewed = true): void {
         const tokens = this.tokensOf(text);
         const compared = this.joined(tokens);
         if (compared.replace(/ /g, "").length < MIN_TERM_LENGTH) return;
         if (this.terms.some(term => term.compared === compared)) return;
-        this.terms.push({ key, category, tokens, compared, budget: typoBudget(this.level, compared.length) });
+        this.terms.push({ key, category, tokens, compared, budget: typoBudget(this.level, compared.length), reviewed: reviewed && compared.length >= NEAR_MISS_MIN_LENGTH });
     }
 
     /** A confirmed near miss is one more form of the name it resembles most, and shares its alias. */
@@ -373,7 +375,7 @@ export class Masker {
                     const span = { start, end, key: term.key, text: text.slice(start, end), category: term.category };
                     if (distance <= term.budget) {
                         candidates.push(span);
-                    } else if (distance === term.budget + 1 && term.compared.length >= NEAR_MISS_MIN_LENGTH) {
+                    } else if (distance === term.budget + 1 && term.reviewed) {
                         misses.push({ span, term });
                     }
                 }

@@ -1703,8 +1703,31 @@ textarea.tlg-input {
 }
 
 .tlg-settings-adder.tlg-privacy-adder {
-    max-width: 36rem;
-    align-items: flex-end;
+    max-width: none;
+}
+
+.tlg-privacy-adder > .tlg-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tlg-privacy-adder > .tlg-privacy-kind-picker {
+    flex: 0 0 12rem;
+    width: 12rem;
+}
+
+.tlg-privacy-adder > .tlg-button {
+    flex: 0 0 auto;
+}
+
+.tlg-privacy-entry {
+    padding: .2rem 0;
+}
+
+.tlg-privacy-kind {
+    flex: 0 0 auto;
+    color: var(--tlg-ink-muted);
+    font-size: .8rem;
 }
 
 .tlg-vocabulary-row > .tlg-input {

@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Names can be shown as written, anonymized or censored, as a view setting beside the audience, remembered per browser. Anonymized names get an alias such as `Org-1` that is the same in every field, view and export; censored names all get a bar of the same length, so the bar gives nothing away. Stored records are never changed.
+- Names are found from the records (people, organisations, teams, threat actors, assets, accounts, the scope) and by pattern (IP and mail addresses, URLs, hashes, hostnames, domains, usernames), plus any text added by hand. Every kind is protected unless revealed.
+- A sensitivity setting decides how far a mention may stray from a name and still be caught: case and punctuation, then accents, glued words and a typo, then a few typos. Mentions just out of reach are listed for review, to be masked or ignored, and any name can be revealed on its own.
+- A Privacy tab in the settings holds the sensitivity, the alias prefixes, the kinds revealed, the text added by hand and whether the record list and the details are masked too, which leaves them read only. It travels with the settings file.
+- Integrators get `privacy`, `onPrivacyChange` and `disclosureLock` on `mountTimeline`, `privacy` and `filters.disclosure` on the headless renderer, and `Masker` and `maskDiagram` in the core.
+
 ## [0.5.1] - 2026-09-21
 
 ### Changed

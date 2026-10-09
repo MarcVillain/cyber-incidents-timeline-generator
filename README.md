@@ -201,6 +201,13 @@ Three ports make it pluggable:
 - **Icons.** `new IconSet(new Map([["my-icon", ["M4 4h16v16H4z"]]]))` adds or replaces stroke icons on a
   24 by 24 grid.
 - **Views.** Pass `renderers` to `mountTimeline` to offer a subset of the built in views, in your own order.
+- **Names.** Every view can show the names of an incident as written, anonymized (`Org-1`, `Person-2`, the
+  same alias everywhere) or censored behind bars of one fixed length, from the toolbar or the view settings.
+  Records are never changed; views, the record list if asked, and every export follow. Names come from the
+  records, from patterns (IP and mail addresses, URLs, hashes, hostnames, domains, usernames) and from text
+  added in the Privacy tab of the settings, which also sets the sensitivity, the prefixes and the kinds of
+  names revealed. Pass `privacy` and `onPrivacyChange` to `mountTimeline` to keep the rules yourself,
+  `disclosureLock` to force a mode, or `filters.disclosure` and `privacy` to the headless renderer.
 
 ## Development
 

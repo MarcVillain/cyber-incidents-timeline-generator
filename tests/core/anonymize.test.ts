@@ -65,6 +65,7 @@ describe("Masker", () => {
         ];
         cases.forEach(([input, expected]) => assert.equal(masked(diagram, input), expected));
         assert.equal(masked(diagram, "Opened invoice.pdf at 10:30:00"), "Opened invoice.pdf at 10:30:00");
+        assert.equal(masked(diagram, "Called std::string at ::1"), "Called std::string at IP-1");
     });
 
     it("censors every name with a bar of one length, whatever the length of the name", async () => {

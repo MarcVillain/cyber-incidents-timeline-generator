@@ -111,7 +111,8 @@ const DETECTORS: readonly Detector[] = [
     { pattern: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, categoryOf: always(SensitiveCategory.Email) },
     { pattern: /\b(?:https?|ftp):\/\/[^\s<>"']*[^\s<>"'.,;:!?)]/gi, categoryOf: always(SensitiveCategory.Url) },
     { pattern: /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g, categoryOf: always(SensitiveCategory.Ip) },
-    { pattern: /(?<![\w:])(?:(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}|(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?)(?![\w:])/gi, categoryOf: always(SensitiveCategory.Ip) },
+    // A lookahead stands where a lookbehind would, since Safari before 16.4 refuses the whole module over one
+    { pattern: /(?:\b|(?=::))(?:(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}|(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?)(?![\w:])/gi, categoryOf: always(SensitiveCategory.Ip) },
     { pattern: /\b(?:[a-f0-9]{64}|[a-f0-9]{40}|[a-f0-9]{32})\b/gi, categoryOf: always(SensitiveCategory.Hash) },
     { pattern: /\b[\w.-]+\\[\w.$-]+/g, categoryOf: always(SensitiveCategory.Username) },
     { pattern: /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\b/gi, categoryOf: hostOrDomain }

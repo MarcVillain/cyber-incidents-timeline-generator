@@ -122,6 +122,47 @@ export enum Audience {
 }
 
 /**
+ * How much of the names an incident holds a view lets through. Stored records are never changed: only what
+ * is drawn, listed and exported is.
+ */
+export enum Disclosure {
+    Full = "Full",
+    /** Every protected name replaced by an alias such as Org-1, the same alias wherever the name appears. */
+    Anonymized = "Anonymized",
+    /** Every protected name replaced by a bar of one fixed length, so the bar tells nothing about the name. */
+    Censored = "Censored"
+}
+
+/**
+ * How far a mention may stray from a protected name and still be caught: case and punctuation only, then
+ * accents, glued words and a typo, then a few typos.
+ */
+export enum FuzzyLevel {
+    Exact = "Exact",
+    Normal = "Normal",
+    Aggressive = "Aggressive"
+}
+
+/** What a protected name is, which picks its alias prefix and lets a whole kind of name be revealed. */
+export enum SensitiveCategory {
+    Organization = "Organization",
+    Person = "Person",
+    Team = "Team",
+    ThreatActor = "ThreatActor",
+    Asset = "Asset",
+    Capability = "Capability",
+    Account = "Account",
+    Ip = "Ip",
+    Email = "Email",
+    Hostname = "Hostname",
+    Domain = "Domain",
+    Url = "Url",
+    Hash = "Hash",
+    Username = "Username",
+    Other = "Other"
+}
+
+/**
  * What a side stands for, which is what the views ask rather than the side itself, so a side added to
  * the catalog, such as an insider, is drawn and measured like the camp it belongs to.
  */

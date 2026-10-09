@@ -15,5 +15,6 @@ export * from "./document.js";
 export * from "./response.js";
 export * from "./store.js";
 export * from "./mapping.js";
+export * from "./anonymize.js";
 export * from "./service.js";
 export * from "./sample.js";

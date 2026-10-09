@@ -1,6 +1,8 @@
 // Every word the interface says, in one place, so a host can hand the workspace its own language.
 // The catalog carries the vocabulary of the domain; this carries the chrome around it.
 
+import { SensitiveCategory } from "../core/enums.js";
+
 export interface WorkspaceStrings {
     representations: string;
     records: string;
@@ -491,6 +493,49 @@ export interface SettingsStrings {
     mutedColor: string;
 }
 
+/** The protection of names: the view setting, its review, and the rules in the settings. */
+export interface PrivacyStrings {
+    names: string;
+    namesHint: string;
+    full: string;
+    anonymized: string;
+    censored: string;
+    lockedHint: string;
+    reviewHeading: string;
+    reviewHint: string;
+    resembles(term: string): string;
+    mask: string;
+    ignore: string;
+    protectedHeading: string;
+    protectedHint: string;
+    reveal(name: string): string;
+    protect(name: string): string;
+    readOnlyHint: string;
+    exportWarning: string;
+    tab: string;
+    detectionHeading: string;
+    detectionHint: string;
+    fuzzy: string;
+    fuzzyExact: string;
+    fuzzyNormal: string;
+    fuzzyAggressive: string;
+    panelsHeading: string;
+    panelsHint: string;
+    maskPanels: string;
+    categoriesHeading: string;
+    categoriesHint: string;
+    prefixOf(category: string): string;
+    termsHeading: string;
+    termsHint: string;
+    noTerms: string;
+    addTerm: string;
+    termCategory: string;
+    decisionsHeading: string;
+    decisionsHint(revealed: number, confirmed: number, ignored: number): string;
+    forgetDecisions: string;
+    categories: Readonly<Record<SensitiveCategory, string>>;
+}
+
 export interface Strings {
     workspace: WorkspaceStrings;
     app: AppStrings;
@@ -505,6 +550,7 @@ export interface Strings {
     scene: SceneStrings;
     narrative: NarrativeStrings;
     settings: SettingsStrings;
+    privacy: PrivacyStrings;
 }
 
 /** A host replaces whole groups or single entries; anything left out keeps the English below. */
@@ -1017,6 +1063,63 @@ export const DEFAULT_STRINGS: Strings = {
         advancedOf: label => `Advanced settings of ${label}`,
         sameColorAs: label => `Same as ${label}`,
         mutedColor: "Muted grey"
+    },
+    privacy: {
+        names: "Names",
+        namesHint: "Shows the names of the incident as written, replaced by aliases such as Org-1, or hidden behind bars of one length. Stored records are never changed.",
+        full: "As written",
+        anonymized: "Anonymized",
+        censored: "Censored",
+        lockedHint: "Set by the page this timeline is shown in.",
+        reviewHeading: "Possible mentions",
+        reviewHint: "Text close to a protected name but not close enough to be masked. Mask it to treat it as that name, or ignore it.",
+        resembles: term => `Looks like ${term}`,
+        mask: "Mask",
+        ignore: "Ignore",
+        protectedHeading: "Protected names",
+        protectedHint: "Every name found in this incident. A revealed name is shown as written.",
+        reveal: name => `Reveal ${name}`,
+        protect: name => `Protect ${name}`,
+        readOnlyHint: "Records cannot be edited while names are masked in the list and the details.",
+        exportWarning: "The file holds masked names and is no longer a faithful copy of the incident.",
+        tab: "Privacy",
+        detectionHeading: "Detection",
+        detectionHint: "How far a mention may stray from a protected name and still be caught. Exact ignores case and punctuation, Normal also accents, glued words and one typo, Aggressive a few typos.",
+        fuzzy: "Sensitivity",
+        fuzzyExact: "Exact",
+        fuzzyNormal: "Normal",
+        fuzzyAggressive: "Aggressive",
+        panelsHeading: "Record list and details",
+        panelsHint: "Masks the names in the list of records and in the details too, which is safer when sharing a screen. Editing is off while it applies.",
+        maskPanels: "Mask the list and the details",
+        categoriesHeading: "Kinds of names",
+        categoriesHint: "Every kind is protected unless unticked. The prefix names the aliases of its kind.",
+        prefixOf: category => `Alias prefix of ${category}`,
+        termsHeading: "Text to protect",
+        termsHint: "Words no record holds as a name, such as the codename of a project. They are protected wherever they appear.",
+        noTerms: "No text added yet.",
+        addTerm: "Add text",
+        termCategory: "Kind",
+        decisionsHeading: "Decisions",
+        decisionsHint: (revealed, confirmed, ignored) => `${revealed} name(s) revealed, ${confirmed} mention(s) masked and ${ignored} ignored from the review.`,
+        forgetDecisions: "Forget decisions",
+        categories: {
+            [SensitiveCategory.Organization]: "Organizations",
+            [SensitiveCategory.Person]: "People",
+            [SensitiveCategory.Team]: "Teams",
+            [SensitiveCategory.ThreatActor]: "Threat actors",
+            [SensitiveCategory.Asset]: "Assets",
+            [SensitiveCategory.Capability]: "Malware and tools",
+            [SensitiveCategory.Account]: "Accounts",
+            [SensitiveCategory.Ip]: "IP addresses",
+            [SensitiveCategory.Email]: "Email addresses",
+            [SensitiveCategory.Hostname]: "Hostnames",
+            [SensitiveCategory.Domain]: "Domains",
+            [SensitiveCategory.Url]: "URLs",
+            [SensitiveCategory.Hash]: "Hashes",
+            [SensitiveCategory.Username]: "Usernames",
+            [SensitiveCategory.Other]: "Other"
+        }
     }
 };
 
@@ -1038,6 +1141,7 @@ export function buildStrings(override: StringsOverride = {}): Strings {
         filters: { ...DEFAULT_STRINGS.filters, ...override.filters },
         scene: { ...DEFAULT_STRINGS.scene, ...override.scene },
         narrative: { ...DEFAULT_STRINGS.narrative, ...override.narrative },
-        settings: { ...DEFAULT_STRINGS.settings, ...override.settings }
+        settings: { ...DEFAULT_STRINGS.settings, ...override.settings },
+        privacy: { ...DEFAULT_STRINGS.privacy, ...override.privacy }
     };
 }

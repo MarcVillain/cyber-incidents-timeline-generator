@@ -2,6 +2,7 @@
 // the impact scale, the milestones and the layout. Everything maps onto options the package already takes,
 // so a setting never adds a rule of its own.
 
+import { defaultPrivacyRules, type PrivacyRules } from "../core/anonymize.js";
 import { buildCatalog, checkImpactScale, checkMilestones, type Catalog, type ImpactLevelInfo, type ImpactScale, type MilestoneInfo, type VocabularyOptions } from "../core/catalog.js";
 import { isEnumValue } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
@@ -12,6 +13,7 @@ import { blend, type TokenResolver } from "./theme.js";
 import { CanvasMode } from "./canvas-mode.js";
 import { ViewPicker } from "./view-picker.js";
 import { parseVocabulary } from "./vocabulary-settings.js";
+import { parsePrivacy } from "./privacy-settings.js";
 import type { PageSize } from "./viewport.js";
 
 /** What the settings may change. */
@@ -67,6 +69,7 @@ export interface AppSettings {
     viewPicker: ViewPicker | null;
     locale: string | null;
     durationUnits: DurationUnits | null;
+    privacy: PrivacyRules;
 }
 
 export enum ColorSection {
@@ -138,7 +141,8 @@ export function defaultSettings(): AppSettings {
         canvasMode: null,
         viewPicker: null,
         locale: null,
-        durationUnits: null
+        durationUnits: null,
+        privacy: defaultPrivacyRules()
     };
 }
 
@@ -264,6 +268,7 @@ export function parseSettings(value: unknown): AppSettings {
     settings.viewPicker = isEnumValue(ViewPicker, value["viewPicker"]) ? value["viewPicker"] : null;
     settings.locale = isKnownLocale(value["locale"]) ? value["locale"] : null;
     settings.durationUnits = parseDurationUnits(value["durationUnits"]);
+    settings.privacy = parsePrivacy(value["privacy"]);
     return settings;
 }
 

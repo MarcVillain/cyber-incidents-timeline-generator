@@ -1673,6 +1673,22 @@ textarea.tlg-input {
     max-width: 24rem;
 }
 
+.tlg-privacy-category .tlg-check,
+.tlg-privacy-term {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.tlg-privacy-category .tlg-input {
+    flex: 0 0 8rem;
+}
+
+.tlg-settings-adder.tlg-privacy-adder {
+    max-width: 36rem;
+    align-items: flex-end;
+}
+
 .tlg-vocabulary-row > .tlg-input {
     flex: 1 1 auto;
     min-width: 0;

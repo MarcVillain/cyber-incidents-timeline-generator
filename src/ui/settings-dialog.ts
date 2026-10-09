@@ -10,6 +10,7 @@ import { CanvasMode } from "./canvas-mode.js";
 import { ViewPicker } from "./view-picker.js";
 import { h, uniqueId } from "./dom.js";
 import { download } from "./export.js";
+import { privacySections } from "./privacy-settings.js";
 import { button, field, row, select, textInput, type Choice } from "./forms.js";
 import type { IconSet } from "./icons/icon-set.js";
 import {
@@ -41,6 +42,7 @@ export enum SettingsTab {
     Vocabulary = "vocabulary",
     Scales = "scales",
     Display = "display",
+    Privacy = "privacy",
     Backup = "backup"
 }
 
@@ -74,6 +76,7 @@ function tabLabels(strings: Strings): Readonly<Record<SettingsTab, { label: stri
         [SettingsTab.Vocabulary]: { label: words.tabVocabulary, icon: Icon.Tag },
         [SettingsTab.Scales]: { label: words.tabScales, icon: Icon.Scale },
         [SettingsTab.Display]: { label: words.tabDisplay, icon: Icon.Workstation },
+        [SettingsTab.Privacy]: { label: strings.privacy.tab, icon: Icon.Lock },
         [SettingsTab.Backup]: { label: words.tabBackup, icon: Icon.Archive }
     };
 }
@@ -287,6 +290,8 @@ class SettingsDialog {
                 return this.scales();
             case SettingsTab.Display:
                 return this.display();
+            case SettingsTab.Privacy:
+                return privacySections({ rules: this.draft.privacy, strings: this.strings, icons: this.icons, onChange: rules => { this.draft.privacy = rules; } });
             case SettingsTab.Backup:
                 return this.backup();
         }

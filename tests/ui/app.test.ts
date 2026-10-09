@@ -198,13 +198,13 @@ describe("mountTimelineApp", () => {
         const element = mountPoint();
         const custom = await mountTimelineApp(element, { api: service, syncAddress: false, preferences: null, settingsButton: true });
         const tabs = [...(await openSettings(element)).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
-        assert.deepEqual(tabs, ["Appearance", "Vocabulary", "Display", "Backup"]);
+        assert.deepEqual(tabs, ["Appearance", "Vocabulary", "Display", "Privacy", "Backup"]);
         custom.destroy();
 
         const full = mountPoint();
         const everything = await mountTimelineApp(full, { api: service, syncAddress: false, preferences: null, settingsButton: true, settingsScope: SettingsScope.Everything });
         const all = [...(await openSettings(full)).querySelectorAll("[role=tab]")].map(tab => tab.textContent?.trim());
-        assert.deepEqual(all, ["Appearance", "Vocabulary", "Scales", "Display", "Backup"]);
+        assert.deepEqual(all, ["Appearance", "Vocabulary", "Scales", "Display", "Privacy", "Backup"]);
         everything.destroy();
     });
 

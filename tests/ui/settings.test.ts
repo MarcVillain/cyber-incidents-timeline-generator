@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildCatalog } from "../../src/core/catalog.js";
-import { Side } from "../../src/core/enums.js";
+import { FuzzyLevel, SensitiveCategory, Side } from "../../src/core/enums.js";
 import { Icon } from "../../src/core/icon.js";
 import { ThemeToken } from "../../src/core/theme-token.js";
 import { loadAppCatalog, loadAppSettings } from "../../src/ui/app.js";
@@ -23,6 +23,8 @@ const RED = "#ff0000";
 const WHITE = "#ffffff";
 const LOCALE = "fr-FR";
 const MILESTONE = { key: "first-access", label: "First access" };
+const PRIVATE_TERM = "Project Falcon";
+const PRIVATE_PREFIX = "Company";
 
 class MapStorage implements KeyValueStorage {
     readonly entries = new Map<string, string>();
@@ -44,6 +46,16 @@ function customised(): ReturnType<typeof defaultSettings> {
     settings.canvasMode = CanvasMode.Continuous;
     settings.viewPicker = ViewPicker.Menu;
     settings.locale = LOCALE;
+    settings.privacy = {
+        fuzzy: FuzzyLevel.Aggressive,
+        prefixes: { [SensitiveCategory.Organization]: PRIVATE_PREFIX },
+        revealed: [SensitiveCategory.Hash],
+        revealedTerms: [PRIVATE_TERM.toLowerCase()],
+        terms: [{ text: PRIVATE_TERM, category: SensitiveCategory.Other }],
+        confirmed: [PRIVATE_TERM],
+        ignored: [PRIVATE_TERM],
+        maskPanels: true
+    };
     return settings;
 }
 
@@ -63,7 +75,15 @@ describe("settings", () => {
             canvasMode: "sideways",
             viewPicker: "carousel",
             locale: "not a locale at all",
-            durationUnits: { minutes: "m", hours: "h" }
+            durationUnits: { minutes: "m", hours: "h" },
+            privacy: {
+                fuzzy: "Psychic",
+                prefixes: { [SensitiveCategory.Person]: PRIVATE_PREFIX, Planet: PRIVATE_PREFIX, [SensitiveCategory.Team]: " " },
+                revealed: [SensitiveCategory.Email, "Planet"],
+                terms: [{ text: PRIVATE_TERM, category: SensitiveCategory.Other }, { text: "", category: SensitiveCategory.Other }, { text: PRIVATE_TERM, category: "Planet" }],
+                ignored: [PRIVATE_TERM, 42],
+                maskPanels: "yes"
+            }
         });
 
         assert.deepEqual(parsed.colors[ColorScheme.Light], { [ThemeToken.Good]: RED });
@@ -76,6 +96,13 @@ describe("settings", () => {
         assert.equal(parsed.viewPicker, null);
         assert.equal(parsed.locale, null);
         assert.equal(parsed.durationUnits, null);
+        assert.deepEqual(parsed.privacy, {
+            ...defaultSettings().privacy,
+            prefixes: { [SensitiveCategory.Person]: PRIVATE_PREFIX },
+            revealed: [SensitiveCategory.Email],
+            terms: [{ text: PRIVATE_TERM, category: SensitiveCategory.Other }],
+            ignored: [PRIVATE_TERM]
+        });
     });
 
     it("keeps a stored list the catalog accepts and drops one it does not", () => {

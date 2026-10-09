@@ -491,6 +491,24 @@ textarea.tlg-input {
     font-size: .74rem;
 }
 
+/* A name takes the room left, so its kind and its controls line up on the right edge */
+.tlg-privacy-row {
+    gap: .5rem;
+    font-size: .8rem;
+}
+
+.tlg-privacy-row > .tlg-view-setting-choice {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tlg-privacy-row > .tlg-view-setting-example {
+    flex: 0 0 auto;
+    text-align: right;
+}
+
 .tlg-view-setting-row > input[type="checkbox"] {
     margin: 0 .3rem 0 0;
 }

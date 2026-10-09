@@ -53,6 +53,7 @@ export enum Icon {
     Failure = "failure",
     Blocked = "blocked",
     Eye = "eye",
+    EyeOff = "eye-off",
     Timeline = "timeline",
     Lanes = "lanes",
     Scale = "scale",

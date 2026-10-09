@@ -837,12 +837,12 @@ class Workspace implements TimelineHandle {
             const toggle = button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", () => {
                 const others = this.privacy.revealedTerms.filter(key => key !== term.key);
                 this.setPrivacy({ ...this.privacy, revealedTerms: term.revealed ? others : [...others, term.key] });
-            }, term.revealed ? Icon.Unlock : Icon.Lock);
+            }, term.revealed ? Icon.Eye : Icon.EyeOff);
             toggle.setAttribute("aria-label", label);
             toggle.setAttribute("aria-pressed", String(!term.revealed));
             toggle.setAttribute(CONTROL_KEY, `${PROTECTED_CONTROL}:${term.key}`);
             toggle.title = label;
-            return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row", {}, [
+            return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row tlg-privacy-row", {}, [
                 h("span", "tlg-view-setting-choice", {}, [term.text]),
                 h("span", "tlg-view-setting-example", {}, [words.categories[term.category]]),
                 toggle
@@ -858,7 +858,7 @@ class Workspace implements TimelineHandle {
                 node.setAttribute(CONTROL_KEY, `${REVIEW_CONTROL}:${miss.key}:${key}`);
                 return node;
             };
-            return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row", {}, [
+            return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row tlg-privacy-row", {}, [
                 h("span", "tlg-view-setting-choice", {}, [miss.text]),
                 h("span", "tlg-view-setting-example", {}, [words.resembles(miss.term)]),
                 decide(words.mask, "mask", () => ({ ...this.privacy, confirmed: [...this.privacy.confirmed, miss.text] })),

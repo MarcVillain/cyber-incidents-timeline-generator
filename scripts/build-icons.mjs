@@ -59,6 +59,7 @@ const ICONS = {
     Failure: ["circle-x"],
     Blocked: ["ban"],
     Eye: ["eye"],
+    EyeOff: ["eye-off"],
     Timeline: ["git-commit-horizontal"],
     Lanes: ["rows-3"],
     Scale: ["scale"],

@@ -9,7 +9,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = resolve(ROOT, "site");
 const DIST = resolve(ROOT, "dist");
 const PAGE = "local.html";
-const PAGE_FILES = ["local.js", "presets.js", "app.css", "favicon.svg"];
+const PAGE_FILES = ["local.js", "presets.js", "app.css", "favicon.svg", "favicon.ico", "apple-touch-icon.png"];
 // Node only code and type declarations are of no use to a browser
 const SERVER_FOLDER = "server";
 const DECLARATION = ".d.ts";

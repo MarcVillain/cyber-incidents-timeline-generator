@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0] - 2026-10-10
 
 ### Added
 
@@ -12,7 +12,14 @@ All notable changes to this project are documented here. The format follows
 - Names are found from the records (people, organisations, teams, threat actors, assets, accounts, the scope) and by pattern (IP and mail addresses, URLs, hashes, hostnames, domains, usernames), plus any text added by hand. Every kind is protected unless revealed.
 - A sensitivity setting decides how far a mention may stray from a name and still be caught: case and punctuation, then accents, glued words and a typo, then a few typos. Mentions just out of reach are listed for review, to be masked or ignored, and any name can be revealed on its own.
 - A Privacy tab in the settings holds the sensitivity, the alias prefixes, the kinds revealed, the text added by hand and whether the record list and the details are masked too, which leaves them read only. It travels with the settings file.
+- Each sensitivity is explained in the Privacy tab with a name written several ways, marked caught or missed for the level chosen.
 - Integrators get `privacy`, `onPrivacyChange` and `disclosureLock` on `mountTimeline`, `privacy` and `filters.disclosure` on the headless renderer, and `Masker` and `maskDiagram` in the core.
+
+### Fixed
+
+- The command no longer prints the experimental SQLite warning of Node.
+- The server tells the browser to check every app file again before using a copy it kept, so a page updated by a new version never runs with code left from an older one, which showed as an empty grey page.
+- The app has an icon for Safari, for browsers asking for `/favicon.ico` and for home screens, and its drawing is centred.
 
 ## [0.5.1] - 2026-09-21
 

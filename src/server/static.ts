@@ -26,6 +26,10 @@ const CONTENT_TYPES: ReadonlyMap<string, string> = new Map([
 
 const INDEX_FILE = "index.html";
 
+// The page and the modules it imports change together with each build, so a browser must never pair a
+// fresh page with a module it kept from an older version
+const CACHE_CONTROL = "no-cache";
+
 // Inline styles are needed because the workspace positions menus and panels from script
 const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'";
 
@@ -84,6 +88,7 @@ export function createStaticHandler(mounts: readonly StaticMount[]): TimelineReq
             response.statusCode = HttpStatus.Ok;
             response.setHeader("Content-Type", CONTENT_TYPES.get(extname(target).toLowerCase()) ?? "application/octet-stream");
             response.setHeader("Content-Length", info.size);
+            response.setHeader("Cache-Control", CACHE_CONTROL);
             response.setHeader("X-Content-Type-Options", "nosniff");
             response.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
             if (request.method === "HEAD") {

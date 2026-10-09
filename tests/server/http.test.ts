@@ -179,7 +179,9 @@ describe("REST contract end to end", () => {
     });
 
     it("serves static files without leaving the mount or showing hidden ones", async () => {
-        assert.equal((await fetch(`${origin}/`)).status, HttpStatus.Ok);
+        const page = await fetch(`${origin}/`);
+        assert.equal(page.status, HttpStatus.Ok);
+        assert.equal(page.headers.get("cache-control"), "no-cache");
         assert.equal((await fetch(`${origin}/.hidden/secret.html`)).status, HttpStatus.NotFound);
         assert.equal((await fetch(`${origin}/..%2f..%2fetc%2fpasswd`)).status, HttpStatus.NotFound);
     });

@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Names can be shown as written, anonymized or censored, as a view setting beside the audience, remembered per browser. Anonymized names get an alias such as `Org-1` that is the same in every field, view and export; censored names get a bar of 4, 8 or 12 characters, whichever is closest to the name, so the bar tells little about it. Stored records are never changed.
+- Names can be shown as written, anonymized or censored, as a view setting beside the audience, remembered per browser. Anonymized names get an alias such as `Org-1` that is the same in every field, view and export; censored names get a bar of 4, 8 or 12 characters by default, whichever is closest to the name, so the bar tells little about it. The lengths are set in the Privacy tab. Stored records are never changed.
 - Names are found from the records (people, organisations, teams, threat actors, assets, accounts, the scope) and by pattern (IP and mail addresses, URLs, hashes, hostnames, domains, usernames), plus any text added by hand. Every kind is protected unless revealed.
 - A sensitivity setting decides how far a mention may stray from a name and still be caught: case and punctuation, then accents, glued words and a typo, then a few typos. Mentions just out of reach are listed for review, to be masked or ignored, and any name can be revealed on its own.
 - A Privacy tab in the settings holds the sensitivity, the alias prefixes, the kinds revealed, the text added by hand and whether the record list and the details are masked too, which leaves them read only. It travels with the settings file.

@@ -28,6 +28,8 @@ export interface PrivacyRules {
     ignored: string[];
     /** Whether the record list and the details are masked too, which leaves them read only. */
     maskPanels: boolean;
+    /** The only lengths a censor bar takes. A name gets the closest, so a bar tells roughly how long it was. */
+    censorLengths: number[];
 }
 
 /** A name the masker protects, or would were it not revealed. */
@@ -64,11 +66,8 @@ export const DEFAULT_PREFIXES: Readonly<Record<SensitiveCategory, string>> = {
     [SensitiveCategory.Other]: "Redacted"
 };
 
-/**
- * The only lengths a censor bar takes. A name gets the closest one, so a bar tells roughly how long the
- * name was and nothing finer.
- */
-export const CENSOR_LENGTHS: readonly number[] = [4, 8, 12];
+export const DEFAULT_CENSOR_LENGTHS: readonly number[] = [4, 8, 12];
+export const MAX_CENSOR_LENGTH = 40;
 export const CENSOR_GLYPH = "\u2588";
 export const MAX_PREFIX_LENGTH = 20;
 export const MAX_TERM_LENGTH = 120;
@@ -149,12 +148,17 @@ const KIND_CATEGORIES: Readonly<Record<NodeKind, SensitiveCategory>> = {
 };
 
 export function defaultPrivacyRules(): PrivacyRules {
-    return { fuzzy: FuzzyLevel.Normal, prefixes: {}, revealed: [], revealedTerms: [], terms: [], confirmed: [], ignored: [], maskPanels: false };
+    return {
+        fuzzy: FuzzyLevel.Normal, prefixes: {}, revealed: [], revealedTerms: [], terms: [], confirmed: [], ignored: [], maskPanels: false,
+        censorLengths: [...DEFAULT_CENSOR_LENGTHS]
+    };
 }
 
 /** The bar standing for a name of this length. Halfway between two lengths, the longer one hides more. */
-export function censorBar(length: number): string {
-    const closest = CENSOR_LENGTHS.reduce((best, candidate) => {
+export function censorBar(length: number, lengths: readonly number[] = DEFAULT_CENSOR_LENGTHS): string {
+    // A host handing no lengths at all still gets bars rather than names
+    const offered = lengths.length > 0 ? lengths : DEFAULT_CENSOR_LENGTHS;
+    const closest = offered.reduce((best, candidate) => {
         const gap = Math.abs(candidate - length) - Math.abs(best - length);
         return gap < 0 || (gap === 0 && candidate > best) ? candidate : best;
     });
@@ -308,7 +312,7 @@ export class Masker {
         let masked = "";
         let cursor = 0;
         for (const span of this.spans(text)) {
-            masked += text.slice(cursor, span.start) + (mode === Disclosure.Censored ? censorBar(span.end - span.start) : this.alias(span));
+            masked += text.slice(cursor, span.start) + (mode === Disclosure.Censored ? censorBar(span.end - span.start, this.rules.censorLengths) : this.alias(span));
             cursor = span.end;
         }
         return masked + text.slice(cursor);

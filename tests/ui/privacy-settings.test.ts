@@ -7,6 +7,12 @@ import { privacySections } from "../../src/ui/privacy-settings.js";
 import { DEFAULT_STRINGS } from "../../src/ui/strings.js";
 import { chooseOption, fieldNamed, installDom, syntheticEvent } from "../support/dom.js";
 
+function kindPicker(root: HTMLElement): HTMLElement {
+    const found = root.querySelector(".tlg-privacy-kind-picker");
+    assert.ok(found instanceof HTMLElement);
+    return found;
+}
+
 installDom();
 
 const WORDS = DEFAULT_STRINGS.privacy;
@@ -55,7 +61,7 @@ describe("privacy settings", () => {
 
     it("adds text to protect under a kind, and removes it", () => {
         const { root, latest } = editor();
-        chooseOption(fieldNamed(root, WORDS.termCategory), WORDS.categories[SensitiveCategory.Organization]);
+        chooseOption(kindPicker(root), WORDS.categories[SensitiveCategory.Organization]);
         const input = inputNamed(root, WORDS.addTerm);
         input.value = CODENAME;
         input.dispatchEvent(syntheticEvent("keydown", { key: "Enter" }));
@@ -64,6 +70,18 @@ describe("privacy settings", () => {
 
         root.querySelector<HTMLButtonElement>(".tlg-settings-list .tlg-button-icon")?.click();
         assert.deepEqual(latest().terms, []);
+    });
+
+    it("takes the bar lengths in order once each, and keeps the last good ones over a bad entry", () => {
+        const { root, latest } = editor();
+        const lengths = fieldNamed(root, WORDS.censorLengths).querySelector("input");
+        assert.ok(lengths instanceof HTMLInputElement);
+        change(lengths, () => { lengths.value = "10, 3, 10"; });
+        assert.deepEqual(latest().censorLengths, [3, 10]);
+        assert.equal(lengths.value, "3, 10");
+        change(lengths, () => { lengths.value = "none"; });
+        assert.deepEqual(latest().censorLengths, [3, 10]);
+        assert.equal(lengths.value, "3, 10");
     });
 
     it("sets the sensitivity and the masking of the panels, and forgets the review decisions", () => {

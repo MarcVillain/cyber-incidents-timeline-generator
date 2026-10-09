@@ -1,7 +1,7 @@
 // The rules of name protection as the settings keep them: read back from stored or imported JSON, and
 // edited in a tab of the settings dialog. The view setting and the review live in the workspace.
 
-import { DEFAULT_PREFIXES, MAX_PREFIX_LENGTH, MAX_TERM_LENGTH, defaultPrivacyRules, type ManualTerm, type PrivacyRules } from "../core/anonymize.js";
+import { DEFAULT_CENSOR_LENGTHS, DEFAULT_PREFIXES, MAX_CENSOR_LENGTH, MAX_PREFIX_LENGTH, MAX_TERM_LENGTH, defaultPrivacyRules, type ManualTerm, type PrivacyRules } from "../core/anonymize.js";
 import { FuzzyLevel, SensitiveCategory, enumValues, isEnumValue } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { h } from "./dom.js";
@@ -19,6 +19,14 @@ function isText(value: unknown, max: number): value is string {
 
 function texts(value: unknown, max: number): string[] {
     return Array.isArray(value) ? [...new Set(value.filter((entry): entry is string => isText(entry, max)))] : [];
+}
+
+const LENGTH_SEPARATOR = ",";
+
+/** Whole lengths a bar can take, once each and shortest first, or null when none holds up. */
+function censorLengths(values: readonly unknown[]): number[] | null {
+    const lengths = values.filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry >= 1 && entry <= MAX_CENSOR_LENGTH);
+    return lengths.length > 0 ? [...new Set(lengths)].sort((left, right) => left - right) : null;
 }
 
 function parseTerm(value: unknown): ManualTerm[] {
@@ -48,6 +56,8 @@ export function parsePrivacy(value: unknown): PrivacyRules {
     rules.confirmed = texts(value["confirmed"], MAX_TERM_LENGTH);
     rules.ignored = texts(value["ignored"], MAX_TERM_LENGTH);
     rules.maskPanels = value["maskPanels"] === true;
+    const lengths = value["censorLengths"];
+    rules.censorLengths = (Array.isArray(lengths) ? censorLengths(lengths) : null) ?? [...DEFAULT_CENSOR_LENGTHS];
     return rules;
 }
 
@@ -120,9 +130,9 @@ export function privacySections(options: PrivacyEditorOptions): HTMLElement[] {
                 paintTerms();
             }, Icon.Trash);
             remove.setAttribute("aria-label", strings.settings.remove);
-            return h("div", "tlg-settings-item", {}, [
+            return h("div", "tlg-settings-item tlg-privacy-entry", {}, [
                 h("span", "tlg-privacy-term", {}, [term.text]),
-                h("span", "tlg-settings-hint", {}, [words.categories[term.category]]),
+                h("span", "tlg-privacy-kind", {}, [words.categories[term.category]]),
                 remove
             ]);
         }));
@@ -132,6 +142,8 @@ export function privacySections(options: PrivacyEditorOptions): HTMLElement[] {
     let category = SensitiveCategory.Other;
     const input = h("input", "tlg-input", { type: "text", maxlength: String(MAX_TERM_LENGTH), placeholder: words.addTerm, "aria-label": words.addTerm });
     const kind = select(category, categoryChoices(strings), value => { category = value ?? SensitiveCategory.Other; }, forms);
+    kind.classList.add("tlg-privacy-kind-picker");
+    kind.querySelector("[data-primary]")?.setAttribute("aria-label", words.termCategory);
     const add = (): void => {
         const text = input.value.trim();
         if (text === "" || rules.terms.some(term => term.text === text)) return;
@@ -145,6 +157,12 @@ export function privacySections(options: PrivacyEditorOptions): HTMLElement[] {
         add();
     });
 
+    const bars = textInput(rules.censorLengths.join(`${LENGTH_SEPARATOR} `), value => {
+        const lengths = censorLengths((value ?? "").split(LENGTH_SEPARATOR).map(entry => Number(entry.trim())));
+        if (lengths !== null) commit({ ...rules, censorLengths: lengths });
+        bars.value = rules.censorLengths.join(`${LENGTH_SEPARATOR} `);
+    }, DEFAULT_CENSOR_LENGTHS.join(`${LENGTH_SEPARATOR} `));
+
     const summary = h("p", "tlg-settings-hint");
     const paintSummary = (): void => {
         summary.textContent = words.decisionsHint(rules.revealedTerms.length, rules.confirmed.length, rules.ignored.length);
@@ -157,11 +175,12 @@ export function privacySections(options: PrivacyEditorOptions): HTMLElement[] {
 
     return [
         section(words.detectionHeading, words.detectionHint, [field(words.fuzzy, fuzzy)]),
+        section(words.censorHeading, words.censorHint, [field(words.censorLengths, bars)]),
         section(words.panelsHeading, words.panelsHint, [panels]),
         section(words.categoriesHeading, words.categoriesHint, [h("div", "tlg-settings-list", {}, categories)]),
         section(words.termsHeading, words.termsHint, [
             list,
-            h("div", "tlg-settings-adder tlg-privacy-adder", {}, [input, field(words.termCategory, kind), button(icons, words.addTerm, "tlg-button", add, Icon.Plus)])
+            h("div", "tlg-settings-adder tlg-privacy-adder", {}, [input, kind, button(icons, words.addTerm, "tlg-button", add, Icon.Plus)])
         ]),
         section(words.decisionsHeading, null, [summary, row(forget)])
     ];

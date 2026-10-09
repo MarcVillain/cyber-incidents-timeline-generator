@@ -54,7 +54,8 @@ function customised(): ReturnType<typeof defaultSettings> {
         terms: [{ text: PRIVATE_TERM, category: SensitiveCategory.Other }],
         confirmed: [PRIVATE_TERM],
         ignored: [PRIVATE_TERM],
-        maskPanels: true
+        maskPanels: true,
+        censorLengths: [6, 10]
     };
     return settings;
 }
@@ -82,7 +83,8 @@ describe("settings", () => {
                 revealed: [SensitiveCategory.Email, "Planet"],
                 terms: [{ text: PRIVATE_TERM, category: SensitiveCategory.Other }, { text: "", category: SensitiveCategory.Other }, { text: PRIVATE_TERM, category: "Planet" }],
                 ignored: [PRIVATE_TERM, 42],
-                maskPanels: "yes"
+                maskPanels: "yes",
+                censorLengths: [12, 4, 4, 0, 99, 2.5, "8"]
             }
         });
 
@@ -101,7 +103,8 @@ describe("settings", () => {
             prefixes: { [SensitiveCategory.Person]: PRIVATE_PREFIX },
             revealed: [SensitiveCategory.Email],
             terms: [{ text: PRIVATE_TERM, category: SensitiveCategory.Other }],
-            ignored: [PRIVATE_TERM]
+            ignored: [PRIVATE_TERM],
+            censorLengths: [4, 12]
         });
     });
 

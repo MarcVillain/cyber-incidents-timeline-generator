@@ -78,6 +78,8 @@ describe("Masker", () => {
         const text = masked(diagram, "Bo Li of Contoso International Holdings", {}, Disclosure.Censored);
         assert.equal(text, `${CENSOR_GLYPH.repeat(SHORT_BAR)} of ${CENSOR_GLYPH.repeat(LONG_BAR)}`);
         assert.equal(censorBar(TIED_LENGTH), CENSOR_GLYPH.repeat(MIDDLE_BAR));
+        const single = masked(diagram, "Bo Li of Contoso International Holdings", { censorLengths: [MIDDLE_BAR] }, Disclosure.Censored);
+        assert.equal(single, `${CENSOR_GLYPH.repeat(MIDDLE_BAR)} of ${CENSOR_GLYPH.repeat(MIDDLE_BAR)}`);
     });
 
     it("leaves revealed kinds and names as written, and keeps a protected name inside a revealed one", async () => {

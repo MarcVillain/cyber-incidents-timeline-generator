@@ -530,6 +530,9 @@ export interface PrivacyStrings {
     noTerms: string;
     addTerm: string;
     termCategory: string;
+    censorHeading: string;
+    censorHint: string;
+    censorLengths: string;
     decisionsHeading: string;
     decisionsHint(revealed: number, confirmed: number, ignored: number): string;
     forgetDecisions: string;
@@ -1100,6 +1103,9 @@ export const DEFAULT_STRINGS: Strings = {
         noTerms: "No text added yet.",
         addTerm: "Add text",
         termCategory: "Kind",
+        censorHeading: "Censor bars",
+        censorHint: "The lengths a bar may take, in characters, separated by commas. Each name gets the closest one, so fewer lengths tell less about the names.",
+        censorLengths: "Bar lengths",
         decisionsHeading: "Decisions",
         decisionsHint: (revealed, confirmed, ignored) => `${revealed} name(s) revealed, ${confirmed} mention(s) masked and ${ignored} ignored from the review.`,
         forgetDecisions: "Forget decisions",

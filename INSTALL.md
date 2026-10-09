@@ -726,7 +726,7 @@ Failures surface as `ValidationError` (with `issues`), `NotFoundError`, `Forbidd
 | Styles are missing and the page looks raw | The stylesheet is not loaded. Link `styles/timeline.css` or import `cyber-incidents-timeline-generator/styles.css` |
 | Every create or update answers 400 "The body is not valid JSON" behind Express | A body parser ran first and consumed the request. Register the timeline handler before `express.json()` |
 | Everything answers 403 | Your `authorize` callback returned `false`. Check the user is attached to the request before the handler runs |
-| `ExperimentalWarning: SQLite is an experimental feature` | Printed by Node for its built in SQLite driver. Harmless; `node --disable-warning=ExperimentalWarning` hides it |
+| `ExperimentalWarning: SQLite is an experimental feature` | Printed by Node for its built in SQLite driver when the server is started some other way than the command, which hides it. Harmless; `node --disable-warning=ExperimentalWarning` hides it too |
 | `No such built-in module: node:sqlite` | Node is older than 22.13. Upgrade Node |
 | The theme never changes with the system or the site | A theme was picked with the toggle and is remembered. Click it until the tooltip says it follows the page, or pass `themeToggle: false` |
 | The workspace stays light on a dark site | The site declares its theme in a way not listed under [Theme](#theme). Pass a `themeDetector` |

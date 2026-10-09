@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CENSOR_BAR } from "../../src/core/anonymize.js";
+import { censorBar } from "../../src/core/anonymize.js";
+
+const CENSOR_BAR = censorBar(8);
 import { measure, text } from "../../src/ui/svg.js";
 import { installDom } from "../support/dom.js";
 

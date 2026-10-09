@@ -64,10 +64,12 @@ export const DEFAULT_PREFIXES: Readonly<Record<SensitiveCategory, string>> = {
     [SensitiveCategory.Other]: "Redacted"
 };
 
-/** Every censored name gets the same bar, so its length gives nothing away. */
-export const CENSOR_LENGTH = 8;
+/**
+ * The only lengths a censor bar takes. A name gets the closest one, so a bar tells roughly how long the
+ * name was and nothing finer.
+ */
+export const CENSOR_LENGTHS: readonly number[] = [4, 8, 12];
 export const CENSOR_GLYPH = "\u2588";
-export const CENSOR_BAR = CENSOR_GLYPH.repeat(CENSOR_LENGTH);
 export const MAX_PREFIX_LENGTH = 20;
 export const MAX_TERM_LENGTH = 120;
 
@@ -148,6 +150,15 @@ const KIND_CATEGORIES: Readonly<Record<NodeKind, SensitiveCategory>> = {
 
 export function defaultPrivacyRules(): PrivacyRules {
     return { fuzzy: FuzzyLevel.Normal, prefixes: {}, revealed: [], revealedTerms: [], terms: [], confirmed: [], ignored: [], maskPanels: false };
+}
+
+/** The bar standing for a name of this length. Halfway between two lengths, the longer one hides more. */
+export function censorBar(length: number): string {
+    const closest = CENSOR_LENGTHS.reduce((best, candidate) => {
+        const gap = Math.abs(candidate - length) - Math.abs(best - length);
+        return gap < 0 || (gap === 0 && candidate > best) ? candidate : best;
+    });
+    return CENSOR_GLYPH.repeat(closest);
 }
 
 function stripAccents(text: string): string {
@@ -297,7 +308,7 @@ export class Masker {
         let masked = "";
         let cursor = 0;
         for (const span of this.spans(text)) {
-            masked += text.slice(cursor, span.start) + (mode === Disclosure.Censored ? CENSOR_BAR : this.alias(span));
+            masked += text.slice(cursor, span.start) + (mode === Disclosure.Censored ? censorBar(span.end - span.start) : this.alias(span));
             cursor = span.end;
         }
         return masked + text.slice(cursor);

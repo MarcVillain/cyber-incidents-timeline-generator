@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CENSOR_BAR, defaultPrivacyRules, foldTerm, type PrivacyRules } from "../../src/core/anonymize.js";
+import { CENSOR_GLYPH, defaultPrivacyRules, foldTerm, type PrivacyRules } from "../../src/core/anonymize.js";
 import { Disclosure, NodeKind, RecordType, Representation, Side } from "../../src/core/enums.js";
 import type { RecordId } from "../../src/core/models.js";
 import { TimelineService } from "../../src/core/service.js";
@@ -97,7 +97,7 @@ describe("disclosure of names", () => {
         assert.ok(railText(element).includes(PERSON));
 
         press(element, `filter-disclosure:${Disclosure.Censored}`);
-        assert.ok(canvasText(element).includes(CENSOR_BAR));
+        assert.ok(canvasText(element).includes(CENSOR_GLYPH));
         assert.ok(!canvasText(element).includes(PERSON_ALIAS));
 
         press(element, "reset");

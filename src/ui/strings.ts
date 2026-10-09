@@ -1066,7 +1066,7 @@ export const DEFAULT_STRINGS: Strings = {
     },
     privacy: {
         names: "Names",
-        namesHint: "Shows the names of the incident as written, replaced by aliases such as Org-1, or hidden behind bars of one length. Stored records are never changed.",
+        namesHint: "Shows the names of the incident as written, replaced by aliases such as Org-1, or hidden behind bars of a few fixed lengths. Stored records are never changed.",
         full: "As written",
         anonymized: "Anonymized",
         censored: "Censored",

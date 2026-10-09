@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CENSOR_BAR, Masker, defaultPrivacyRules, foldTerm, maskDiagram, type PrivacyRules } from "../../src/core/anonymize.js";
+import { CENSOR_GLYPH, Masker, censorBar, defaultPrivacyRules, foldTerm, maskDiagram, type PrivacyRules } from "../../src/core/anonymize.js";
 import { Disclosure, FuzzyLevel, NodeKind, SensitiveCategory, Side } from "../../src/core/enums.js";
 import type { Diagram } from "../../src/core/models.js";
 import { INCIDENT_TITLE, createService, person } from "../support/fixtures.js";
@@ -15,6 +15,11 @@ const SENTINEL = "Wolfenstein";
 const STEP_AT = "2026-01-12T08:00:00";
 const PERSON_ALIAS = "Person-1";
 const COMPANY_ALIAS = "Org-1";
+const SHORT_BAR = 4;
+const MIDDLE_BAR = 8;
+const LONG_BAR = 12;
+// Halfway between the short and the middle bar
+const TIED_LENGTH = 6;
 
 async function diagramWith(names: { person?: string; company?: string; description?: string }): Promise<Diagram> {
     const { service } = createService();
@@ -68,10 +73,11 @@ describe("Masker", () => {
         assert.equal(masked(diagram, "Called std::string at ::1"), "Called std::string at IP-1");
     });
 
-    it("censors every name with a bar of one length, whatever the length of the name", async () => {
+    it("censors every name with the closest of a few bar lengths", async () => {
         const diagram = await diagramWith({ person: "Bo Li", company: "Contoso International Holdings" });
         const text = masked(diagram, "Bo Li of Contoso International Holdings", {}, Disclosure.Censored);
-        assert.equal(text, `${CENSOR_BAR} of ${CENSOR_BAR}`);
+        assert.equal(text, `${CENSOR_GLYPH.repeat(SHORT_BAR)} of ${CENSOR_GLYPH.repeat(LONG_BAR)}`);
+        assert.equal(censorBar(TIED_LENGTH), CENSOR_GLYPH.repeat(MIDDLE_BAR));
     });
 
     it("leaves revealed kinds and names as written, and keeps a protected name inside a revealed one", async () => {

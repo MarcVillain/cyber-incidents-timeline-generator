@@ -129,7 +129,7 @@ export enum Disclosure {
     Full = "Full",
     /** Every protected name replaced by an alias such as Org-1, the same alias wherever the name appears. */
     Anonymized = "Anonymized",
-    /** Every protected name replaced by a bar of one fixed length, so the bar tells nothing about the name. */
+    /** Every protected name replaced by a bar of a few fixed lengths, so the bar tells little about the name. */
     Censored = "Censored"
 }
 

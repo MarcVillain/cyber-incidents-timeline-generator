@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseHTML } from "linkedom";
-import { CENSOR_BAR, defaultPrivacyRules } from "../../src/core/anonymize.js";
+import { CENSOR_GLYPH, defaultPrivacyRules } from "../../src/core/anonymize.js";
 import { Disclosure, Representation, SensitiveCategory } from "../../src/core/enums.js";
 import type { Diagram } from "../../src/core/models.js";
 import { countPages, renderPage, renderPages } from "../../src/render/index.js";
@@ -29,7 +29,7 @@ describe("rendering with no page", () => {
 
         const censored = renderPage(built, { ...options, filters: { disclosure: Disclosure.Censored } });
         assert.ok(!censored.includes(name));
-        assert.ok(censored.includes(CENSOR_BAR));
+        assert.ok(censored.includes(CENSOR_GLYPH));
 
         const revealed = Object.values(SensitiveCategory);
         const privacy = { ...defaultPrivacyRules(), revealed };

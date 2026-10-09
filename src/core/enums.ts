@@ -143,6 +143,15 @@ export enum FuzzyLevel {
     Aggressive = "Aggressive"
 }
 
+/** How a mention strays from a name, in the examples that explain the sensitivity. */
+export enum FuzzyExampleReason {
+    Case = "Case",
+    Accent = "Accent",
+    Glued = "Glued",
+    Typo = "Typo",
+    Typos = "Typos"
+}
+
 /** What a protected name is, which picks its alias prefix and lets a whole kind of name be revealed. */
 export enum SensitiveCategory {
     Organization = "Organization",

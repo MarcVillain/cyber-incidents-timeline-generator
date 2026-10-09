@@ -1,7 +1,7 @@
 // Every word the interface says, in one place, so a host can hand the workspace its own language.
 // The catalog carries the vocabulary of the domain; this carries the chrome around it.
 
-import { SensitiveCategory } from "../core/enums.js";
+import { FuzzyExampleReason, SensitiveCategory } from "../core/enums.js";
 
 export interface WorkspaceStrings {
     representations: string;
@@ -519,6 +519,10 @@ export interface PrivacyStrings {
     fuzzyExact: string;
     fuzzyNormal: string;
     fuzzyAggressive: string;
+    exampleIntro(name: string): string;
+    caught: string;
+    missed: string;
+    exampleReasons: Readonly<Record<FuzzyExampleReason, string>>;
     panelsHeading: string;
     panelsHint: string;
     maskPanels: string;
@@ -1087,11 +1091,21 @@ export const DEFAULT_STRINGS: Strings = {
         exportWarning: "The file holds masked names and is no longer a faithful copy of the incident.",
         tab: "Privacy",
         detectionHeading: "Detection",
-        detectionHint: "How far a mention may stray from a protected name and still be caught. Exact ignores case and punctuation, Normal also accents, glued words and one typo, Aggressive a few typos.",
+        detectionHint: "How far a mention may stray from a protected name and still be caught.",
         fuzzy: "Sensitivity",
         fuzzyExact: "Exact",
         fuzzyNormal: "Normal",
         fuzzyAggressive: "Aggressive",
+        exampleIntro: name => `With ${name} protected:`,
+        caught: "Caught",
+        missed: "Missed",
+        exampleReasons: {
+            [FuzzyExampleReason.Case]: "case and punctuation",
+            [FuzzyExampleReason.Accent]: "an accent",
+            [FuzzyExampleReason.Glued]: "glued words",
+            [FuzzyExampleReason.Typo]: "one typo",
+            [FuzzyExampleReason.Typos]: "two typos"
+        },
         panelsHeading: "Record list and details",
         panelsHint: "Masks the names in the list of records and in the details too, which is safer when sharing a screen. Editing is off while it applies.",
         maskPanels: "Mask the list and the details",

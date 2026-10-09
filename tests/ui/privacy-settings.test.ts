@@ -1,11 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { defaultPrivacyRules, type PrivacyRules } from "../../src/core/anonymize.js";
-import { FuzzyLevel, SensitiveCategory } from "../../src/core/enums.js";
+import { Masker, defaultPrivacyRules, type PrivacyRules } from "../../src/core/anonymize.js";
+import { Disclosure, FuzzyLevel, NodeKind, SensitiveCategory, Side, enumValues } from "../../src/core/enums.js";
 import { IconSet } from "../../src/ui/icons/icon-set.js";
-import { privacySections } from "../../src/ui/privacy-settings.js";
+import { FUZZY_EXAMPLES, FUZZY_EXAMPLE_NAME, catchesAt, privacySections } from "../../src/ui/privacy-settings.js";
 import { DEFAULT_STRINGS } from "../../src/ui/strings.js";
 import { chooseOption, fieldNamed, installDom, syntheticEvent } from "../support/dom.js";
+import { INCIDENT_TITLE, createService } from "../support/fixtures.js";
+
+function levelButton(root: HTMLElement, label: string): HTMLElement {
+    const found = [...root.querySelectorAll("[role=radio]")].find(node => node.textContent === label);
+    assert.ok(found instanceof HTMLElement);
+    return found;
+}
+
+function verdicts(root: HTMLElement): string[] {
+    return [...root.querySelectorAll(".tlg-privacy-verdict")].map(node => node.textContent ?? "");
+}
 
 function kindPicker(root: HTMLElement): HTMLElement {
     const found = root.querySelector(".tlg-privacy-kind-picker");
@@ -72,6 +83,29 @@ describe("privacy settings", () => {
         assert.deepEqual(latest().terms, []);
     });
 
+    it("shows which ways of writing a name each sensitivity catches", () => {
+        const { root } = editor();
+        const expected = (level: FuzzyLevel): string[] => FUZZY_EXAMPLES.map(example => (catchesAt(example, level) ? WORDS.caught : WORDS.missed));
+        assert.deepEqual(verdicts(root), expected(FuzzyLevel.Normal));
+        levelButton(root, WORDS.fuzzyExact).click();
+        assert.deepEqual(verdicts(root), expected(FuzzyLevel.Exact));
+        assert.ok(verdicts(root).includes(WORDS.missed));
+    });
+
+    it("promises only what the masker does", async () => {
+        const { service } = createService();
+        const incident = await service.createIncident({ title: INCIDENT_TITLE });
+        await service.createNode(incident.id, { name: FUZZY_EXAMPLE_NAME, kind: NodeKind.Company, side: Side.Victim });
+        const diagram = await service.getDiagram(incident.id);
+        for (const fuzzy of enumValues(FuzzyLevel)) {
+            const masker = new Masker(diagram, { ...defaultPrivacyRules(), fuzzy });
+            FUZZY_EXAMPLES.forEach(example => {
+                const caught = masker.mask(example.mention, Disclosure.Anonymized) !== example.mention;
+                assert.equal(caught, catchesAt(example, fuzzy), `${example.mention} at ${fuzzy}`);
+            });
+        }
+    });
+
     it("takes the bar lengths in order once each, and keeps the last good ones over a bad entry", () => {
         const { root, latest } = editor();
         const lengths = fieldNamed(root, WORDS.censorLengths).querySelector("input");
@@ -86,8 +120,9 @@ describe("privacy settings", () => {
 
     it("sets the sensitivity and the masking of the panels, and forgets the review decisions", () => {
         const { root, latest } = editor({ ...defaultPrivacyRules(), revealedTerms: [CODENAME], confirmed: [CODENAME], ignored: [CODENAME] });
-        chooseOption(fieldNamed(root, WORDS.fuzzy), WORDS.fuzzyAggressive);
+        levelButton(root, WORDS.fuzzyAggressive).click();
         assert.equal(latest().fuzzy, FuzzyLevel.Aggressive);
+        assert.equal(levelButton(root, WORDS.fuzzyAggressive).getAttribute("aria-checked"), "true");
         const panels = checkboxNamed(root, WORDS.maskPanels);
         change(panels, () => { panels.checked = true; });
         assert.equal(latest().maskPanels, true);

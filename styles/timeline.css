@@ -1720,6 +1720,39 @@ textarea.tlg-input {
     flex: 0 0 auto;
 }
 
+.tlg-privacy-example-intro {
+    margin: .75rem 0 .25rem;
+}
+
+.tlg-privacy-examples {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tlg-privacy-example {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .15rem 0;
+    font-size: .8rem;
+    color: var(--tlg-ink-muted);
+}
+
+.tlg-privacy-verdict {
+    flex: 0 0 4.5rem;
+    text-align: right;
+}
+
+.tlg-privacy-example.is-caught .tlg-privacy-term {
+    color: var(--tlg-ink);
+}
+
+.tlg-privacy-example.is-caught .tlg-privacy-verdict {
+    color: var(--tlg-good);
+    font-weight: 600;
+}
+
 .tlg-privacy-entry {
     padding: .2rem 0;
 }

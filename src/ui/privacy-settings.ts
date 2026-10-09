@@ -2,7 +2,7 @@
 // edited in a tab of the settings dialog. The view setting and the review live in the workspace.
 
 import { DEFAULT_CENSOR_LENGTHS, DEFAULT_PREFIXES, MAX_CENSOR_LENGTH, MAX_PREFIX_LENGTH, MAX_TERM_LENGTH, defaultPrivacyRules, type ManualTerm, type PrivacyRules } from "../core/anonymize.js";
-import { FuzzyLevel, SensitiveCategory, enumValues, isEnumValue } from "../core/enums.js";
+import { FuzzyExampleReason, FuzzyLevel, SensitiveCategory, enumValues, isEnumValue } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { h } from "./dom.js";
 import { button, checkbox, field, row, select, textInput, type Choice } from "./forms.js";
@@ -22,6 +22,30 @@ function texts(value: unknown, max: number): string[] {
 }
 
 const LENGTH_SEPARATOR = ",";
+
+/** A way a name may be written, and the lowest sensitivity that still catches it. */
+export interface FuzzyExample {
+    mention: string;
+    reason: FuzzyExampleReason;
+    caughtFrom: FuzzyLevel;
+}
+
+export const FUZZY_EXAMPLE_NAME = "Contoso Bank";
+
+// Checked against the masker by the tests, so what the tab promises is what gets masked
+export const FUZZY_EXAMPLES: readonly FuzzyExample[] = [
+    { mention: "CONTOSO-BANK", reason: FuzzyExampleReason.Case, caughtFrom: FuzzyLevel.Exact },
+    { mention: "Cont\u00f6so Bank", reason: FuzzyExampleReason.Accent, caughtFrom: FuzzyLevel.Normal },
+    { mention: "ContosoBank", reason: FuzzyExampleReason.Glued, caughtFrom: FuzzyLevel.Normal },
+    { mention: "Contosso Bank", reason: FuzzyExampleReason.Typo, caughtFrom: FuzzyLevel.Normal },
+    { mention: "Kontosso Bank", reason: FuzzyExampleReason.Typos, caughtFrom: FuzzyLevel.Aggressive }
+];
+
+const FUZZY_ORDER: readonly FuzzyLevel[] = [FuzzyLevel.Exact, FuzzyLevel.Normal, FuzzyLevel.Aggressive];
+
+export function catchesAt(example: FuzzyExample, level: FuzzyLevel): boolean {
+    return FUZZY_ORDER.indexOf(level) >= FUZZY_ORDER.indexOf(example.caughtFrom);
+}
 
 /** Whole lengths a bar can take, once each and shortest first, or null when none holds up. */
 function censorLengths(values: readonly unknown[]): number[] | null {
@@ -94,7 +118,29 @@ export function privacySections(options: PrivacyEditorOptions): HTMLElement[] {
         { value: FuzzyLevel.Normal, label: words.fuzzyNormal },
         { value: FuzzyLevel.Aggressive, label: words.fuzzyAggressive }
     ];
-    const fuzzy = select(rules.fuzzy, levels, value => commit({ ...rules, fuzzy: value ?? FuzzyLevel.Normal }), forms);
+    // Built once and only told the level, so the button pressed keeps the focus
+    const levelButtons = levels.map(level => {
+        const node = h("button", "tlg-chip-toggle", { type: "button", role: "radio" }, [level.label]);
+        node.addEventListener("click", () => {
+            commit({ ...rules, fuzzy: level.value });
+            paintFuzzy();
+        });
+        return { level: level.value, node };
+    });
+    const examples = h("ul", "tlg-privacy-examples", { "aria-live": "polite" });
+    const paintFuzzy = (): void => {
+        levelButtons.forEach(({ level, node }) => node.setAttribute("aria-checked", String(level === rules.fuzzy)));
+        examples.replaceChildren(...FUZZY_EXAMPLES.map(example => {
+            const caught = catchesAt(example, rules.fuzzy);
+            return h("li", caught ? "tlg-privacy-example is-caught" : "tlg-privacy-example", {}, [
+                h("span", "tlg-privacy-term", {}, [example.mention]),
+                h("span", "tlg-privacy-kind", {}, [words.exampleReasons[example.reason]]),
+                h("span", "tlg-privacy-verdict", {}, [caught ? words.caught : words.missed])
+            ]);
+        }));
+    };
+    paintFuzzy();
+    const fuzzy = h("div", "tlg-view-setting-choices", { role: "radiogroup", "aria-label": words.fuzzy }, levelButtons.map(entry => entry.node));
     const panels = checkbox(words.maskPanels, rules.maskPanels, value => commit({ ...rules, maskPanels: value }));
 
     const categories = enumValues(SensitiveCategory).map(category => {
@@ -174,7 +220,7 @@ export function privacySections(options: PrivacyEditorOptions): HTMLElement[] {
     }, Icon.Undo);
 
     return [
-        section(words.detectionHeading, words.detectionHint, [field(words.fuzzy, fuzzy)]),
+        section(words.detectionHeading, words.detectionHint, [fuzzy, h("p", "tlg-settings-hint tlg-privacy-example-intro", {}, [words.exampleIntro(FUZZY_EXAMPLE_NAME)]), examples]),
         section(words.censorHeading, words.censorHint, [field(words.censorLengths, bars)]),
         section(words.panelsHeading, words.panelsHint, [panels]),
         section(words.categoriesHeading, words.categoriesHint, [h("div", "tlg-settings-list", {}, categories)]),

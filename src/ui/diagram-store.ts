@@ -18,6 +18,7 @@ import type {
 import {
     AttackTactic,
     Audience,
+    Disclosure,
     OutcomeMeaning,
     RecordType,
     Representation,
@@ -71,6 +72,8 @@ export interface StepFilters {
     audience: AudienceKey;
     milestonesOnly: boolean;
     sides: ReadonlySet<SideKey> | null;
+    /** How much of the names the views and exports show. Kept with the audience, being a choice of view too. */
+    disclosure: Disclosure;
 }
 
 export enum StoreChange {
@@ -98,6 +101,11 @@ function timed(step: DiagramStep): TimelineStep {
     return { ...step, at: parseWallClock(step.timestamp), until: parseWallClock(step.endTimestamp) };
 }
 
+export function withoutMoments(step: TimelineStep): DiagramStep {
+    const { at, until, ...rest } = step;
+    return rest;
+}
+
 function chronological(a: TimelineStep, b: TimelineStep): number {
     return ((a.at?.getTime() ?? 0) - (b.at?.getTime() ?? 0)) || (a.orderIndex - b.orderIndex) || (a.id - b.id);
 }
@@ -118,7 +126,7 @@ function swap<TRecord extends object>(record: TRecord, patch: Partial<TRecord>):
 
 export class DiagramStore {
     selection: Selection | null = null;
-    filters: StepFilters = { audience: Audience.Both, milestonesOnly: false, sides: null };
+    filters: StepFilters = { audience: Audience.Both, milestonesOnly: false, sides: null, disclosure: Disclosure.Full };
 
     private loaded: LoadedDiagram | null = null;
     private readonly listeners = new Set<(change: StoreChange) => void>();
@@ -357,6 +365,23 @@ export class DiagramStore {
     /** What the loaded diagram holds, counted. Reads the whole diagram, not the filtered view. */
     get summary(): DiagramSummary {
         return summarise(this.diagram);
+    }
+
+    /** The loaded diagram as the service served it, edits included, with steps in chronological order. */
+    get snapshot(): Diagram {
+        return { ...this.diagram, steps: this.diagram.steps.map(withoutMoments) };
+    }
+
+    /**
+     * Another store holding a rewritten copy of this diagram, with the same filters and selection. The copy
+     * answers nothing back: whoever made it decides what flows between the two.
+     */
+    disclosed(rewrite: (diagram: Diagram) => Diagram): DiagramStore {
+        const copy = new DiagramStore();
+        copy.load(rewrite(this.snapshot));
+        copy.filters = this.filters;
+        copy.selection = this.selection;
+        return copy;
     }
 
     setFilters(filters: Partial<StepFilters>): void {

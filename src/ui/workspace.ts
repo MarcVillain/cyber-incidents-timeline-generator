@@ -4,14 +4,16 @@
 // Edits are applied here first and saved behind them. That is what lets an open form keep its scroll
 // position and its half typed fields while the drawing updates.
 
+import { Masker, defaultPrivacyRules, maskDiagram, type PrivacyRules } from "../core/anonymize.js";
 import type { Catalog } from "../core/catalog.js";
-import { Audience, RecordType, Representation, type AudienceKey, type RepresentationKey } from "../core/enums.js";
+import { exportDocument } from "../core/document.js";
+import { Audience, Disclosure, RecordType, Representation, type AudienceKey, type RepresentationKey } from "../core/enums.js";
 import { Icon } from "../core/icon.js";
 import { linkFieldsOf, nodeFieldsOf, stepFieldsOf } from "../core/mapping.js";
 import type { LinkCreateInput, RecordId, StepInvolvement } from "../core/models.js";
 import type { TimelineApi } from "../core/service.js";
 import type { KeyValueStorage } from "../storage/browser-storage-store.js";
-import { DiagramStore, StoreChange, type Selection, type StepFilters, type TimelineStep } from "./diagram-store.js";
+import { DiagramStore, StoreChange, withoutMoments, type Selection, type StepFilters } from "./diagram-store.js";
 import { h } from "./dom.js";
 import { ExportFormat, copyTable, exportCsv, exportDocumentFile, exportHtml, exportMarkdown, exportPng, exportSvg, exportXlsx, printPages } from "./export.js";
 import { button } from "./forms.js";
@@ -19,7 +21,7 @@ import { History, type HistoryEntry } from "./history.js";
 import { IconSet } from "./icons/icon-set.js";
 import { Inspector } from "./inspector.js";
 import { Access } from "./panels.js";
-import type { RecordDraft, RecordEdit, TimelinePermissions, WorkspaceActions } from "./panels.js";
+import type { PanelContext, RecordDraft, RecordEdit, TimelinePermissions, WorkspaceActions } from "./panels.js";
 import { Preferences, defaultPreferenceStorage } from "./preferences.js";
 import { Rail } from "./rail.js";
 import { BUILT_IN_RENDERERS } from "./renderers/index.js";
@@ -78,6 +80,12 @@ export interface TimelineOptions {
     locale?: string;
     /** The suffixes durations are written with, which no locale covers. */
     durationUnits?: DurationUnits;
+    /** What names are protected when the view masks them. Defaults to every name, matched with the normal sensitivity. */
+    privacy?: PrivacyRules;
+    /** Receives the rules after the viewer revealed a name or decided on a possible mention, so a host can keep them. */
+    onPrivacyChange?: (rules: PrivacyRules) => void;
+    /** Forces how names are shown and takes the choice away from the viewer, for a page shown to an audience. */
+    disclosureLock?: Disclosure;
 }
 
 /**
@@ -119,6 +127,9 @@ const TOAST_MS = 4000;
 // Names each control of the settings panel, so the focus survives the panel being rebuilt
 const CONTROL_KEY = "data-control";
 const AUDIENCE_CONTROL = "filter-audience";
+const DISCLOSURE_CONTROL = "filter-disclosure";
+const PROTECTED_CONTROL = "protected-name";
+const REVIEW_CONTROL = "possible-mention";
 const MILESTONES_CONTROL = "filter-milestones";
 const RESET_CONTROL = "reset";
 // How much of the strip one press of an edge arrow scrolls, leaving a pill of the old view in sight
@@ -150,6 +161,14 @@ const CANVAS_MAX_HEIGHT = 20000;
 /** Every step, then each audience of the catalog. */
 function audienceChoices(strings: Strings, catalog: Catalog): readonly RendererChoice<AudienceKey>[] {
     return [{ value: Audience.Both, label: strings.workspace.audienceEverything }, ...catalog.audiences];
+}
+
+function disclosureChoices(strings: Strings): readonly RendererChoice<Disclosure>[] {
+    return [
+        { value: Disclosure.Full, label: strings.privacy.full },
+        { value: Disclosure.Anonymized, label: strings.privacy.anonymized },
+        { value: Disclosure.Censored, label: strings.privacy.censored }
+    ];
 }
 
 function exportChoices(strings: Strings): readonly { format: ExportFormat; label: string; icon: Icon }[] {
@@ -227,6 +246,13 @@ function remapLink(input: LinkCreateInput, history: History): LinkCreateInput {
     };
 }
 
+/** The records as a masked view shows them, with the masker that wrote them. */
+interface MaskedCopy {
+    store: DiagramStore;
+    masker: Masker;
+    mode: Disclosure;
+}
+
 interface Captured {
     draft: RecordDraft;
     id: RecordId;
@@ -299,6 +325,12 @@ class Workspace implements TimelineHandle {
     private pageIndex = 0;
     private pageCount = 1;
     private followedSelection: string | null = null;
+    private privacy: PrivacyRules;
+    private readonly onPrivacyChange: ((rules: PrivacyRules) => void) | null;
+    private readonly disclosureLock: Disclosure | null;
+    private readonly readOnly: Access;
+    // The masked copy and the masker that wrote it, kept until the records, the rules or the mode change
+    private masked: MaskedCopy | null = null;
 
     constructor(root: HTMLElement, options: TimelineOptions) {
         this.root = root;
@@ -318,6 +350,11 @@ class Workspace implements TimelineHandle {
         this.time = new TimeFormats(options.locale, options.durationUnits);
         this.preferences = new Preferences(options.preferences === undefined ? defaultPreferenceStorage() : options.preferences, options.preferenceKey ?? DEFAULT_PREFERENCE_KEY);
         this.history = new History(() => this.renderHistoryButtons());
+        this.privacy = options.privacy ?? defaultPrivacyRules();
+        this.onPrivacyChange = options.onPrivacyChange ?? null;
+        this.disclosureLock = options.disclosureLock ?? null;
+        this.readOnly = new Access({ canCreate: false, canEdit: false, canDelete: false, canMove: false, canExport: this.permissions.canExport });
+        this.store.setFilters({ disclosure: this.disclosureLock ?? this.preferences.disclosure ?? Disclosure.Full });
 
         const first = this.renderers[0];
         if (!first) {
@@ -343,7 +380,14 @@ class Workspace implements TimelineHandle {
             remove: (type, id) => this.remove(type, id),
             notify: message => this.notify(message)
         };
-        const panelContext = { store: this.store, actions, permissions: this.permissions, icons: this.icons, strings: this.strings, time: this.time, signal };
+        // Read at each use, because the panels follow the masked copy for as long as names are masked in them
+        const panelStore = (): DiagramStore => (this.masksPanels ? this.view : this.store);
+        const panelAccess = (): Access => (this.masksPanels ? this.readOnly : this.permissions);
+        const panelContext: PanelContext = {
+            get store(): DiagramStore { return panelStore(); },
+            get permissions(): Access { return panelAccess(); },
+            actions, icons: this.icons, strings: this.strings, time: this.time, signal
+        };
         this.rail = new Rail(this.elements, panelContext);
         this.inspector = new Inspector(this.elements.inspector, panelContext);
         this.bind();
@@ -455,6 +499,7 @@ class Workspace implements TimelineHandle {
         const { elements } = this;
 
         this.store.subscribe(change => {
+            this.followRecords(change);
             if (change === StoreChange.Load) {
                 this.renderViewSwitcher();
                 this.renderFilters();
@@ -570,10 +615,59 @@ class Workspace implements TimelineHandle {
         return found;
     }
 
+    /**
+     * The store the views and exports read: the records themselves, or a masked copy of them. The copy is
+     * written once per change of the records, the rules or the mode, not once per redraw.
+     */
+    private get view(): DiagramStore {
+        return this.store.filters.disclosure === Disclosure.Full ? this.store : this.maskedCopy().store;
+    }
+
+    private maskedCopy(): MaskedCopy {
+        const mode = this.store.filters.disclosure;
+        if (this.masked?.mode !== mode) {
+            const masker = new Masker(this.store.snapshot, this.privacy);
+            const store = this.store.disclosed(diagram => maskDiagram(diagram, masker, mode));
+            // A record picked in a masked list is the same record, so the pick is handed to the real store
+            store.subscribe(change => {
+                if (change === StoreChange.Selection) this.store.setSelection(store.selection);
+            });
+            this.masked = { store, masker, mode };
+        }
+        return this.masked;
+    }
+
+    private get masksPanels(): boolean {
+        return this.privacy.maskPanels && this.store.filters.disclosure !== Disclosure.Full;
+    }
+
+    /** Keeps the masked copy in step with the records: rewritten when they change, told the selection otherwise. */
+    private followRecords(change: StoreChange): void {
+        if (change === StoreChange.Load || change === StoreChange.Records) {
+            this.masked = null;
+            return;
+        }
+        if (this.masked) {
+            this.masked.store.selection = this.store.selection;
+            this.masked.store.filters = this.store.filters;
+        }
+    }
+
+    private setPrivacy(rules: PrivacyRules): void {
+        this.privacy = rules;
+        this.masked = null;
+        this.onPrivacyChange?.(rules);
+        this.renderFilters();
+        this.rail.render();
+        this.inspector.render();
+        this.redraw();
+    }
+
     private renderContext(): RenderContext {
+        const store = this.view;
         return {
-            store: this.store,
-            palette: new Palette(this.store.catalog, elementTokenResolver(this.root)),
+            store,
+            palette: new Palette(store.catalog, elementTokenResolver(this.root)),
             icons: this.icons,
             strings: this.strings,
             time: this.time,
@@ -647,13 +741,34 @@ class Workspace implements TimelineHandle {
         const audience = this.cycleButton(audienceChoices(this.strings, this.store.catalog), filters.audience, filters.audience !== Audience.Both, value => this.applyFilters({ audience: value }));
         const milestones = h("button", "tlg-chip-toggle", { type: "button", "aria-pressed": String(filters.milestonesOnly) }, [this.strings.workspace.milestonesOnly]);
         milestones.addEventListener("click", () => this.applyFilters({ milestonesOnly: !this.store.filters.milestonesOnly }));
-        this.elements.filters.replaceChildren(audience, milestones);
+        const disclosure = this.disclosureLock === null
+            ? this.cycleButton(disclosureChoices(this.strings), filters.disclosure, filters.disclosure !== Disclosure.Full, value => this.applyFilters({ disclosure: value }))
+            : null;
+        this.elements.filters.replaceChildren(...[audience, milestones, disclosure].flatMap(control => (control ? [control] : [])));
+        if (this.elements.addButton) this.elements.addButton.hidden = this.masksPanels;
         this.renderSettings();
     }
 
     private applyFilters(filters: Partial<StepFilters>): void {
-        this.store.setFilters(filters);
+        const disclosed = this.store.filters.disclosure;
+        this.updateFilters(filters);
         this.renderFilters();
+        if (this.store.filters.disclosure !== disclosed) {
+            // The list and the details may have to follow the names into or out of their mask
+            this.rail.render();
+            this.inspector.render();
+        }
+    }
+
+    /** Every change of filters passes here, so a locked mode stays locked and a chosen one is remembered. */
+    private updateFilters(filters: Partial<StepFilters>): void {
+        const { disclosure, ...others } = filters;
+        if (disclosure === undefined || this.disclosureLock !== null) {
+            this.store.setFilters(others);
+            return;
+        }
+        this.preferences.setDisclosure(disclosure);
+        this.store.setFilters({ ...others, disclosure });
     }
 
     private chosenValue(option: RendererOption, chosen: ReadonlyMap<string, string>): string {
@@ -676,6 +791,7 @@ class Workspace implements TimelineHandle {
             : null;
 
         const audienceChanged = filters.audience !== Audience.Both;
+        const disclosureChanged = this.disclosureLock === null && filters.disclosure !== Disclosure.Full;
         const settings = this.renderer.options(this.strings);
         const changed = settings.filter(setting => this.differsFromDefault(setting, chosen));
         const shared = [
@@ -683,13 +799,14 @@ class Workspace implements TimelineHandle {
                 value => this.applyFilters({ audience: value })), audienceChanged ? () => this.applyFilters({ audience: Audience.Both }) : null),
             this.settingSection(MILESTONES_CONTROL, words.milestones, described.milestones, this.choiceGroup(MILESTONES_CONTROL, words.milestones, milestoneChoices(this.strings),
                 filters.milestonesOnly ? MilestoneChoice.Only : MilestoneChoice.Every, value => this.applyFilters({ milestonesOnly: value === MilestoneChoice.Only })),
-            filters.milestonesOnly ? () => this.applyFilters({ milestonesOnly: false }) : null)
+            filters.milestonesOnly ? () => this.applyFilters({ milestonesOnly: false }) : null),
+            ...this.disclosureSettings()
         ];
         const own = settings.map(setting => this.settingSection(setting.id, setting.label, setting.description ?? null, setting.kind === OptionKind.List
             ? this.listSetting(setting, chosen.get(setting.id))
             : this.choiceGroup(setting.id, setting.label, setting.choices, this.chosenValue(setting, chosen), value => this.setOption(this.representation, setting.id, value)),
         changed.includes(setting) ? () => this.resetOption(setting.id) : null));
-        const untouched = changed.length === 0 && !audienceChanged && !filters.milestonesOnly;
+        const untouched = changed.length === 0 && !audienceChanged && !filters.milestonesOnly && !disclosureChanged;
         const reset = button(this.icons, words.resetView, "tlg-button tlg-button-quiet", () => this.resetView(), Icon.Undo);
         reset.setAttribute(CONTROL_KEY, RESET_CONTROL);
         reset.disabled = untouched;
@@ -701,14 +818,67 @@ class Workspace implements TimelineHandle {
     }
 
     /**
+     * How names are shown, then while they are masked, every protected name with a way to reveal it and
+     * every possible mention left to decide on. A locked mode is stated rather than offered.
+     */
+    private disclosureSettings(): HTMLElement[] {
+        const words = this.strings.privacy;
+        const mode = this.store.filters.disclosure;
+        const choice = this.disclosureLock === null
+            ? this.choiceGroup(DISCLOSURE_CONTROL, words.names, disclosureChoices(this.strings), mode, value => this.applyFilters({ disclosure: value }))
+            : h("p", "tlg-view-setting-hint", {}, [words.lockedHint]);
+        const reset = this.disclosureLock === null && mode !== Disclosure.Full ? () => this.applyFilters({ disclosure: Disclosure.Full }) : null;
+        const sections = [this.settingSection(DISCLOSURE_CONTROL, words.names, this.masksPanels ? `${words.namesHint} ${words.readOnlyHint}` : words.namesHint, choice, reset)];
+        if (mode === Disclosure.Full) return sections;
+
+        const { masker } = this.maskedCopy();
+        const names = masker.protectedTerms.map(term => {
+            const label = term.revealed ? words.protect(term.text) : words.reveal(term.text);
+            const toggle = button(this.icons, "", "tlg-button tlg-button-icon tlg-button-quiet", () => {
+                const others = this.privacy.revealedTerms.filter(key => key !== term.key);
+                this.setPrivacy({ ...this.privacy, revealedTerms: term.revealed ? others : [...others, term.key] });
+            }, term.revealed ? Icon.Unlock : Icon.Lock);
+            toggle.setAttribute("aria-label", label);
+            toggle.setAttribute("aria-pressed", String(!term.revealed));
+            toggle.setAttribute(CONTROL_KEY, `${PROTECTED_CONTROL}:${term.key}`);
+            toggle.title = label;
+            return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row", {}, [
+                h("span", "tlg-view-setting-choice", {}, [term.text]),
+                h("span", "tlg-view-setting-example", {}, [words.categories[term.category]]),
+                toggle
+            ])]);
+        });
+        if (names.length > 0) {
+            sections.push(this.settingSection(PROTECTED_CONTROL, words.protectedHeading, words.protectedHint, h("ul", "tlg-view-setting-list", { "aria-label": words.protectedHeading }, names), null));
+        }
+
+        const mentions = masker.nearMisses.map(miss => {
+            const decide = (label: string, key: string, apply: () => PrivacyRules): HTMLButtonElement => {
+                const node = button(this.icons, label, "tlg-button tlg-button-quiet", () => this.setPrivacy(apply()));
+                node.setAttribute(CONTROL_KEY, `${REVIEW_CONTROL}:${miss.key}:${key}`);
+                return node;
+            };
+            return h("li", "tlg-view-setting-item", {}, [h("div", "tlg-view-setting-row", {}, [
+                h("span", "tlg-view-setting-choice", {}, [miss.text]),
+                h("span", "tlg-view-setting-example", {}, [words.resembles(miss.term)]),
+                decide(words.mask, "mask", () => ({ ...this.privacy, confirmed: [...this.privacy.confirmed, miss.text] })),
+                decide(words.ignore, "ignore", () => ({ ...this.privacy, ignored: [...this.privacy.ignored, miss.text] }))
+            ])]);
+        });
+        if (mentions.length > 0) {
+            sections.push(this.settingSection(REVIEW_CONTROL, words.reviewHeading, words.reviewHint, h("ul", "tlg-view-setting-list", { "aria-label": words.reviewHeading }, mentions), null));
+        }
+        return sections;
+    }
+
+    /**
      * Puts the view on screen back as it first came: its own settings, columns and their names included,
      * and the filters it shares with every other view.
      */
     private resetView(): void {
         this.preferences.clearChoices(this.representation);
-        this.store.setFilters({ audience: Audience.Both, milestonesOnly: false });
+        this.applyFilters({ audience: Audience.Both, milestonesOnly: false, disclosure: Disclosure.Full });
         this.pageIndex = 0;
-        this.renderFilters();
         this.redraw();
     }
 
@@ -862,9 +1032,8 @@ class Workspace implements TimelineHandle {
     }
 
     setFilters(filters: Partial<StepFilters>): void {
-        this.store.setFilters(filters);
+        this.applyFilters(filters);
         this.pageIndex = 0;
-        this.renderFilters();
         this.redraw();
     }
 
@@ -981,7 +1150,7 @@ class Workspace implements TimelineHandle {
 
             const info = this.store.representationInfo(this.representation);
             this.viewport.setPageSize(this.canvas);
-            this.viewport.setContent(pages.draw(this.pageIndex), `${info.label} of ${this.store.incident.title}`);
+            this.viewport.setContent(pages.draw(this.pageIndex), `${info.label} of ${this.view.incident.title}`);
             this.markSelection();
             this.renderCaption();
             this.renderPager(pages.count);
@@ -1313,11 +1482,7 @@ class Workspace implements TimelineHandle {
         if (!this.store.isLoaded) return;
 
         if (format === ExportFormat.Document) {
-            try {
-                await exportDocumentFile(await this.api.exportDocument(this.incidentId), this.store.incident.title);
-            } catch {
-                this.notify(this.strings.workspace.exportFailed);
-            }
+            await this.exportTimelineDocument();
             return;
         }
 
@@ -1329,7 +1494,7 @@ class Workspace implements TimelineHandle {
         const context = this.renderContext();
         const pages = this.renderer.paginate(context);
         const drawn = Array.from({ length: pages.count }, (_, index) => pages.draw(index));
-        const title = `${this.store.incident.title} - ${context.representation.label}`;
+        const title = `${context.store.incident.title} - ${context.representation.label}`;
 
         try {
             switch (format) {
@@ -1352,14 +1517,31 @@ class Workspace implements TimelineHandle {
     }
 
     /**
+     * Written by whoever keeps the records while names are shown, so the file is the faithful copy an
+     * import expects. While names are masked it is written here from the masked copy, and says so.
+     */
+    private async exportTimelineDocument(): Promise<void> {
+        const view = this.view;
+        try {
+            const document = view === this.store ? await this.api.exportDocument(this.incidentId) : exportDocument(view.snapshot);
+            await exportDocumentFile(document, view.incident.title);
+        } catch {
+            this.notify(this.strings.workspace.exportFailed);
+            return;
+        }
+        if (view !== this.store) this.notify(this.strings.privacy.exportWarning);
+    }
+
+    /**
      * The table uses the columns chosen for the narrative, whichever view is on screen, so what was
      * arranged there is what lands in the file.
      */
     private async exportTable(format: ExportFormat.Xlsx | ExportFormat.Csv | ExportFormat.Markdown | ExportFormat.Clipboard): Promise<void> {
         const option = tableColumnsOption(this.strings);
         const columns = parseOptionList(this.preferences.choices(Representation.Narrative).get(option.id), option);
-        const table = timelineTable(this.store, this.time, this.strings, columns);
-        const name = this.store.incident.title;
+        const view = this.view;
+        const table = timelineTable(view, this.time, this.strings, columns);
+        const name = view.incident.title;
         try {
             switch (format) {
                 case ExportFormat.Xlsx:
@@ -1414,11 +1596,6 @@ function fitMenu(menu: HTMLDetailsElement): void {
     list.style.maxHeight = `${Math.max(MENU_MIN_HEIGHT, window.innerHeight - box.top - VIEWPORT_MARGIN)}px`;
     const spill = VIEWPORT_MARGIN - box.left;
     if (spill > 0) list.style.transform = `translateX(${spill}px)`;
-}
-
-function withoutMoments(step: TimelineStep): Omit<TimelineStep, "at" | "until"> {
-    const { at, until, ...rest } = step;
-    return rest;
 }
 
 /**

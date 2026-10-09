@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
-import { AttackTactic, Audience, DiamondVertex, KillChainPhase, RecordType, Representation, Side } from "../../src/core/enums.js";
+import { AttackTactic, Audience, DiamondVertex, Disclosure, KillChainPhase, RecordType, Representation, Side } from "../../src/core/enums.js";
 import type { Diagram } from "../../src/core/models.js";
 import { DiagramStore, StoreChange } from "../../src/ui/diagram-store.js";
 import { History } from "../../src/ui/history.js";
@@ -9,6 +9,7 @@ import { seededService } from "../support/fixtures.js";
 const MISSING_ID = 9999;
 const FIRST_TAG = "credential access";
 const SECOND_TAG = "ransomware";
+const REWRITTEN = "Rewritten";
 
 describe("DiagramStore", () => {
     let sample: Diagram;
@@ -83,6 +84,21 @@ describe("DiagramStore", () => {
         assert.deepEqual(store.placement(node, Representation.RelationshipGraph), { x: 5, y: 6 });
         store.setPlacement(node.id, Representation.RelationshipGraph, null);
         assert.equal(store.placement(node, Representation.RelationshipGraph), null);
+    });
+
+    it("hands out a rewritten copy with the same filters and selection, leaving itself untouched", () => {
+        const store = loaded();
+        const first = store.nodes[0];
+        assert.ok(first);
+        store.setFilters({ audience: Audience.Technical, disclosure: Disclosure.Censored });
+        store.setSelection({ type: RecordType.Node, id: first.id });
+
+        const copy = store.disclosed(diagram => ({ ...diagram, nodes: diagram.nodes.map(node => ({ ...node, name: REWRITTEN })) }));
+        assert.ok(copy.nodes.every(node => node.name === REWRITTEN));
+        assert.equal(store.node(first.id)?.name, first.name);
+        assert.deepEqual(copy.filters, store.filters);
+        assert.deepEqual(copy.selection, store.selection);
+        assert.ok(store.snapshot.steps.every(step => !("at" in step) && !("until" in step)));
     });
 });
 

@@ -1,4 +1,4 @@
-import { isEnumValue, type RepresentationKey } from "../core/enums.js";
+import { Disclosure, isEnumValue, type RepresentationKey } from "../core/enums.js";
 
 // A stored key is a plain identifier, the same shape the catalog holds a representation to
 const KEY_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
@@ -35,6 +35,7 @@ export class Preferences {
     private readonly options = new Map<RepresentationKey, OptionChoices>();
     representation: RepresentationKey | null = null;
     theme: ThemeMode | null = null;
+    disclosure: Disclosure | null = null;
     settings: AppSettings = defaultSettings();
 
     constructor(storage: KeyValueStorage | null, key: string) {
@@ -64,6 +65,8 @@ export class Preferences {
         this.representation = view !== null && KEY_PATTERN.test(view) ? view : null;
         const theme = this.read("theme");
         this.theme = isEnumValue(ThemeMode, theme) ? theme : null;
+        const disclosure = this.read("disclosure");
+        this.disclosure = isEnumValue(Disclosure, disclosure) ? disclosure : null;
         this.settings = parseSettings(readJson(this.read("settings")));
 
         const stored = readJson(this.read("options"));
@@ -90,6 +93,11 @@ export class Preferences {
     setTheme(theme: ThemeMode): void {
         this.theme = theme;
         this.write("theme", theme);
+    }
+
+    setDisclosure(disclosure: Disclosure): void {
+        this.disclosure = disclosure;
+        this.write("disclosure", disclosure);
     }
 
     setSettings(settings: AppSettings): void {

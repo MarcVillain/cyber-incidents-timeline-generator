@@ -474,6 +474,7 @@ class TimelineApp implements TimelineAppHandle {
             ...(settings?.canvasMode ? { canvasMode: settings.canvasMode } : {}),
             ...(settings?.viewPicker ? { viewPicker: settings.viewPicker } : {}),
             ...(settings?.durationUnits ? { durationUnits: settings.durationUnits } : {}),
+            ...(settings ? { privacy: settings.privacy, onPrivacyChange: rules => this.preferences.setSettings({ ...this.preferences.settings, privacy: rules }) } : {}),
             api: this.api,
             incidentId,
             strings: this.options.strings,

@@ -22,7 +22,7 @@ const HIDDEN = "hidden";
 const SUMMARY_HEADING = "WHAT HAPPENED";
 const UNKNOWN_COLUMN = "shoe-size";
 const COLUMNS = tableColumnsOption(DEFAULT_STRINGS);
-const SHARED_FILTERS = 2;
+const SHARED_FILTERS = 3;
 const RENAMED = "Action, taken = 100%";
 const LONG_NAME = "x".repeat(200);
 const LABEL_LIMIT = 60;

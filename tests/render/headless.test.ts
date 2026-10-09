@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseHTML } from "linkedom";
-import { Representation } from "../../src/core/enums.js";
+import { CENSOR_BAR, defaultPrivacyRules } from "../../src/core/anonymize.js";
+import { Disclosure, Representation, SensitiveCategory } from "../../src/core/enums.js";
 import type { Diagram } from "../../src/core/models.js";
 import { countPages, renderPage, renderPages } from "../../src/render/index.js";
 import { defaultTokenResolver } from "../../src/ui/theme.js";
@@ -19,6 +20,22 @@ async function diagram(): Promise<Diagram> {
 }
 
 describe("rendering with no page", () => {
+    it("masks the names when the filters ask, under the rules given", async () => {
+        const built = await diagram();
+        const name = built.nodes[0]?.name;
+        assert.ok(name);
+        const options = { representation: Representation.Narrative, ...headless() };
+        assert.ok(renderPage(built, options).includes(name));
+
+        const censored = renderPage(built, { ...options, filters: { disclosure: Disclosure.Censored } });
+        assert.ok(!censored.includes(name));
+        assert.ok(censored.includes(CENSOR_BAR));
+
+        const revealed = Object.values(SensitiveCategory);
+        const privacy = { ...defaultPrivacyRules(), revealed };
+        assert.ok(renderPage(built, { ...options, filters: { disclosure: Disclosure.Censored }, privacy }).includes(name));
+    });
+
     it("draws every slide of a representation", async () => {
         const pages = renderPages(await diagram(), { representation: Representation.SequentialTimeline, ...headless() });
         assert.ok(pages.length >= 1);

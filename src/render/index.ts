@@ -1,8 +1,9 @@
 // Drawing a slide with no page to draw it in. The scene is deterministic: text is measured from a
 // bundled table rather than the DOM, so a server renders exactly what the screen shows.
 
+import { Masker, defaultPrivacyRules, maskDiagram, type PrivacyRules } from "../core/anonymize.js";
 import type { Diagram } from "../core/models.js";
-import type { RepresentationKey } from "../core/enums.js";
+import { Disclosure, type RepresentationKey } from "../core/enums.js";
 import { TimeFormats, type DurationUnits } from "../core/time.js";
 import { DiagramStore, type StepFilters } from "../ui/diagram-store.js";
 import { serialize, type SerializeOptions, type XmlSerializer } from "../ui/export.js";
@@ -35,8 +36,10 @@ export interface RenderOptions {
     durationUnits?: DurationUnits;
     /** The settings of the representation, keyed by option id. */
     options?: ReadonlyMap<string, string>;
-    /** Which records are drawn. Defaults to all of them. */
+    /** Which records are drawn, and how their names are shown. Defaults to all of them, as written. */
     filters?: Partial<StepFilters>;
+    /** What names are protected when the filters mask them. Defaults to every name. */
+    privacy?: PrivacyRules;
     slideHeader?: SlideHeaderCustomizer;
     /** How each page is wrapped into a file. */
     file?: SerializeOptions;
@@ -51,8 +54,10 @@ function drawn(diagram: Diagram, options: RenderOptions): { pages: SVGGElement[]
         throw new Error(`No renderer draws ${options.representation}.`);
     }
 
+    const disclosure = options.filters?.disclosure ?? Disclosure.Full;
+    const shown = disclosure === Disclosure.Full ? diagram : maskDiagram(diagram, new Masker(diagram, options.privacy ?? defaultPrivacyRules()), disclosure);
     const store = new DiagramStore();
-    store.load(diagram);
+    store.load(shown);
     if (options.filters) {
         store.setFilters(options.filters);
     }

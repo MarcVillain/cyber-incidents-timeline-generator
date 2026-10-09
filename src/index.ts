@@ -13,12 +13,13 @@ export {
     SettingsGroup, SettingsScope, defaultSettings, parseSettings, relabelCatalog, serializeSettings, settingsCatalog,
     type AppSettings, type ColorOverrides, type EntryOverride
 } from "./ui/settings.js";
+export { parsePrivacy } from "./ui/privacy-settings.js";
 export { IncidentFieldType, checkIncidentFields, fieldValue, withFieldValues, type IncidentFieldChoice, type IncidentFieldDef, type IncidentFieldValue } from "./ui/incident-fields.js";
 export { ColorScheme, detectPageTheme, watchPageTheme, type ThemeDetector } from "./ui/theme-detection.js";
 export {
     DEFAULT_STRINGS, buildStrings,
     type AppStrings, type DeckStrings, type FormStrings, type InspectorStrings, type NarrativeStrings,
-    type OptionStrings, type RailStrings, type SceneStrings, type SlideStrings, type Strings,
+    type OptionStrings, type PrivacyStrings, type RailStrings, type SceneStrings, type SlideStrings, type Strings,
     type SettingsStrings, type StringsOverride, type WorkspaceStrings
 } from "./ui/strings.js";
 export { Access, RecordAction, type TimelinePermissions } from "./ui/panels.js";

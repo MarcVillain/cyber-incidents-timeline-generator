@@ -8,6 +8,8 @@ const PROJECT_ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..", ".
 const BROWSER_FOLDERS = ["src/core", "src/storage", "src/ui", "src/render"];
 const NODE_IMPORT = /from\s+["']node:/;
 const SERVER_IMPORT = /from\s+["'][./]*server\//;
+const APP_ICON = "app/favicon.svg";
+const README_LOGO = "docs/images/logo.svg";
 
 function sources(folder: string): string[] {
     return readdirSync(folder).flatMap(entry => {
@@ -17,6 +19,10 @@ function sources(folder: string): string[] {
 }
 
 describe("architecture", () => {
+    it("shows the same icon in the readme as in the app", () => {
+        assert.equal(readFileSync(join(PROJECT_ROOT, README_LOGO), "utf8"), readFileSync(join(PROJECT_ROOT, APP_ICON), "utf8"));
+    });
+
     it("keeps everything a browser loads free of Node modules and server code", () => {
         const offenders = BROWSER_FOLDERS
             .flatMap(folder => sources(join(PROJECT_ROOT, folder)))

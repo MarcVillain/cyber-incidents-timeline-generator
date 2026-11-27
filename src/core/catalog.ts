@@ -200,6 +200,7 @@ const NODE_KINDS: Readonly<Record<NodeKind, NodeKindInfo>> = {
     [NodeKind.Application]: nodeKind(NodeKind.Application, NodeCategory.Resource, "Application", Icon.Application, DiamondVertex.Infrastructure),
     [NodeKind.Network]: nodeKind(NodeKind.Network, NodeCategory.Resource, "Network", Icon.Network, DiamondVertex.Infrastructure),
     [NodeKind.CloudService]: nodeKind(NodeKind.CloudService, NodeCategory.Resource, "Cloud service", Icon.Cloud, DiamondVertex.Infrastructure),
+    [NodeKind.Service]: nodeKind(NodeKind.Service, NodeCategory.Resource, "Service", Icon.Boxes, DiamondVertex.Infrastructure),
     [NodeKind.Credential]: nodeKind(NodeKind.Credential, NodeCategory.Resource, "Credential", Icon.Credential, DiamondVertex.Capability),
     [NodeKind.Database]: nodeKind(NodeKind.Database, NodeCategory.Resource, "Database", Icon.Database, DiamondVertex.Infrastructure),
     [NodeKind.Device]: nodeKind(NodeKind.Device, NodeCategory.Resource, "Device", Icon.Device, DiamondVertex.Infrastructure),

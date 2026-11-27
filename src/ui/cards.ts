@@ -300,12 +300,14 @@ export function headerStrip(context: RenderContext, step: TimelineStep, x: numbe
  * the full range down to the bare start date.
  */
 export function momentVariants(step: TimelineStep, time: TimeFormats = DEFAULT_TIME): string[] {
+    if (step.timeLabel !== null) return [step.timeLabel];
     if (!step.at) return [""];
     const start = time.formatMoment(step);
     if (!step.until) return [start];
 
     const sameDay = step.until.toDateString() === step.at.toDateString();
-    const end = sameDay && step.timeKnown ? time.formatTime(step.until) : time.formatMoment({ at: step.until, timeKnown: step.timeKnown });
+    const until = { ...step, at: step.until };
+    const end = sameDay && step.timeKnown ? time.formatMomentTime(until) : time.formatMoment(until);
 
     const variants = [`${start} to ${end}`];
     if (!sameDay) {
@@ -313,7 +315,7 @@ export function momentVariants(step: TimelineStep, time: TimeFormats = DEFAULT_T
         variants.push(`${time.formatDateShort(step.at)} to ${time.formatDateShort(step.until)}`);
     }
     variants.push(start);
-    variants.push(time.formatDate(step.at));
+    variants.push(time.formatMomentDate(step));
     return variants;
 }
 

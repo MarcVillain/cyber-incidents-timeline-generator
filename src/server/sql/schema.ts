@@ -1,3 +1,5 @@
+import { RowReader, type SqlDriver } from "./driver.js";
+
 /**
  * Table names derived from one prefix, so the timeline can live inside the database of a host
  * application without colliding with its tables.
@@ -104,6 +106,8 @@ CREATE TABLE IF NOT EXISTS ${tables.steps} (
     timestamp TEXT NOT NULL,
     end_timestamp TEXT NULL,
     time_known INTEGER NOT NULL,
+    time_approximate INTEGER NOT NULL DEFAULT 0,
+    time_label TEXT NULL,
     order_index INTEGER NOT NULL,
     title TEXT NOT NULL,
     description TEXT NULL,
@@ -175,4 +179,28 @@ CREATE TABLE IF NOT EXISTS ${tables.catalogSettings} (
     settings TEXT NOT NULL
 );
 `;
+}
+
+interface AddedColumn {
+    name: string;
+    definition: string;
+}
+
+/** Step columns added after the first release, which CREATE TABLE IF NOT EXISTS leaves out of older files. */
+const ADDED_STEP_COLUMNS: readonly AddedColumn[] = [
+    { name: "time_approximate", definition: "INTEGER NOT NULL DEFAULT 0" },
+    { name: "time_label", definition: "TEXT NULL" }
+];
+
+/**
+ * Adds to an existing SQLite file the columns later versions introduced, so upgrading keeps the incidents
+ * already recorded. SQLite has no ADD COLUMN IF NOT EXISTS, hence the look at the table first.
+ */
+export async function upgradeSqliteSchema(driver: SqlDriver, tables: TableNames): Promise<void> {
+    const rows = await driver.query(`PRAGMA table_info(${tables.steps})`);
+    const present = new Set(rows.map(row => new RowReader(row).text("name")));
+    for (const column of ADDED_STEP_COLUMNS) {
+        if (present.has(column.name)) continue;
+        await driver.execute(`ALTER TABLE ${tables.steps} ADD COLUMN ${column.name} ${column.definition}`);
+    }
 }

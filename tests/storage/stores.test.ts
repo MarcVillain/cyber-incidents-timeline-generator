@@ -6,7 +6,7 @@ import { seedSampleData } from "../../src/core/sample.js";
 import { TimelineService } from "../../src/core/service.js";
 import { readIncidentCreate } from "../../src/core/validation.js";
 import { openSqliteStore } from "../../src/server/index.js";
-import { TableNames } from "../../src/server/sql/schema.js";
+import { TableNames, upgradeSqliteSchema } from "../../src/server/sql/schema.js";
 import { RowReader } from "../../src/server/sql/driver.js";
 import { IN_MEMORY_DATABASE } from "../../src/server/sql/sqlite-driver.js";
 import { BrowserStorageTimelineStore, type KeyValueStorage } from "../../src/storage/browser-storage-store.js";
@@ -21,6 +21,8 @@ const CONCURRENT_WRITES = 20;
 const SAMPLE_TIMESTAMP = "2026-01-12T08:00";
 const SINGLE_AUDIENCE_VERSION = 1;
 const SINGLE_END_VERSION = 2;
+const EXACT_TIME_VERSION = 3;
+const TIME_LABEL = "Following initial access";
 
 function isStoredSnapshot(value: unknown): value is StoreSnapshot {
     return typeof value === "object" && value !== null && "steps" in value && Array.isArray(value.steps);
@@ -106,6 +108,27 @@ describe("BrowserStorageTimelineStore", () => {
         assert.deepEqual((await reloaded.getDiagram(incident.id)).links.map(link => [link.sourceNodeIds, link.targetNodeIds]), [[[clerk.id], [host.id]]]);
     });
 
+    it("upgrades a snapshot holding no approximate flag nor time label", async () => {
+        const storage = new MapStorage();
+        const service = new TimelineService(new BrowserStorageTimelineStore(storage, STORAGE_KEY));
+        const incident = await service.createIncident({ title: "Earlier" });
+        await service.createStep(incident.id, { title: "Step", timestamp: SAMPLE_TIMESTAMP });
+
+        const stored: unknown = JSON.parse(storage.getItem(STORAGE_KEY) ?? "null");
+        assert.ok(isStoredSnapshot(stored));
+        const earlier = {
+            ...stored,
+            version: EXACT_TIME_VERSION,
+            steps: stored.steps.map(({ timeApproximate, timeLabel, ...rest }) => rest)
+        };
+        storage.setItem(STORAGE_KEY, JSON.stringify(earlier));
+
+        const reloaded = new TimelineService(new BrowserStorageTimelineStore(storage, STORAGE_KEY));
+        const [step] = (await reloaded.getDiagram(incident.id)).steps;
+        assert.equal(step?.timeApproximate, false);
+        assert.equal(step?.timeLabel, null);
+    });
+
     it("refuses data that is not a snapshot", () => {
         const storage = new MapStorage();
         storage.setItem(STORAGE_KEY, JSON.stringify({ version: 99 }));
@@ -146,6 +169,19 @@ describe("SqlTimelineStore", () => {
 
         assert.deepEqual((await store.findStep(everyone.id))?.audiences, []);
         assert.deepEqual((await store.findStep(technical.id))?.audiences, [Audience.Technical]);
+    });
+
+    it("adds the time columns to a database written by an earlier release", async () => {
+        const { driver, store } = await openSqliteStore(IN_MEMORY_DATABASE);
+        await driver.execute(`ALTER TABLE ${store.tables.steps} DROP COLUMN time_approximate`);
+        await driver.execute(`ALTER TABLE ${store.tables.steps} DROP COLUMN time_label`);
+        await upgradeSqliteSchema(driver, store.tables);
+        await upgradeSqliteSchema(driver, store.tables);
+
+        const service = new TimelineService(store);
+        const incident = await service.createIncident({ title: "Earlier" });
+        const step = await service.createStep(incident.id, { title: "Step", timestamp: SAMPLE_TIMESTAMP, timeApproximate: true, timeLabel: TIME_LABEL });
+        assert.equal((await store.findStep(step.id))?.timeLabel, TIME_LABEL);
     });
 
     it("keeps concurrent writes apart", async () => {

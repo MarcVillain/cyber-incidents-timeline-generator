@@ -117,6 +117,13 @@ export interface StepRecord {
      * holds one, and this says not to show the clock time.
      */
     timeKnown: boolean;
+    /** The time, or the day when the time is not known, was reported as approximate. */
+    timeApproximate: boolean;
+    /**
+     * Words standing in for the date, such as "Following initial access", when the sources place the step
+     * relative to others rather than on the calendar. The timestamp still orders the step.
+     */
+    timeLabel: string | null;
     /** Breaks ties between steps sharing a timestamp, which is common when only the day is known. */
     orderIndex: number;
     title: string;

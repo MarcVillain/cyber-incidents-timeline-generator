@@ -41,6 +41,7 @@ export class FieldLimits {
     static readonly Color = 40;
     static readonly ExternalId = 200;
     static readonly StepTitle = 200;
+    static readonly TimeLabel = 200;
     static readonly StepDescription = 4000;
     static readonly TechniqueId = 20;
     static readonly EvidenceSource = 200;
@@ -419,6 +420,8 @@ function stepDefaults(rules: ValidationRules): Omit<StepFields, "title" | "times
     return {
         endTimestamp: null,
         timeKnown: true,
+        timeApproximate: false,
+        timeLabel: null,
         orderIndex: 0,
         description: null,
         side: Side.Unknown,
@@ -517,6 +520,8 @@ function readStepPatch(reader: FieldReader, rules: ValidationRules): Partial<Ste
         timestamp: reader.wallClock("timestamp"),
         endTimestamp: reader.nullableWallClock("endTimestamp"),
         timeKnown: reader.boolean("timeKnown"),
+        timeApproximate: reader.boolean("timeApproximate"),
+        timeLabel: reader.nullableText("timeLabel", FieldLimits.TimeLabel),
         orderIndex: reader.integer("orderIndex", -FieldLimits.OrderIndex, FieldLimits.OrderIndex),
         title: reader.text("title", FieldLimits.StepTitle),
         description: reader.nullableText("description", FieldLimits.StepDescription),

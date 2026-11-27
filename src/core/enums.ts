@@ -42,6 +42,8 @@ export enum NodeKind {
     Application = "Application",
     Network = "Network",
     CloudService = "CloudService",
+    /** A business service such as online payment, delivered by one or more applications. */
+    Service = "Service",
     Credential = "Credential",
     Database = "Database",
     Device = "Device",

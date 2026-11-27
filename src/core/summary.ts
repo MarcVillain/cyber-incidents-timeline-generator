@@ -26,6 +26,7 @@ export interface MilestoneMoment {
     stepId: RecordId;
     timestamp: WallClock;
     timeKnown: boolean;
+    timeApproximate: boolean;
 }
 
 export interface NodeSummary {
@@ -170,7 +171,7 @@ function summariseMilestones(diagram: Diagram): { milestones: MilestoneMoment[];
     diagram.catalog.milestones.forEach(entry => {
         const step = held.get(entry.key);
         if (step) {
-            milestones.push({ key: entry.key, stepId: step.id, timestamp: step.timestamp, timeKnown: step.timeKnown });
+            milestones.push({ key: entry.key, stepId: step.id, timestamp: step.timestamp, timeKnown: step.timeKnown, timeApproximate: step.timeApproximate });
         } else {
             missing.push(entry.key);
         }

@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-11-27
+
+### Added
+
+- A step can carry an approximate time, shown with a `~` on the time, as in `16 Nov 2026 ~22:54`, or on the day when no time is known.
+- A step can show a label instead of its date, such as Following initial access, for events the sources only place relative to others. The date still orders the step.
+- A Service kind of record, for a business service such as online payment delivered by one or more applications.
+- The REST contract and the stores carry `timeApproximate` and `timeLabel` on steps, and the incident summary tells whether a milestone time is approximate.
+
+### Changed
+
+- The step list shows the day alone for a step whose time is not known, and the sequential timeline no longer writes a clock time beside its marker.
+- SQLite databases gain the new step columns when opened, keeping their incidents. PostgreSQL databases get them by running `schema/postgres.sql` again. Browser data and older exports still load.
+
 ## [0.7.0] - 2026-10-26
 
 ### Added

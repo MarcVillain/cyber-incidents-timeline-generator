@@ -226,6 +226,8 @@ export class Inspector {
             field(w.until, dateAndTime(splitWallClock(step.until, step.timeKnown), value => {
                 save({ endTimestamp: value.date ? joinWallClock(value.date, value.time) : null });
             }, this.context.strings.forms)),
+            checkbox(w.approximate, step.timeApproximate, value => save({ timeApproximate: value })),
+            field(w.timeLabel, textInput(step.timeLabel, value => save({ timeLabel: value }), w.timeLabelHint)),
             row(
                 field(w.side, this.pick(step.side, catalog.sides.map(entry => ({ value: entry.side, label: entry.label })), value => { if (value) save({ side: value }); })),
                 field(w.outcome, this.pick(step.outcome, catalog.outcomes.map(entry => ({ value: entry.outcome, label: entry.label })), value => { if (value) save({ outcome: value }); }))

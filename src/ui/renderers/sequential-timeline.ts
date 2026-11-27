@@ -9,7 +9,7 @@
 // use the height available instead of stopping at a fixed number of lines.
 
 import { Representation } from "../../core/enums.js";
-import { formatDate, formatDuration, formatTime, hoursBetween } from "../../core/time.js";
+import { formatDate, formatDuration, hoursBetween } from "../../core/time.js";
 import { cardFooterHeight, stepCard, stepCardHeight, stepMarker, titleLayout } from "../cards.js";
 import { CONTENT, frame, placeholder, sideLegend } from "../chrome.js";
 import type { TimelineStep } from "../diagram-store.js";
@@ -219,7 +219,7 @@ export const sequentialTimeline = defineRenderer<TimelineStep[]>({
                 // clock label there would run under the block opposite. The card header carries the full
                 // date and time anyway, and only the one sided sizings have room to repeat it.
                 if (!density.alternate) {
-                    content.appendChild(text(formatTime(step.at), x, axisY - density.marker - 8, {
+                    content.appendChild(text(context.time.formatMomentTime(step), x, axisY - density.marker - 8, {
                         "font-size": 10.5, "font-weight": 600, "text-anchor": "middle", fill: palette.inkMuted
                     }));
                 }

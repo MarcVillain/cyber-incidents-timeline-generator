@@ -4,7 +4,7 @@ import { createStaticHandler, type StaticMount } from "./static.js";
 import { SqliteDriver } from "./sql/sqlite-driver.js";
 import { SqlTimelineStore, type SqlTimelineStoreOptions } from "./sql/sql-store.js";
 import { SqlCatalogStore } from "./sql/sql-catalog-store.js";
-import { sqliteSchema } from "./sql/schema.js";
+import { sqliteSchema, upgradeSqliteSchema } from "./sql/schema.js";
 
 export * from "./http.js";
 export * from "./static.js";
@@ -39,7 +39,7 @@ export function createTimelineServer(options: TimelineServerOptions): Server {
 }
 
 /**
- * Opens a SQLite file, creates the tables it is missing and returns a store over it, with the store of
+ * Opens a SQLite file, creates the tables and columns it is missing and returns a store over it, with the store of
  * the catalog settings kept in the same file.
  */
 export async function openSqliteStore(
@@ -49,5 +49,6 @@ export async function openSqliteStore(
     const driver = new SqliteDriver(path);
     const store = new SqlTimelineStore(driver, options);
     await driver.executeScript(sqliteSchema(store.tables));
+    await upgradeSqliteSchema(driver, store.tables);
     return { driver, store, catalogStore: new SqlCatalogStore(driver, options) };
 }

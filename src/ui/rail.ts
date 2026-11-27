@@ -323,7 +323,7 @@ export class Rail {
 
     private stepRow(step: TimelineStep): HTMLDivElement {
         const { store } = this.context;
-        const meta = [this.context.time.formatDateTime(step.at), store.node(step.sourceNodeId)?.name ?? null].filter(Boolean).join(" - ");
+        const meta = [this.context.time.formatMoment(step), store.node(step.sourceNodeId)?.name ?? null].filter(Boolean).join(" - ");
         return this.row({ type: RecordType.Step, id: step.id, icon: store.stepIcon(step), side: step.side, name: step.title, meta, child: false });
     }
 

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatDuration, hoursBetween, joinWallClock, momentBetween, normalizeWallClock, parseWallClock, splitWallClock } from "../../src/core/time.js";
+import { APPROXIMATE_MARK, TimeFormats, formatDuration, hoursBetween, joinWallClock, momentBetween, normalizeWallClock, parseWallClock, splitWallClock } from "../../src/core/time.js";
 
 const MOMENT = "2026-03-05T09:30:00";
+const TIME_LABEL = "Following initial access";
 
 describe("wall clock times", () => {
     it("drops a zone suffix instead of applying it", () => {
@@ -54,5 +55,29 @@ describe("wall clock times", () => {
         assert.equal(formatDuration(5), "5h");
         assert.equal(formatDuration(72), "3d");
         assert.equal(formatDuration(null), null);
+    });
+});
+
+describe("approximate and labelled moments", () => {
+    const formats = new TimeFormats();
+    const at = parseWallClock(MOMENT);
+    const day = formats.formatDate(at);
+    const clock = formats.formatTime(at);
+
+    it("marks the time when it is approximate", () => {
+        assert.equal(formats.formatMoment({ at, timeKnown: true, timeApproximate: true, timeLabel: null }), `${day} ${APPROXIMATE_MARK}${clock}`);
+        assert.equal(formats.formatMoment({ at, timeKnown: true, timeApproximate: false, timeLabel: null }), `${day} ${clock}`);
+    });
+
+    it("marks the day when no time is known", () => {
+        assert.equal(formats.formatMoment({ at, timeKnown: false, timeApproximate: true, timeLabel: null }), `${APPROXIMATE_MARK}${day}`);
+        assert.equal(formats.formatMomentTime({ at, timeKnown: false, timeApproximate: true, timeLabel: null }), "");
+    });
+
+    it("shows the label instead of the date", () => {
+        const moment = { at, timeKnown: true, timeApproximate: true, timeLabel: TIME_LABEL };
+        assert.equal(formats.formatMoment(moment), TIME_LABEL);
+        assert.equal(formats.formatMomentDate(moment), TIME_LABEL);
+        assert.equal(formats.formatMomentTime(moment), "");
     });
 });

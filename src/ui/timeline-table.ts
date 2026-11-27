@@ -174,11 +174,11 @@ export function cellText(source: TableSource, step: TimelineStep, column: TableC
         case TableColumn.When:
             return time.formatMoment(step);
         case TableColumn.Date:
-            return time.formatDate(step.at);
+            return time.formatMomentDate(step);
         case TableColumn.Time:
-            return step.timeKnown ? time.formatTime(step.at) : "";
+            return time.formatMomentTime(step);
         case TableColumn.Until:
-            return time.formatMoment({ at: step.until, timeKnown: step.timeKnown });
+            return step.timeLabel === null ? time.formatMoment({ ...step, at: step.until }) : "";
         case TableColumn.Duration:
             return time.formatDuration(hoursBetween(step.at, step.until)) ?? "";
         case TableColumn.Elapsed: {

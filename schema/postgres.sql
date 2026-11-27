@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS tlg_steps (
     timestamp TEXT NOT NULL,
     end_timestamp TEXT NULL,
     time_known SMALLINT NOT NULL,
+    time_approximate SMALLINT NOT NULL DEFAULT 0,
+    time_label TEXT NULL,
     order_index INTEGER NOT NULL,
     title TEXT NOT NULL,
     description TEXT NULL,
@@ -79,6 +81,9 @@ CREATE TABLE IF NOT EXISTS tlg_steps (
 CREATE INDEX IF NOT EXISTS tlg_steps_incident ON tlg_steps(incident_id);
 CREATE INDEX IF NOT EXISTS tlg_steps_timestamp ON tlg_steps(timestamp);
 CREATE INDEX IF NOT EXISTS tlg_steps_external ON tlg_steps(external_id);
+-- Brings tables created before 0.8.0 up to date
+ALTER TABLE tlg_steps ADD COLUMN IF NOT EXISTS time_approximate SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE tlg_steps ADD COLUMN IF NOT EXISTS time_label TEXT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS tlg_steps_milestone ON tlg_steps(incident_id, milestone_key) WHERE milestone_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS tlg_step_involvements (

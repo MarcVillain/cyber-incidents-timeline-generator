@@ -6,6 +6,7 @@ import type { TimelineStore } from "../../src/core/store.js";
 import { readIncidentCreate, readLinkCreate, readNodeCreate, readStepCreate } from "../../src/core/validation.js";
 
 const TIMESTAMP = "2026-01-12T08:00:00";
+const TIME_LABEL = "Following initial access";
 
 export interface StoreContractOptions {
     /** False for stores whose incidents live in an outside system that cannot join a local transaction. */
@@ -45,6 +46,18 @@ export function runStoreContract(name: string, createStore: () => Promise<Timeli
 
             await store.updateStep({ ...step, metadata: null });
             assert.equal((await store.findStep(step.id))?.metadata, null);
+        });
+
+        it("round trips an approximate time and a time label", async () => {
+            const store = await createStore();
+            const incident = await store.insertIncident(readIncidentCreate({ title: "Incident" }));
+            const step = await store.insertStep({ ...readStepCreate({ title: "Step", timestamp: TIMESTAMP, timeApproximate: true, timeLabel: TIME_LABEL }), incidentId: incident.id });
+            assert.deepEqual(await store.findStep(step.id), step);
+
+            await store.updateStep({ ...step, timeApproximate: false, timeLabel: null });
+            const updated = await store.findStep(step.id);
+            assert.equal(updated?.timeApproximate, false);
+            assert.equal(updated?.timeLabel, null);
         });
 
         it("keeps the ends of a link in their order", async () => {

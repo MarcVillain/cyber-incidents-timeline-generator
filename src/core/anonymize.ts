@@ -135,6 +135,7 @@ const KIND_CATEGORIES: Readonly<Record<NodeKind, SensitiveCategory>> = {
     [NodeKind.Application]: SensitiveCategory.Asset,
     [NodeKind.Network]: SensitiveCategory.Asset,
     [NodeKind.CloudService]: SensitiveCategory.Asset,
+    [NodeKind.Service]: SensitiveCategory.Asset,
     [NodeKind.Credential]: SensitiveCategory.Account,
     [NodeKind.Database]: SensitiveCategory.Asset,
     [NodeKind.Device]: SensitiveCategory.Asset,

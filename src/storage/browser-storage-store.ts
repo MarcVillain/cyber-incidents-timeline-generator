@@ -38,6 +38,14 @@ function upgradeStep(step: unknown): unknown {
     return { ...rest, audiences: typeof audience === "string" && audience !== Audience.Both ? [audience] : [] };
 }
 
+// Snapshots of this version held no approximate flag nor time label on the steps
+const EXACT_TIME_VERSION = 3;
+
+function upgradeStepTime(step: unknown): unknown {
+    if (!isRecord(step)) return step;
+    return { ...step, timeApproximate: false, timeLabel: null };
+}
+
 function upgradeLink(link: unknown): unknown {
     if (!isRecord(link)) return link;
     const { sourceNodeId, targetNodeId, ...rest } = link;
@@ -58,7 +66,10 @@ function upgrade(value: unknown): unknown {
         return upgrade({ ...value, version: SINGLE_END_VERSION, steps: value["steps"].map(upgradeStep) });
     }
     if (value["version"] === SINGLE_END_VERSION && Array.isArray(value["links"])) {
-        return { ...value, version: SNAPSHOT_VERSION, links: value["links"].map(upgradeLink) };
+        return upgrade({ ...value, version: EXACT_TIME_VERSION, links: value["links"].map(upgradeLink) });
+    }
+    if (value["version"] === EXACT_TIME_VERSION && Array.isArray(value["steps"])) {
+        return { ...value, version: SNAPSHOT_VERSION, steps: value["steps"].map(upgradeStepTime) };
     }
     return value;
 }

@@ -135,6 +135,9 @@ export interface InspectorStrings {
     whatHappened: string;
     when: string;
     until: string;
+    approximate: string;
+    timeLabel: string;
+    timeLabelHint: string;
     outcome: string;
     performedBy: string;
     performedOn: string;
@@ -699,6 +702,9 @@ export const DEFAULT_STRINGS: Strings = {
         whatHappened: "What happened",
         when: "When",
         until: "Until",
+        approximate: "Approximate time",
+        timeLabel: "Shown instead of the date",
+        timeLabelHint: "Following initial access",
         outcome: "Outcome",
         performedBy: "Performed by",
         performedOn: "Performed on",

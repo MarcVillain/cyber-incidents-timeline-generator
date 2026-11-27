@@ -69,6 +69,17 @@ the base path, `/api` by default.
 | `LinkCreateInput` | `sourceNodeIds`, `targetNodeIds` (each a list of 1 to 200 distinct record ids, no record on both sides) |
 | `LayoutInput` | `nodeId`, `representation`, `x`, `y` (both `null` to release a pinned record) |
 
+### When a step happened
+
+A step always holds a `timestamp`, a zone-less moment such as `2026-11-16T22:54:00`, which orders it.
+Three optional fields say how much of it the sources actually gave:
+
+- `timeKnown`, `true` by default, is `false` when only the day was recorded. The clock time is not shown.
+- `timeApproximate`, `false` by default, marks the time, or the day when no time is known, as approximate.
+  It is shown with a `~`, as in `16 Nov 2026 ~22:54`.
+- `timeLabel`, `null` by default, is a text of up to 200 characters shown instead of the date, such as
+  `Following initial access`, for a step the sources only place relative to others.
+
 ### Moving a whole timeline
 
 `GET /incidents/{incidentId}/document` returns every record, step, relationship and pinned position as one

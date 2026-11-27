@@ -47,6 +47,17 @@ describe("validation", () => {
         assert.deepEqual(readNodeUpdate({ colorOverride: "#aa0000" }), { colorOverride: "#aa0000" });
     });
 
+    it("reads an approximate time and a time label, and defaults to neither", () => {
+        const plain = readStepCreate({ title: "Step", timestamp: TIMESTAMP });
+        assert.equal(plain.timeApproximate, false);
+        assert.equal(plain.timeLabel, null);
+
+        const loose = readStepCreate({ title: "Step", timestamp: TIMESTAMP, timeApproximate: true, timeLabel: "  Later  " });
+        assert.equal(loose.timeApproximate, true);
+        assert.equal(loose.timeLabel, "Later");
+        assert.deepEqual(issuesOf(() => readStepCreate({ title: "Step", timestamp: TIMESTAMP, timeLabel: "x".repeat(FieldLimits.TimeLabel + 1) })), ["timeLabel"]);
+    });
+
     it("refuses a step ending before it started", () => {
         assert.deepEqual(issuesOf(() => readStepCreate({ title: "Step", timestamp: TIMESTAMP, endTimestamp: "2026-01-12T07:00" })), ["endTimestamp"]);
     });

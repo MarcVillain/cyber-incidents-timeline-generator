@@ -64,7 +64,7 @@ describe("summary", () => {
         const step = await service.createStep(incident.id, { title: "Got in", timestamp: FIRST, milestoneKey: "first_access" });
 
         const summary = await service.getSummary(incident.id);
-        assert.deepEqual(summary.milestones, [{ key: "first_access", stepId: step.id, timestamp: `${FIRST}:00`, timeKnown: true }]);
+        assert.deepEqual(summary.milestones, [{ key: "first_access", stepId: step.id, timestamp: `${FIRST}:00`, timeKnown: true, timeApproximate: false }]);
         assert.deepEqual(summary.missingMilestones, ["containment"]);
     });
 

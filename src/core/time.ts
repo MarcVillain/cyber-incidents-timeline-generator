@@ -85,6 +85,9 @@ export function millisecondsFromHours(hours: number): number {
     return hours * MILLISECONDS_PER_HOUR;
 }
 
+/** Written before the part of a moment that was reported as approximate, as in ~22:54. */
+export const APPROXIMATE_MARK = "~";
+
 /** The dates on a slide read the same everywhere until a host asks for its own locale. */
 export const DEFAULT_LOCALE = "en-GB";
 
@@ -134,9 +137,28 @@ export class TimeFormats {
         return `${Math.round(hours / HOURS_PER_DAY)}${this.units.days}`;
     }
 
+    /**
+     * How a step announces when it happened: its label when the sources only place it relative to others,
+     * the day alone when nobody recorded a time, and a mark on the part reported as approximate.
+     */
     formatMoment(moment: Moment): string {
+        if (moment.timeLabel !== null) return moment.timeLabel;
+        return [this.formatMomentDate(moment), this.formatMomentTime(moment)].filter(Boolean).join(" ");
+    }
+
+    /** The day of a moment, marked approximate when the day is the finest part known. */
+    formatMomentDate(moment: Moment): string {
+        if (moment.timeLabel !== null) return moment.timeLabel;
         if (!moment.at) return "";
-        return moment.timeKnown ? this.formatDateTime(moment.at) : this.formatDate(moment.at);
+        const day = this.date.format(moment.at);
+        return moment.timeApproximate && !moment.timeKnown ? `${APPROXIMATE_MARK}${day}` : day;
+    }
+
+    /** The clock time of a moment, empty when none was recorded. */
+    formatMomentTime(moment: Moment): string {
+        if (moment.timeLabel !== null || !moment.timeKnown || !moment.at) return "";
+        const clock = this.time.format(moment.at);
+        return moment.timeApproximate ? `${APPROXIMATE_MARK}${clock}` : clock;
     }
 }
 
@@ -174,11 +196,10 @@ export function formatDuration(hours: number | null): string | null {
 export interface Moment {
     at: Date | null;
     timeKnown: boolean;
+    timeApproximate: boolean;
+    timeLabel: string | null;
 }
 
-/**
- * How a step announces when it happened: the day alone when nobody recorded a time.
- */
 export function formatMoment(moment: Moment): string {
     return DEFAULT_FORMATS.formatMoment(moment);
 }
